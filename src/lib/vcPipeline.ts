@@ -126,3 +126,49 @@ export function alignPitchToEmbeddings(
   }
   return aligned;
 }
+
+// ── Full end-to-end Voice Conversion ──────────────────────────────────────
+
+export interface VcFullResult {
+  /** Converted audio as WAV Blob */
+  wav: Blob;
+  /** Features extracted from source audio */
+  features: VcFeatures;
+  /** Synthesis result (raw audio, timing) */
+  synthesis: VcSynthesisResult;
+  /** Total wall-clock time in ms */
+  totalMs: number;
+}
+
+/**
+ * Full end-to-end Voice Conversion pipeline:
+ * raw audio → resample → ContentVec → CREPE → RVC synthesis → WAV
+ *
+ * @param audio - Source audio (any browser-decodable format)
+ * @param options - Pipeline + synthesis options
+ */
+export async function convertVoiceFull(
+  audio: ArrayBuffer | Blob,
+  options?: VcPipelineOptions,
+): Promise<VcFullResult> {
+  const t0 = performance.now();
+
+  // Extract features (resample + ContentVec + CREPE)
+  const features = await extractVcFeatures(audio, options);
+
+  // Synthesize with RVC
+  options?.onProgress?.("synthesis", 0);
+  const synthesis = await synthesizeVoice(features, options?.synthesis);
+  options?.onProgress?.("synthesis", 1);
+
+  // Encode to WAV
+  const wav = vcAudioToWav(synthesis.audio, synthesis.sampleRate);
+  const totalMs = Math.round(performance.now() - t0);
+
+  console.info(
+    `[vcPipeline] Full VC complete: ${features.durationSec.toFixed(2)}s input → ` +
+    `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
+  );
+
+  return { wav, features, synthesis, totalMs };
+}
