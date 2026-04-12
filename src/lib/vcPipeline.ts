@@ -1,16 +1,17 @@
 /**
- * vcPipeline.ts — Unified Voice Conversion feature extraction pipeline.
+ * vcPipeline.ts — Unified Voice Conversion pipeline.
  *
- * Orchestrates: resample → ContentVec embeddings → CREPE pitch (F0)
- * Produces a VcFeatures object ready for the voice synthesis stage.
+ * Orchestrates: resample → ContentVec embeddings → CREPE pitch (F0) → RVC synthesis
+ * Produces a VcFeatures object or fully converted audio.
  */
 
 import { resampleTo16kMono } from "./vcResample";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
+import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
 
 export interface VcFeatures {
-  /** Speaker-independent phonetic embeddings [T, 256] */
+  /** Speaker-independent phonetic embeddings [T, 768] */
   embeddings: Float32Array;
   numFrames: number;
   embeddingDim: number;
@@ -32,7 +33,9 @@ export interface VcPipelineOptions {
   /** CREPE hop size in ms (default 10) */
   crepeHopMs?: number;
   /** Callback for progress updates */
-  onProgress?: (stage: "resample" | "contentvec" | "crepe", progress: number) => void;
+  onProgress?: (stage: "resample" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
+  /** Synthesis options (pitch shift, speaker ID, model) */
+  synthesis?: VcSynthesisOptions;
 }
 
 /**
@@ -122,4 +125,50 @@ export function alignPitchToEmbeddings(
     }
   }
   return aligned;
+}
+
+// ── Full end-to-end Voice Conversion ──────────────────────────────────────
+
+export interface VcFullResult {
+  /** Converted audio as WAV Blob */
+  wav: Blob;
+  /** Features extracted from source audio */
+  features: VcFeatures;
+  /** Synthesis result (raw audio, timing) */
+  synthesis: VcSynthesisResult;
+  /** Total wall-clock time in ms */
+  totalMs: number;
+}
+
+/**
+ * Full end-to-end Voice Conversion pipeline:
+ * raw audio → resample → ContentVec → CREPE → RVC synthesis → WAV
+ *
+ * @param audio - Source audio (any browser-decodable format)
+ * @param options - Pipeline + synthesis options
+ */
+export async function convertVoiceFull(
+  audio: ArrayBuffer | Blob,
+  options?: VcPipelineOptions,
+): Promise<VcFullResult> {
+  const t0 = performance.now();
+
+  // Extract features (resample + ContentVec + CREPE)
+  const features = await extractVcFeatures(audio, options);
+
+  // Synthesize with RVC
+  options?.onProgress?.("synthesis", 0);
+  const synthesis = await synthesizeVoice(features, options?.synthesis);
+  options?.onProgress?.("synthesis", 1);
+
+  // Encode to WAV
+  const wav = vcAudioToWav(synthesis.audio, synthesis.sampleRate);
+  const totalMs = Math.round(performance.now() - t0);
+
+  console.info(
+    `[vcPipeline] Full VC complete: ${features.durationSec.toFixed(2)}s input → ` +
+    `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
+  );
+
+  return { wav, features, synthesis, totalMs };
 }

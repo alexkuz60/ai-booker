@@ -39,8 +39,13 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
     sizeBytes: 8_000_000,
     description: "Pitch (F0) extraction model",
   },
-  // RVC and OpenVoice models will be added in Étape 3-4
-  // when we have verified ONNX exports available on CDN.
+  {
+    id: "rvc-v2",
+    label: "RVC v2 Synthesizer",
+    url: "https://huggingface.co/Cycl0/voice-changer-models/resolve/main/rvc_full.onnx",
+    sizeBytes: 111_000_000,
+    description: "Voice conversion synthesizer (SynthesizerTrn, NSF-HiFiGAN)",
+  },
 ];
 
 const VC_CACHE_DIR = "vc-models";

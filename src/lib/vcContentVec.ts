@@ -3,7 +3,7 @@
  * using ContentVec (HuBERT-based) ONNX model.
  *
  * Input:  16 kHz mono Float32Array
- * Output: Float32Array of shape [T, 256] — one embedding per ~20ms frame
+ * Output: Float32Array of shape [T, 768] — one embedding per ~20ms frame
  */
 
 import * as ort from "onnxruntime-web";
@@ -12,15 +12,15 @@ import { createVcSession } from "./vcInferenceSession";
 /** ContentVec expects 16 kHz input */
 const EXPECTED_SR = 16_000;
 
-/** ContentVec output embedding dimension */
-export const CONTENTVEC_DIM = 256;
+/** ContentVec output embedding dimension (HuBERT base layer 12) */
+export const CONTENTVEC_DIM = 768;
 
 export interface ContentVecResult {
-  /** Embeddings tensor — shape [numFrames, 256] */
+  /** Embeddings tensor — shape [numFrames, 768] */
   embeddings: Float32Array;
   /** Number of time frames */
   numFrames: number;
-  /** Embedding dimension (256) */
+  /** Embedding dimension (768) */
   dim: number;
   /** Inference time in ms */
   inferenceMs: number;
@@ -40,14 +40,12 @@ export async function extractContentVec(
 
   const session = await createVcSession("contentvec");
 
-  // ContentVec expects input shape [1, 1, T] or [1, T] depending on export
-  // Most HuBERT ONNX exports use [batch, sequence] = [1, T]
+  // HuBERT ONNX exports typically use [batch, sequence] = [1, T]
   const inputTensor = new ort.Tensor("float32", samples, [1, samples.length]);
 
   const startMs = performance.now();
   const feeds: Record<string, ort.Tensor> = {};
   
-  // Determine input name from session
   const inputNames = session.inputNames;
   const inputName = inputNames[0] ?? "source";
   feeds[inputName] = inputTensor;
@@ -55,7 +53,6 @@ export async function extractContentVec(
   const results = await session.run(feeds);
   const inferenceMs = Math.round(performance.now() - startMs);
 
-  // Get output tensor
   const outputNames = session.outputNames;
   const outputName = outputNames[0] ?? "embed";
   const output = results[outputName];
@@ -69,7 +66,7 @@ export async function extractContentVec(
   const data = output.data as Float32Array;
   const shape = output.dims as readonly number[];
   
-  // Shape is typically [1, T, 256] or [T, 256]
+  // Shape is typically [1, T, 768] or [T, 768]
   const numFrames = shape.length === 3 ? shape[1] : shape[0];
   const dim = shape[shape.length - 1];
 
