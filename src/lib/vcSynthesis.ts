@@ -95,9 +95,23 @@ export async function synthesizeVoice(
   const modelId = options?.modelId ?? "rvc-v2";
   const speakerId = options?.speakerId ?? 0;
   const pitchShift = options?.pitchShift ?? 0;
-  const outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR;
 
   const session = await createVcSession(modelId);
+
+  // Try to auto-detect output SR from model metadata
+  let srAutoDetected = false;
+  let outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR_DEFAULT;
+
+  if (!options?.outputSampleRate) {
+    const detectedSR = detectOutputSRFromModel(session);
+    if (detectedSR) {
+      outputSR = detectedSR;
+      srAutoDetected = true;
+      console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
+    }
+  }
+
+  const T = features.numFrames;
   const T = features.numFrames;
 
   // Align F0 pitch to ContentVec frame count
@@ -194,7 +208,7 @@ export async function synthesizeVoice(
     `${inferenceMs}ms inference`
   );
 
-  return { audio, sampleRate: outputSR, durationSec, inferenceMs };
+  return { audio, sampleRate: outputSR, durationSec, inferenceMs, srAutoDetected };
 }
 
 /**
