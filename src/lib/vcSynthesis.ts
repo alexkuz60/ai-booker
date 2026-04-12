@@ -134,6 +134,8 @@ async function resampleToProjectSR(samples: Float32Array, sourceSR: number): Pro
 }
 
 
+/**
+ * Synthesize voice-converted audio from extracted VC features.
  *
  * @param features - Output from extractVcFeatures()
  * @param options  - Synthesis configuration
