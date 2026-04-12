@@ -21,6 +21,7 @@ const AUDIO_META_FILES = [
   "atmospheres.json",
   "clip_plugins.json",
   "mixer_state.json",
+  "storyboard.json",
 ];
 
 function isAudioPath(path: string): boolean {
