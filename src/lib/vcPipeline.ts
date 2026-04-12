@@ -1,13 +1,14 @@
 /**
- * vcPipeline.ts — Unified Voice Conversion feature extraction pipeline.
+ * vcPipeline.ts — Unified Voice Conversion pipeline.
  *
- * Orchestrates: resample → ContentVec embeddings → CREPE pitch (F0)
- * Produces a VcFeatures object ready for the voice synthesis stage.
+ * Orchestrates: resample → ContentVec embeddings → CREPE pitch (F0) → RVC synthesis
+ * Produces a VcFeatures object or fully converted audio.
  */
 
 import { resampleTo16kMono } from "./vcResample";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
+import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
 
 export interface VcFeatures {
   /** Speaker-independent phonetic embeddings [T, 768] */
