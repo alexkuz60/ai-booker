@@ -219,8 +219,13 @@ export function useProjectStorage(): UseProjectStorageReturn {
 
       let store: ProjectStorage;
       if (backend === "fs-access") {
-        store = await LocalFSStorage.createProject(projectName);
-        await store.importZip(file);
+        try {
+          store = await LocalFSStorage.createProject(projectName);
+          await store.importZip(file);
+        } catch (fsErr: any) {
+          console.warn("[ProjectStorage] fs-access import failed, falling back to OPFS:", fsErr.message);
+          store = await OPFSStorage.restoreProjectFromBackup(projectName, file);
+        }
       } else {
         store = await OPFSStorage.restoreProjectFromBackup(projectName, file);
       }
