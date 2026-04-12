@@ -43,8 +43,8 @@ interface UseProjectStorageReturn {
   /** Bump progressVersion so consumers re-read pipeline progress */
   bumpProgressVersion: () => void;
 
-  /** Create new project (opens folder picker on Chromium) */
-  createProject: (title: string, bookId: string, userId: string, language: "ru" | "en") => Promise<ProjectStorage>;
+  /** Create new project (opens folder picker on Chromium). overwrite=true reuses folder name (Wipe-and-Deploy). */
+  createProject: (title: string, bookId: string, userId: string, language: "ru" | "en", options?: { overwrite?: boolean }) => Promise<ProjectStorage>;
   /** Open existing project folder */
   openProject: () => Promise<ProjectStorage>;
   /** Open specific OPFS project by directory name and make it active */
@@ -78,10 +78,12 @@ export function useProjectStorage(): UseProjectStorageReturn {
     bookId: string,
     userId: string,
     language: "ru" | "en",
+    options?: { overwrite?: boolean },
   ): Promise<ProjectStorage> => {
     setLoading(true);
     try {
       const folderName = title.replace(/[<>:"/\\|?*]/g, "_").trim() || "BookProject";
+      const overwrite = options?.overwrite ?? false;
 
       let store: ProjectStorage;
       if (backend === "fs-access") {
@@ -90,10 +92,10 @@ export function useProjectStorage(): UseProjectStorageReturn {
         } catch (fsErr: any) {
           // showDirectoryPicker fails in cross-origin iframes — fall back to OPFS
           console.warn("[ProjectStorage] fs-access failed, falling back to OPFS:", fsErr.message);
-          store = await OPFSStorage.createNewProject(folderName);
+          store = await OPFSStorage.createNewProject(folderName, overwrite);
         }
       } else {
-        store = await OPFSStorage.createNewProject(folderName);
+        store = await OPFSStorage.createNewProject(folderName, overwrite);
       }
 
       const projectMeta = getProjectMetaDefault(title, bookId, userId, language);
