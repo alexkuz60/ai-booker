@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
   CheckCircle2, Wand2, ArrowRight,
