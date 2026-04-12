@@ -111,7 +111,29 @@ function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | n
 }
 
 /**
- * Synthesize voice-converted audio from extracted VC features.
+ * Resample raw RVC output to project-standard 44.1 kHz using OfflineAudioContext.
+ */
+async function resampleToProjectSR(samples: Float32Array, sourceSR: number): Promise<Float32Array> {
+  if (sourceSR === PROJECT_OUTPUT_SR) return samples;
+
+  const duration = samples.length / sourceSR;
+  const outLength = Math.ceil(duration * PROJECT_OUTPUT_SR);
+
+  // Create a buffer at the source SR, then resample via OfflineAudioContext
+  const offCtx = new OfflineAudioContext(1, outLength, PROJECT_OUTPUT_SR);
+  const buf = offCtx.createBuffer(1, samples.length, sourceSR);
+  buf.getChannelData(0).set(samples);
+
+  const src = offCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(offCtx.destination);
+  src.start(0);
+
+  const rendered = await offCtx.startRendering();
+  return rendered.getChannelData(0);
+}
+
+
  *
  * @param features - Output from extractVcFeatures()
  * @param options  - Synthesis configuration
