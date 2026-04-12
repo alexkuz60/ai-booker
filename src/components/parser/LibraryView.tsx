@@ -27,7 +27,7 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { checkTranslationReadiness } from "@/lib/translationProject";
 import { paths } from "@/lib/projectPaths";
 import { toast } from "sonner";
-
+import { supabase } from "@/integrations/supabase/client";
 interface LibraryViewProps {
   isRu: boolean;
   books: BookRecord[];
