@@ -455,7 +455,34 @@ export function VoiceConversionTab({
 
       <Separator />
 
-      {/* Test Pipeline */}
+      {/* Output Sample Rate */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Sample Rate выхода" : "Output Sample Rate"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">{(vcOutputSR / 1000).toFixed(0)} kHz</span>
+        </div>
+        <Select value={String(vcOutputSR)} onValueChange={v => onUpdateVcConfig({ vc_output_sr: Number(v) })}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RVC_OUTPUT_SR_OPTIONS.map(sr => (
+              <SelectItem key={sr} value={String(sr)}>
+                {(sr / 1000).toFixed(0)} kHz {sr === RVC_OUTPUT_SR_DEFAULT ? (isRu ? "(по умолчанию)" : "(default)") : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-sm text-center">
+          {isRu
+            ? "Если голос слишком высокий/быстрый — попробуйте 32 kHz"
+            : "If voice sounds too high/fast — try 32 kHz"}
+        </p>
+      </div>
+
+      <Separator />
       <div className="space-y-3">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {isRu ? "Тест пайплайна" : "Pipeline Test"}
