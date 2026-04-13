@@ -174,10 +174,28 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
             <AlertTitle className="text-sm">
               {isRu ? "Совместимость браузера" : "Browser Compatibility"}
             </AlertTitle>
-            <AlertDescription className="text-xs text-muted-foreground">
-              {isRu
-                ? "WebGPU поддерживается в Firefox начиная с версии 141 и в Safari начиная с версии 26. Убедитесь, что ваш браузер обновлён. Для максимальной производительности рекомендуем Google Chrome или Microsoft Edge."
-                : "WebGPU is supported in Firefox starting from version 141 and in Safari starting from version 26. Make sure your browser is up to date. For best performance, we recommend Google Chrome or Microsoft Edge."}
+            <AlertDescription className="text-xs text-muted-foreground space-y-2">
+              <p>
+                {isRu
+                  ? "WebGPU поддерживается в Firefox (141+) и Safari (26+). Для максимальной производительности рекомендуем Google Chrome или Microsoft Edge."
+                  : "WebGPU is supported in Firefox (141+) and Safari (26+). For best performance, we recommend Google Chrome or Microsoft Edge."}
+              </p>
+              <p className="font-medium">
+                {isRu ? "Firefox — about:config:" : "Firefox — about:config:"}
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
+                <li>dom.webgpu.enabled → true</li>
+                <li>gfx.webgpu.ignore-blocklist → true</li>
+                <li>dom.webgpu.testing.assert-hardware-adapter → true</li>
+                <li>javascript.options.wasm_simd → true</li>
+                <li>javascript.options.wasm_memory64 → true</li>
+                <li>gfx.webrender.all → true</li>
+              </ul>
+              <p className="text-[11px] opacity-70">
+                {isRu
+                  ? "После изменений перезапустите Firefox."
+                  : "Restart Firefox after changes."}
+              </p>
             </AlertDescription>
           </Alert>
         )}
