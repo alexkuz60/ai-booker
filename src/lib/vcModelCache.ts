@@ -137,7 +137,7 @@ async function resolveModelFile(modelId: string): Promise<ResolvedModelFile | nu
   const dir = await getVcCacheDir();
   if (!dir) return null;
 
-  const entry = VC_MODEL_REGISTRY.find(model => model.id === modelId);
+  const entry = VC_ALL_MODELS.find(model => model.id === modelId);
   if (!entry) return null;
 
   for (const fileName of getModelFileNames(entry)) {
