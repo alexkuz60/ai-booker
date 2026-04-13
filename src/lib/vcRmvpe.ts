@@ -210,7 +210,7 @@ export async function extractPitchRmvpe(
   }
 
   const melMs = Math.round(performance.now() - startMs);
-  console.info(`[RMVPE] Mel spectrogram: ${mel.numFrames} frames in ${melMs}ms`);
+  console.info(`[RMVPE] Mel spectrogram: ${mel.numFrames} frames (padded to ${mel.paddedFrames}) in ${melMs}ms`);
 
   // Step 2: Run RMVPE inference
   const session = await createVcSession("rmvpe");
