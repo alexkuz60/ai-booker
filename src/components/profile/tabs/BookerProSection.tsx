@@ -168,7 +168,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
         />
 
         {/* Browser compatibility note */}
-        {!pro.isChromium && (
+        {!pro.isChromium && pro.gpuStatus !== "supported" && (
           <Alert className="border-blue-500/30 bg-blue-500/5">
             <AlertTriangle className="h-4 w-4 text-blue-500" />
             <AlertTitle className="text-sm">
