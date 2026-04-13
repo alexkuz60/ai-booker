@@ -66,6 +66,8 @@ export function VoiceConversionTab({
   const pitchShift = (voiceConfig.vc_pitch_shift as number) ?? 0;
   const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
+  const indexRate = (voiceConfig.vc_index_rate as number) ?? 0.75;
+  const protect = (voiceConfig.vc_protect as number) ?? 0.33;
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
@@ -253,7 +255,7 @@ export function VoiceConversionTab({
       setStageProgress(100);
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift, outputSampleRate: vcOutputSR },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
@@ -278,7 +280,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -458,6 +460,56 @@ export function VoiceConversionTab({
         </div>
         <p className="text-muted-foreground/60 text-sm text-center">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Feature Ratio (index_rate) */}
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Feature Ratio" : "Feature Ratio"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {indexRate.toFixed(2)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Slider min={0} max={1} step={0.05} value={[indexRate]} onValueChange={([v]) => onUpdateVcConfig({ vc_index_rate: v })} className="flex-1" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onUpdateVcConfig({ vc_index_rate: 0.75 })} disabled={indexRate === 0.75}>
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "0 = чистая артикуляция источника | 1 = максимальное сходство с целевым голосом"
+            : "0 = pure source articulation | 1 = max similarity to target voice"}
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Consonant Protection (protect) */}
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Защита согласных" : "Consonant Protection"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {protect.toFixed(2)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Slider min={0} max={0.5} step={0.01} value={[protect]} onValueChange={([v]) => onUpdateVcConfig({ vc_protect: v })} className="flex-1" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onUpdateVcConfig({ vc_protect: 0.33 })} disabled={protect === 0.33}>
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "0 = без защиты | 0.5 = максимальное сохранение шипящих/взрывных"
+            : "0 = no protection | 0.5 = max preservation of sibilants/plosives"}
         </p>
       </div>
 

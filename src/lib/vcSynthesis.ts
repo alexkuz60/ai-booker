@@ -73,6 +73,21 @@ export interface VcSynthesisOptions {
   modelId?: string;
   /** RVC model native sample rate (default 40kHz for most RVC v2 models) */
   outputSampleRate?: RvcOutputSR;
+  /**
+   * Feature Ratio (index_rate): 0.0–1.0 (default 0.75).
+   * Controls blend between raw ContentVec embeddings and FAISS-retrieved
+   * training data embeddings. Higher = more similar to training voice,
+   * lower = more faithful to source articulation.
+   * When no FAISS index is loaded, this is ignored.
+   */
+  indexRate?: number;
+  /**
+   * Consonant Protection: 0.0–0.5 (default 0.33).
+   * Protects unvoiced consonants (sibilants, plosives) from VC artifacts.
+   * Higher values preserve more of the original consonant texture.
+   * Applied by zeroing F0 for frames below a voicing confidence threshold.
+   */
+  protect?: number;
 }
 
 /**
@@ -179,6 +194,8 @@ export async function synthesizeVoice(
   const modelId = options?.modelId ?? "rvc-v2";
   const speakerId = options?.speakerId ?? 0;
   const pitchShift = options?.pitchShift ?? 0;
+  const protect = Math.max(0, Math.min(0.5, options?.protect ?? 0.33));
+  const indexRate = Math.max(0, Math.min(1, options?.indexRate ?? 0.75));
 
   const session = await createVcSession(modelId);
 
@@ -220,6 +237,28 @@ export async function synthesizeVoice(
 
   // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
+
+  // ── Consonant Protection ─────────────────────────────────────────────
+  // Reference RVC implementation: if protect < 0.5, zero out F0 for frames
+  // with low voicing confidence to preserve unvoiced consonant texture.
+  // CREPE confidence <(1 - protect) → treat as unvoiced.
+  if (protect < 0.5) {
+    const confThreshold = 1 - protect; // e.g. protect=0.33 → threshold=0.67
+    // Interpolate CREPE confidence to match T frames (same as F0 alignment)
+    const srcConfLen = features.pitchFrames.length;
+    const ratio = srcConfLen / T;
+    for (let i = 0; i < T; i++) {
+      const srcIdx = i * ratio;
+      const lo = Math.floor(srcIdx);
+      const hi = Math.min(lo + 1, srcConfLen - 1);
+      const frac = srcIdx - lo;
+      const conf = features.pitchFrames[lo].confidence * (1 - frac)
+                 + features.pitchFrames[hi].confidence * frac;
+      if (conf < confThreshold) {
+        alignedF0[i] = 0; // mark as unvoiced → protects consonants
+      }
+    }
+  }
 
   // Build pitch tensors
   const pitchCoarse = new Float32Array(T);
@@ -286,6 +325,7 @@ export async function synthesizeVoice(
   console.info(
     `[vcSynthesis] Running RVC "${modelId}": ${T} frames, ` +
     `pitchShift=${pitchShift}st, speaker=${speakerId}, ` +
+    `indexRate=${indexRate}, protect=${protect}, ` +
     `inputs=[${inputNames.join(", ")}]`
   );
 
