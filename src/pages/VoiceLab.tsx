@@ -94,7 +94,7 @@ export default function VoiceLab() {
     setDownloading(true);
     try {
       await downloadAllModels((p) => setDlProgress(p));
-      setModelStatus(await getModelStatus());
+      await refreshModelStatus();
       toast.success(isRu ? "Все модели загружены" : "All models downloaded");
     } catch (err: any) {
       toast.error(err.message || (isRu ? "Ошибка загрузки моделей" : "Model download error"));
@@ -102,7 +102,30 @@ export default function VoiceLab() {
       setDownloading(false);
       setDlProgress(null);
     }
-  }, [isRu]);
+  }, [isRu, refreshModelStatus]);
+
+  const handleDownloadPitch = useCallback(async (entry: typeof VC_PITCH_MODELS[number]) => {
+    setPitchBusy(entry.id);
+    setPitchDlPct(0);
+    try {
+      const ok = await downloadModel(entry, (p) => setPitchDlPct(Math.round(p.fraction * 100)));
+      if (!ok) throw new Error("Download failed");
+      await refreshModelStatus();
+      toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? "Ошибка загрузки" : "Download error"));
+    } finally {
+      setPitchBusy(null);
+    }
+  }, [isRu, refreshModelStatus]);
+
+  const handleDeletePitch = useCallback(async (modelId: string, label: string) => {
+    const ok = await deleteModel(modelId);
+    if (ok) {
+      await refreshModelStatus();
+      toast.success(isRu ? `${label} удалена` : `${label} deleted`);
+    }
+  }, [isRu, refreshModelStatus]);
 
   // ── Reference upload ──
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
