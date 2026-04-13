@@ -19,9 +19,13 @@ import {
   type VcReferenceEntry,
 } from "@/lib/vcReferenceCache";
 import {
+  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseNpy,
+  type VcIndexEntry,
+} from "@/lib/vcIndexSearch";
+import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
   CheckCircle2, Wand2, ArrowRight, Upload, Music, Trash2,
-  Download, Library,
+  Download, Library, Database,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
