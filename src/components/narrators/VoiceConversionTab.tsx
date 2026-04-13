@@ -385,6 +385,52 @@ export function VoiceConversionTab({
 
       <Separator />
 
+      {/* ─── Compute Backend ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Вычислительный бэкенд" : "Compute Backend"}
+          </label>
+          {activeBackend && (
+            <Badge variant="outline" className={`text-[10px] ${activeBackend === "webgpu" ? "border-primary/50 text-primary" : "border-muted-foreground/50 text-muted-foreground"}`}>
+              {activeBackend === "webgpu" ? "GPU" : "CPU"}
+            </Badge>
+          )}
+        </div>
+        <Select value={backendChoice} onValueChange={handleBackendChange} disabled={isProcessing}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">
+              <span className="flex items-center gap-1.5">
+                <Monitor className="h-3 w-3" />
+                {isRu ? "Авто (GPU → CPU)" : "Auto (GPU → CPU)"}
+              </span>
+            </SelectItem>
+            <SelectItem value="webgpu">
+              <span className="flex items-center gap-1.5">
+                <Monitor className="h-3 w-3" />
+                {isRu ? "GPU (WebGPU)" : "GPU (WebGPU)"}
+              </span>
+            </SelectItem>
+            <SelectItem value="wasm">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="h-3 w-3" />
+                {isRu ? "CPU (WASM) — без ошибок WebGPU" : "CPU (WASM) — no WebGPU errors"}
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "WASM = стабильно, но медленнее в ~3-5× | GPU = быстро, но возможны ошибки валидации"
+            : "WASM = stable but ~3-5× slower | GPU = fast but may have validation errors"}
+        </p>
+      </div>
+
+      <Separator />
+
       {/* Test Pipeline */}
       <div className="space-y-3">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
