@@ -240,7 +240,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
               <Cpu className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">{isRu ? "ONNX модели" : "ONNX Models"}</span>
               <span className="text-xs text-muted-foreground">
-                ({cachedCount}/{VC_MODEL_REGISTRY.length})
+                ({cachedCount}/{VC_ALL_MODELS.length})
               </span>
             </div>
             {pro.modelsReady ? (
