@@ -54,6 +54,8 @@ export default function VoiceLab() {
   const [modelStatus, setModelStatus] = useState<Record<string, boolean>>({});
   const [downloading, setDownloading] = useState(false);
   const [dlProgress, setDlProgress] = useState<ModelDownloadProgress | null>(null);
+  const [pitchBusy, setPitchBusy] = useState<string | null>(null);
+  const [pitchDlPct, setPitchDlPct] = useState(0);
 
   // ── References ──
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
