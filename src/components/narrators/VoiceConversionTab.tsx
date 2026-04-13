@@ -104,11 +104,54 @@ export function VoiceConversionTab({
     );
   }, [isRu]);
 
+  // Pitch model download state
+  const [pitchModelDownloading, setPitchModelDownloading] = useState(false);
+  const [pitchDlProgress, setPitchDlProgress] = useState(0);
+
   // Available references & indexes (read-only lists from OPFS)
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
   const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
 
   const isProcessing = stage !== "idle" && stage !== "done" && stage !== "error";
+
+  /** Handle pitch algorithm change — download model if needed */
+  const handlePitchAlgorithmChange = useCallback(async (val: string) => {
+    const algo = val as PitchAlgorithm;
+    onUpdateVcConfig({ vc_pitch_algorithm: algo });
+
+    // Check if the selected model is already downloaded
+    const modelId = algo; // model IDs match algorithm IDs
+    const cached = await hasModel(modelId);
+    if (cached) return;
+
+    // Need to download the model
+    const entry = VC_ALL_MODELS.find(m => m.id === modelId);
+    if (!entry) return;
+
+    const confirmed = window.confirm(
+      isRu
+        ? `Модель "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) не загружена. Скачать?`
+        : `Model "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) not cached. Download?`
+    );
+    if (!confirmed) {
+      // Revert to crepe-tiny which is always available
+      onUpdateVcConfig({ vc_pitch_algorithm: "crepe-tiny" });
+      return;
+    }
+
+    setPitchModelDownloading(true);
+    setPitchDlProgress(0);
+    try {
+      const ok = await downloadModel(entry, (p) => setPitchDlProgress(Math.round(p.fraction * 100)));
+      if (!ok) throw new Error("Download failed");
+      toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+    } catch (err: any) {
+      toast.error(isRu ? `Ошибка загрузки: ${err.message}` : `Download error: ${err.message}`);
+      onUpdateVcConfig({ vc_pitch_algorithm: "crepe-tiny" });
+    } finally {
+      setPitchModelDownloading(false);
+    }
+  }, [isRu, onUpdateVcConfig]);
 
   // Load available refs & indexes
   useEffect(() => {
