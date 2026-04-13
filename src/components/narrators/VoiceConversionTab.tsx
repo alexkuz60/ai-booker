@@ -19,7 +19,7 @@ import {
   type VcReferenceEntry,
 } from "@/lib/vcReferenceCache";
 import {
-  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseIndexFile,
+  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseIndexFile, buildNpyBlob,
   type VcIndexEntry,
 } from "@/lib/vcIndexSearch";
 import {
