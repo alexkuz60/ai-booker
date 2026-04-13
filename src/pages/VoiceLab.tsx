@@ -75,11 +75,19 @@ export default function VoiceLab() {
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   // Load data on mount
+  const refreshModelStatus = useCallback(async () => {
+    const core = await getModelStatus();
+    const pitchEntries = await Promise.all(
+      VC_PITCH_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
+    );
+    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries) });
+  }, []);
+
   useEffect(() => {
-    getModelStatus().then(setModelStatus);
+    refreshModelStatus();
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
-  }, []);
+  }, [refreshModelStatus]);
 
   // ── Model download ──
   const handleDownloadModels = useCallback(async () => {
