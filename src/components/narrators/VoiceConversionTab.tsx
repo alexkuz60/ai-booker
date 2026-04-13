@@ -465,6 +465,56 @@ export function VoiceConversionTab({
 
       <Separator />
 
+      {/* Feature Ratio (index_rate) */}
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Feature Ratio" : "Feature Ratio"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {indexRate.toFixed(2)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Slider min={0} max={1} step={0.05} value={[indexRate]} onValueChange={([v]) => onUpdateVcConfig({ vc_index_rate: v })} className="flex-1" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onUpdateVcConfig({ vc_index_rate: 0.75 })} disabled={indexRate === 0.75}>
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "0 = чистая артикуляция источника | 1 = максимальное сходство с целевым голосом"
+            : "0 = pure source articulation | 1 = max similarity to target voice"}
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Consonant Protection (protect) */}
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Защита согласных" : "Consonant Protection"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {protect.toFixed(2)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Slider min={0} max={0.5} step={0.01} value={[protect]} onValueChange={([v]) => onUpdateVcConfig({ vc_protect: v })} className="flex-1" />
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onUpdateVcConfig({ vc_protect: 0.33 })} disabled={protect === 0.33}>
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "0 = без защиты | 0.5 = максимальное сохранение шипящих/взрывных"
+            : "0 = no protection | 0.5 = max preservation of sibilants/plosives"}
+        </p>
+      </div>
+
+      <Separator />
+
       {/* Output Sample Rate */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
