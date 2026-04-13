@@ -17,7 +17,7 @@ import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache"
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
@@ -25,6 +25,10 @@ import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  type VcBackend, setForcedBackend, getForcedBackend,
+  releaseAllVcSessions, getAvailableBackend,
+} from "@/lib/vcInferenceSession";
 
 interface VoiceConversionTabProps {
   isRu: boolean;
@@ -72,6 +76,31 @@ export function VoiceConversionTab({
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
   const [timingInfo, setTimingInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Backend selection: "auto" | "webgpu" | "wasm"
+  const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
+    getForcedBackend() ?? "auto"
+  );
+  const [activeBackend, setActiveBackend] = useState<VcBackend | null>(null);
+
+  // Resolve active backend on mount and after change
+  useEffect(() => {
+    getAvailableBackend().then(setActiveBackend);
+  }, [backendChoice]);
+
+  // Handle backend switch — release existing sessions first
+  const handleBackendChange = useCallback(async (val: string) => {
+    const choice = val as "auto" | VcBackend;
+    // Release all cached sessions since they were created with the old backend
+    await releaseAllVcSessions();
+    setForcedBackend(choice === "auto" ? null : choice);
+    setBackendChoice(choice);
+    toast.info(
+      isRu
+        ? `Бэкенд переключён: ${choice === "auto" ? "авто" : choice === "wasm" ? "CPU (WASM)" : "GPU (WebGPU)"}`
+        : `Backend switched: ${choice === "auto" ? "auto" : choice === "wasm" ? "CPU (WASM)" : "GPU (WebGPU)"}`
+    );
+  }, [isRu]);
 
   // Available references & indexes (read-only lists from OPFS)
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
@@ -139,8 +168,9 @@ export function VoiceConversionTab({
       const srOut = rs.outputSR >= 1000 ? `${(rs.outputSR / 1000).toFixed(rs.outputSR % 1000 === 0 ? 0 : 1)}k` : `${rs.outputSR}`;
       const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
+      const backendLabel = activeBackend === "wasm" ? " [CPU/WASM]" : " [GPU/WebGPU]";
       setTimingInfo(
-        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}\n` +
+        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
@@ -352,6 +382,52 @@ export function VoiceConversionTab({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <Separator />
+
+      {/* ─── Compute Backend ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Вычислительный бэкенд" : "Compute Backend"}
+          </label>
+          {activeBackend && (
+            <Badge variant="outline" className={`text-[10px] ${activeBackend === "webgpu" ? "border-primary/50 text-primary" : "border-muted-foreground/50 text-muted-foreground"}`}>
+              {activeBackend === "webgpu" ? "GPU" : "CPU"}
+            </Badge>
+          )}
+        </div>
+        <Select value={backendChoice} onValueChange={handleBackendChange} disabled={isProcessing}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">
+              <span className="flex items-center gap-1.5">
+                <Monitor className="h-3 w-3" />
+                {isRu ? "Авто (GPU → CPU)" : "Auto (GPU → CPU)"}
+              </span>
+            </SelectItem>
+            <SelectItem value="webgpu">
+              <span className="flex items-center gap-1.5">
+                <Monitor className="h-3 w-3" />
+                {isRu ? "GPU (WebGPU)" : "GPU (WebGPU)"}
+              </span>
+            </SelectItem>
+            <SelectItem value="wasm">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="h-3 w-3" />
+                {isRu ? "CPU (WASM) — без ошибок WebGPU" : "CPU (WASM) — no WebGPU errors"}
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "WASM = стабильно, но медленнее в ~3-5× | GPU = быстро, но возможны ошибки валидации"
+            : "WASM = stable but ~3-5× slower | GPU = fast but may have validation errors"}
+        </p>
       </div>
 
       <Separator />
