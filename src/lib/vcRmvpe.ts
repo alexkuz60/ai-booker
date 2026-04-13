@@ -219,14 +219,14 @@ export async function extractPitchRmvpe(
   // RMVPE expects [1, n_mels, n_frames] or [1, 1, n_mels, n_frames]
   // Try [1, 1, n_frames, n_mels] first (common ONNX layout)
   // Transpose mel data from [frames, mels] to [mels, frames] for model input
-  const transposed = new Float32Array(mel.numFrames * N_MELS);
-  for (let t = 0; t < mel.numFrames; t++) {
+  const transposed = new Float32Array(mel.paddedFrames * N_MELS);
+  for (let t = 0; t < mel.paddedFrames; t++) {
     for (let m = 0; m < N_MELS; m++) {
-      transposed[m * mel.numFrames + t] = mel.data[t * N_MELS + m];
+      transposed[m * mel.paddedFrames + t] = mel.data[t * N_MELS + m];
     }
   }
 
-  const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.numFrames]);
+  const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.paddedFrames]);
   const results = await session.run({ [inputName]: tensor });
 
   const outputName = session.outputNames[0] ?? "output";
