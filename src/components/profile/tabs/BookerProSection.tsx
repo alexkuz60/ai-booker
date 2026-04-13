@@ -176,8 +176,8 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
             </AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground">
               {isRu
-                ? "WebGPU поддерживается в Firefox начиная с версии 141 и в Safari начиная с версии 26. Убедитесь, что ваш браузер обновлён до актуальной версии."
-                : "WebGPU is supported in Firefox starting from version 141 and in Safari starting from version 26. Make sure your browser is up to date."}
+                ? "WebGPU поддерживается в Firefox начиная с версии 141 и в Safari начиная с версии 26. Убедитесь, что ваш браузер обновлён. Для максимальной производительности рекомендуем Google Chrome или Microsoft Edge."
+                : "WebGPU is supported in Firefox starting from version 141 and in Safari starting from version 26. Make sure your browser is up to date. For best performance, we recommend Google Chrome or Microsoft Edge."}
             </AlertDescription>
           </Alert>
         )}
