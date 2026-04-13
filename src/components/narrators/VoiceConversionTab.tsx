@@ -161,9 +161,20 @@ export function VoiceConversionTab({
   }, []);
 
   const handleStop = useCallback(() => {
-    if (audioRef) { audioRef.pause(); audioRef.currentTime = 0; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     setPlaying(false);
-  }, [audioRef]);
+  }, []);
+
+  const handleReplay = useCallback(() => {
+    if (!resultBlobUrl) return;
+    handleStop();
+    const audio = new Audio(resultBlobUrl);
+    audioRef.current = audio;
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => { setPlaying(false); toast.error(isRu ? "Ошибка воспроизведения" : "Playback error"); };
+    setPlaying(true);
+    audio.play().catch(() => { setPlaying(false); toast.error(isRu ? "Браузер заблокировал воспроизведение" : "Browser blocked playback"); });
+  }, [resultBlobUrl, handleStop, isRu]);
 
   const handleTestVc = useCallback(async () => {
     if (playing) { handleStop(); return; }
