@@ -542,10 +542,18 @@ export function VoiceConversionTab({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {isRu ? "Тест пайплайна" : "Pipeline Test"}
         </p>
-        <Button onClick={handleTestVc} disabled={isProcessing} variant={playing ? "destructive" : "outline"} className="w-full gap-2">
-          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          {isProcessing ? (isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en) : playing ? (isRu ? "Стоп" : "Stop") : (isRu ? `Тест: ${ttsProvider} → VC` : `Test: ${ttsProvider} → VC`)}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleTestVc} disabled={isProcessing} variant={playing ? "destructive" : "outline"} className="flex-1 gap-2">
+            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <FlaskConical className="h-4 w-4" />}
+            {isProcessing ? (isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en) : playing ? (isRu ? "Стоп" : "Stop") : (isRu ? `Тест: ${ttsProvider} → VC` : `Test: ${ttsProvider} → VC`)}
+          </Button>
+          {stage === "done" && resultBlobUrl && !playing && !isProcessing && (
+            <Button onClick={handleReplay} variant="outline" className="gap-2 shrink-0">
+              <Play className="h-4 w-4" />
+              {isRu ? "Повторить" : "Replay"}
+            </Button>
+          )}
+        </div>
         {isProcessing && (
           <div className="space-y-1">
             <Progress value={stageProgress} className="h-1.5" />
