@@ -24,6 +24,9 @@ export interface VcModelEntry {
  * ContentVec extracts phonetic embeddings; CREPE extracts pitch;
  * RVC converts timbre; OpenVoice transfers style/energy.
  */
+/**
+ * Core models required for the basic VC pipeline.
+ */
 export const VC_MODEL_REGISTRY: VcModelEntry[] = [
   {
     id: "contentvec",
@@ -37,7 +40,7 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
     label: "CREPE Tiny",
     url: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/vc-models/crepe-tiny.onnx`,
     sizeBytes: 1_956_000,
-    description: "Pitch (F0) extraction model",
+    description: "Pitch (F0) extraction — fast, lower accuracy",
   },
   {
     id: "rvc-v2",
@@ -48,13 +51,47 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
   },
 ];
 
+/** Pitch algorithm options */
+export type PitchAlgorithm = "crepe-tiny" | "crepe-full" | "rmvpe";
+
+export const PITCH_ALGORITHM_LABELS: Record<PitchAlgorithm, { ru: string; en: string; size: string }> = {
+  "crepe-tiny": { ru: "CREPE Tiny (быстро)", en: "CREPE Tiny (fast)", size: "~2 MB" },
+  "crepe-full": { ru: "CREPE Full (качество)", en: "CREPE Full (quality)", size: "~89 MB" },
+  "rmvpe": { ru: "RMVPE (золотой стандарт)", en: "RMVPE (gold standard)", size: "~362 MB" },
+};
+
+/**
+ * Optional pitch models — downloaded on demand when user selects algorithm.
+ */
+export const VC_PITCH_MODELS: VcModelEntry[] = [
+  {
+    id: "crepe-full",
+    label: "CREPE Full",
+    url: "https://huggingface.co/AnhP/Vietnamese-RVC-Project/resolve/main/predictors/crepe_full.onnx",
+    sizeBytes: 89_000_000,
+    description: "Pitch (F0) extraction — high accuracy, slower",
+  },
+  {
+    id: "rmvpe",
+    label: "RMVPE",
+    url: "https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.onnx",
+    sizeBytes: 362_000_000,
+    description: "Robust Model for Voice Pitch Estimation — best quality",
+  },
+];
+
+/** All models combined (core + optional pitch) */
+export const VC_ALL_MODELS: VcModelEntry[] = [...VC_MODEL_REGISTRY, ...VC_PITCH_MODELS];
+
 const VC_CACHE_DIR = "vc-models";
 export const VC_MODEL_CACHE_EVENT = "booker-pro:vc-model-cache-changed";
 
-const LEGACY_MODEL_FILE_NAMES: Partial<Record<VcModelEntry["id"], string[]>> = {
+const LEGACY_MODEL_FILE_NAMES: Partial<Record<string, string[]>> = {
   contentvec: ["hubert_base.onnx", "hubert-base.onnx"],
   "crepe-tiny": ["crepe_tiny.onnx"],
+  "crepe-full": ["crepe_full.onnx"],
   "rvc-v2": ["rvc_full.onnx", "rvc.onnx"],
+  rmvpe: ["rmvpe.onnx"],
 };
 
 interface ResolvedModelFile {
