@@ -305,9 +305,20 @@ export function VoiceConversionTab({
       if (!ttsResp.ok) { const txt = await ttsResp.text().catch(() => ""); throw new Error(`TTS: ${ttsResp.status} ${txt.slice(0, 100)}`); }
       const ttsBlob = await ttsResp.blob();
       setStageProgress(100);
+
+      // Load index data if configured
+      let indexData: { data: Float32Array; rows: number; cols: number } | undefined;
+      if (vcIndexId && indexRate > 0) {
+        const loaded = await loadVcIndex(vcIndexId);
+        if (loaded) {
+          indexData = loaded;
+          console.info(`[VcTest] Index loaded: ${loaded.rows} vectors × ${loaded.cols}D`);
+        }
+      }
+
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
