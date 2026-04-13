@@ -1,14 +1,16 @@
 /**
  * vcPipeline.ts — Unified Voice Conversion pipeline.
  *
- * Orchestrates: resample → ContentVec embeddings → CREPE pitch (F0) → RVC synthesis
- * Produces a VcFeatures object or fully converted audio.
+ * Orchestrates: resample → ContentVec embeddings → Pitch (F0) → RVC synthesis
+ * Supports pitch algorithms: CREPE Tiny, CREPE Full, RMVPE
  */
 
 import { resampleTo16kMono } from "./vcResample";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
+import { extractPitchRmvpe } from "./vcRmvpe";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
+import type { PitchAlgorithm } from "./vcModelCache";
 
 export interface VcFeatures {
   /** Speaker-independent phonetic embeddings [T, 768] */
@@ -27,11 +29,15 @@ export interface VcFeatures {
     contentvecMs: number;
     crepeMs: number;
   };
+  /** Which pitch algorithm was used */
+  pitchAlgorithm: PitchAlgorithm;
 }
 
 export interface VcPipelineOptions {
-  /** CREPE hop size in ms (default 10) */
+  /** CREPE hop size in ms (default 10) — only for CREPE algorithms */
   crepeHopMs?: number;
+  /** Pitch extraction algorithm (default "crepe-tiny") */
+  pitchAlgorithm?: PitchAlgorithm;
   /** Callback for progress updates */
   onProgress?: (stage: "resample" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
   /** Synthesis options (pitch shift, speaker ID, model) */
@@ -39,12 +45,27 @@ export interface VcPipelineOptions {
 }
 
 /**
+ * Extract pitch using the selected algorithm.
+ */
+async function extractPitchWithAlgorithm(
+  samples: Float32Array,
+  algorithm: PitchAlgorithm,
+  hopMs: number,
+): Promise<CrepeResult> {
+  switch (algorithm) {
+    case "crepe-tiny":
+      return extractPitch(samples, 16_000, hopMs, "crepe-tiny");
+    case "crepe-full":
+      return extractPitch(samples, 16_000, hopMs, "crepe-full");
+    case "rmvpe":
+      return extractPitchRmvpe(samples, 16_000);
+    default:
+      return extractPitch(samples, 16_000, hopMs, "crepe-tiny");
+  }
+}
+
+/**
  * Extract all VC features from raw audio.
- * Models must be pre-downloaded to OPFS via vcModelCache.
- *
- * @param audio - Raw audio as ArrayBuffer or Blob (any format browsers can decode)
- * @param options - Pipeline configuration
- * @returns VcFeatures ready for voice synthesis
  */
 export async function extractVcFeatures(
   audio: ArrayBuffer | Blob,
@@ -52,6 +73,7 @@ export async function extractVcFeatures(
 ): Promise<VcFeatures> {
   const startTotal = performance.now();
   const onProgress = options?.onProgress;
+  const pitchAlgorithm = options?.pitchAlgorithm ?? "crepe-tiny";
 
   // Stage 1: Resample to 16kHz mono
   onProgress?.("resample", 0);
@@ -65,35 +87,37 @@ export async function extractVcFeatures(
   const cvResult: ContentVecResult = await extractContentVec(samples);
   onProgress?.("contentvec", 1);
 
-  // Stage 3: CREPE pitch extraction
+  // Stage 3: Pitch extraction (algorithm-dependent)
   onProgress?.("crepe", 0);
-  const crepeResult: CrepeResult = await extractPitch(
+  const pitchResult: CrepeResult = await extractPitchWithAlgorithm(
     samples,
-    16_000,
+    pitchAlgorithm,
     options?.crepeHopMs ?? 10,
   );
   onProgress?.("crepe", 1);
 
   const totalMs = Math.round(performance.now() - startTotal);
 
+  const algoLabel = pitchAlgorithm === "rmvpe" ? "RMVPE" : pitchAlgorithm === "crepe-full" ? "CREPE-Full" : "CREPE-Tiny";
   console.info(
-    `[vcPipeline] Complete: ${durationSec.toFixed(2)}s audio → ` +
-    `${cvResult.numFrames} embeddings + ${crepeResult.frames.length} pitch frames, ` +
-    `${totalMs}ms total (resample ${resampleMs}ms, CV ${cvResult.inferenceMs}ms, CREPE ${crepeResult.inferenceMs}ms)`
+    `[vcPipeline] Complete (${algoLabel}): ${durationSec.toFixed(2)}s audio → ` +
+    `${cvResult.numFrames} embeddings + ${pitchResult.frames.length} pitch frames, ` +
+    `${totalMs}ms total (resample ${resampleMs}ms, CV ${cvResult.inferenceMs}ms, pitch ${pitchResult.inferenceMs}ms)`
   );
 
   return {
     embeddings: cvResult.embeddings,
     numFrames: cvResult.numFrames,
     embeddingDim: cvResult.dim,
-    pitchFrames: crepeResult.frames,
+    pitchFrames: pitchResult.frames,
     durationSec,
     totalMs,
     timing: {
       resampleMs,
       contentvecMs: cvResult.inferenceMs,
-      crepeMs: crepeResult.inferenceMs,
+      crepeMs: pitchResult.inferenceMs,
     },
+    pitchAlgorithm,
   };
 }
 
