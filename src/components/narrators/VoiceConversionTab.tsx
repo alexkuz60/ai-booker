@@ -564,10 +564,10 @@ export function VoiceConversionTab({
 
         {/* Upload button */}
         <div className="flex gap-2">
-          <input ref={indexInputRef} type="file" accept=".npy" className="hidden" onChange={handleIndexUpload} />
+          <input ref={indexInputRef} type="file" accept=".npy,.index,.bin" className="hidden" onChange={handleIndexUpload} />
           <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => indexInputRef.current?.click()} disabled={uploadingIndex}>
             {uploadingIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            {isRu ? "Загрузить .npy" : "Upload .npy"}
+            {isRu ? "Загрузить .npy / .index" : "Upload .npy / .index"}
           </Button>
         </div>
 
