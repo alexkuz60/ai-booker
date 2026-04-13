@@ -246,6 +246,18 @@ export async function synthesizeVoice(
     }
   }
 
+  // ── Feature Retrieval (index_rate) ───────────────────────────────────
+  // If training data index is loaded, blend source embeddings with
+  // KNN-retrieved training embeddings. Modifies upEmb in-place.
+  if (indexRate > 0 && options?.indexData) {
+    const { data: trainData, rows: trainN, cols: trainDim } = options.indexData;
+    if (trainDim === features.embeddingDim) {
+      applyFeatureRetrieval(upEmb, T, features.embeddingDim, trainData, trainN, indexRate);
+    } else {
+      console.warn(`[vcSynthesis] Index dim mismatch: ${trainDim} vs ${features.embeddingDim}, skipping retrieval`);
+    }
+  }
+
   // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
