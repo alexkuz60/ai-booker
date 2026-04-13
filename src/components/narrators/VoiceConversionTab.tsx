@@ -233,12 +233,20 @@ export function VoiceConversionTab({
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
+      // Clean up previous blob URL
+      if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
+      setResultBlobUrl(url);
       const audio = new Audio(url);
-      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      setAudioRef(audio);
+      audioRef.current = audio;
+      audio.onended = () => setPlaying(false);
+      audio.onerror = () => { setPlaying(false); };
       setPlaying(true);
-      await audio.play();
+      audio.play().catch(() => {
+        setPlaying(false);
+        // Autoplay blocked — user can click replay
+        console.warn("[VcTest] Autoplay blocked, user can click Play to replay");
+      });
     } catch (err: any) {
       console.error("[VoiceConversionTab] Test error:", err);
       setErrorMsg(err.message || String(err));
