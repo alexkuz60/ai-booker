@@ -40,11 +40,14 @@ export default function VoiceLab() {
   const { isRu } = useLanguage();
   const navigate = useNavigate();
   const pro = useBookerPro();
+  const { setPageHeader } = usePageHeader();
 
-  usePageHeader({
-    title: isRu ? "Голосовая лаборатория" : "Voice Lab",
-    subtitle: isRu ? "Управление моделями, референсами и обучающими индексами" : "Manage models, references, and training indexes",
-  });
+  useEffect(() => {
+    setPageHeader({
+      title: isRu ? "Голосовая лаборатория" : "Voice Lab",
+      subtitle: isRu ? "Управление моделями, референсами и обучающими индексами" : "Manage models, references, and training indexes",
+    });
+  }, [isRu, setPageHeader]);
 
   // ── Model status ──
   const [modelStatus, setModelStatus] = useState<Record<string, boolean>>({});
