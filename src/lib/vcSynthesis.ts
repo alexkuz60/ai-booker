@@ -285,17 +285,17 @@ export async function synthesizeVoice(
   const rawAudio = new Float32Array(output.data as Float32Array);
 
   // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility
-  const finalAudio = await resampleToProjectSR(rawAudio, outputSR);
+  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
   const finalSR = PROJECT_OUTPUT_SR;
   const durationSec = finalAudio.length / finalSR;
 
   console.info(
     `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
     `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
-    `${inferenceMs}ms inference`
+    `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
   );
 
-  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected };
+  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected, resampleMetrics };
 }
 
 /**
