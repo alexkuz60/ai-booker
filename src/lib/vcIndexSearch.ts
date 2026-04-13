@@ -100,7 +100,326 @@ export function parseNpy(buffer: ArrayBuffer): { data: Float32Array; rows: numbe
   return { data, rows, cols };
 }
 
-// ── Brute-force L2 KNN ────────────────────────────────────────────────────
+// ── FAISS .index parser ───────────────────────────────────────────────────
+
+/**
+ * Helper: read a 4-byte fourcc string at offset.
+ */
+function readFourcc(view: DataView, off: number): string {
+  return String.fromCharCode(
+    view.getUint8(off), view.getUint8(off + 1),
+    view.getUint8(off + 2), view.getUint8(off + 3),
+  );
+}
+
+/**
+ * FAISS binary stream reader — tracks cursor position.
+ */
+class FaissReader {
+  private view: DataView;
+  private pos: number;
+  readonly length: number;
+
+  constructor(buffer: ArrayBuffer, offset = 0) {
+    this.view = new DataView(buffer);
+    this.pos = offset;
+    this.length = buffer.byteLength;
+  }
+
+  get offset() { return this.pos; }
+
+  fourcc(): string {
+    const s = readFourcc(this.view, this.pos);
+    this.pos += 4;
+    return s;
+  }
+
+  int32(): number { const v = this.view.getInt32(this.pos, true); this.pos += 4; return v; }
+  uint32(): number { const v = this.view.getUint32(this.pos, true); this.pos += 4; return v; }
+  int64(): number {
+    // Read as two 32-bit parts (JS doesn't support int64 natively without BigInt)
+    const lo = this.view.getUint32(this.pos, true);
+    const hi = this.view.getInt32(this.pos + 4, true);
+    this.pos += 8;
+    return hi * 0x100000000 + lo;
+  }
+  float32(): number { const v = this.view.getFloat32(this.pos, true); this.pos += 4; return v; }
+  uint8(): number { const v = this.view.getUint8(this.pos); this.pos += 1; return v; }
+
+  skip(n: number) { this.pos += n; }
+
+  /** Read a READVECTOR: size(8B) then size elements */
+  readVectorSize(): number { return this.int64(); }
+
+  /** Skip a READVECTOR */
+  skipVector(elemSize: number) {
+    const size = this.int64();
+    this.pos += size * elemSize;
+  }
+
+  /** Read float32 array of known size */
+  readFloat32Array(count: number): Float32Array {
+    const arr = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      arr[i] = this.view.getFloat32(this.pos, true);
+      this.pos += 4;
+    }
+    return arr;
+  }
+
+  /** Read READXBVECTOR: size(8B) then size*4 bytes */
+  readXbVector(): Float32Array {
+    const size = this.int64(); // in float-groups-of-4 units
+    const totalFloats = size * 4;
+    return this.readFloat32Array(totalFloats);
+  }
+
+  /** Check remaining bytes */
+  remaining(): number { return this.length - this.pos; }
+}
+
+/**
+ * Read a FAISS index header (shared by all Index types).
+ * Returns d and ntotal.
+ */
+function readIndexHeader(r: FaissReader): { d: number; ntotal: number; metricType: number } {
+  const d = r.int32();
+  const ntotal = r.int64();
+  r.int64(); // dummy
+  r.int64(); // dummy
+  const isTrained = r.uint8();
+  const metricType = r.int32();
+  if (metricType > 1) {
+    r.float32(); // metric_arg
+  }
+  return { d, ntotal, metricType };
+}
+
+/**
+ * Read DirectMap structure.
+ */
+function readDirectMap(r: FaissReader) {
+  const type = r.uint8(); // maintain_direct_map char
+  r.skipVector(8); // array: vector<idx_t> (int64)
+  if (type === 2) { // Hashtable
+    r.skipVector(16); // vector<pair<idx_t, idx_t>>
+  }
+}
+
+/**
+ * Recursively read a FAISS Index, extracting flat vectors.
+ * Only supports IndexFlatL2, IndexFlatIP, IndexFlat, and IndexIVFFlat.
+ */
+function readFaissIndex(r: FaissReader): { data: Float32Array; rows: number; cols: number } | null {
+  const h = r.fourcc();
+
+  // ── IndexFlat variants (IxFl, IxF2, IxFI) ──
+  if (h === "IxFl" || h === "IxF2" || h === "IxFI") {
+    const { d, ntotal } = readIndexHeader(r);
+    // READXBVECTOR: size(8B) = ntotal*d/4 units, then size*4 floats
+    const codes = r.readXbVector();
+    const expectedFloats = ntotal * d;
+    if (codes.length !== expectedFloats) {
+      console.warn(`[faissParser] IndexFlat: expected ${expectedFloats} floats, got ${codes.length}`);
+    }
+    return { data: codes, rows: ntotal, cols: d };
+  }
+
+  // ── IndexIVFFlat (IwFl) — modern format ──
+  if (h === "IwFl") {
+    const header = readIndexHeader(r);
+    const d = header.d;
+    const nlist = r.int64();
+    r.int64(); // nprobe
+
+    // Read nested quantizer (recursive — usually IndexFlatL2)
+    readFaissIndex(r); // skip quantizer, we don't need centroids
+
+    // read_direct_map
+    readDirectMap(r);
+
+    // code_size = d * sizeof(float) — we know this from format
+    const codeSize = d * 4; // bytes per vector
+
+    // read_InvertedLists
+    const ilFourcc = r.fourcc();
+    if (ilFourcc === "il00") {
+      // null inverted lists
+      return null;
+    }
+    if (ilFourcc !== "ilar") {
+      throw new Error(`[faissParser] Unsupported inverted list type: "${ilFourcc}". Expected "ilar" (ArrayInvertedLists).`);
+    }
+
+    const ilNlist = r.int64();
+    const ilCodeSize = r.int64();
+
+    // Read list sizes
+    const listTypeFourcc = r.fourcc();
+    let sizes: number[];
+    if (listTypeFourcc === "full") {
+      const sizeCount = r.int64();
+      sizes = [];
+      for (let i = 0; i < sizeCount; i++) {
+        sizes.push(r.int64());
+      }
+    } else if (listTypeFourcc === "sprs") {
+      sizes = new Array(ilNlist).fill(0);
+      const pairCount = r.int64();
+      for (let i = 0; i < pairCount; i += 2) {
+        const idx = r.int64();
+        const sz = r.int64();
+        if (idx < ilNlist) sizes[idx] = sz;
+      }
+    } else {
+      throw new Error(`[faissParser] Unknown list_type fourcc: "${listTypeFourcc}"`);
+    }
+
+    // Total vectors across all lists
+    const totalVectors = sizes.reduce((a, b) => a + b, 0);
+    const floatsPerVector = ilCodeSize / 4; // code_size is in bytes
+
+    // Read codes and ids for each list, extract float vectors
+    const allVectors = new Float32Array(totalVectors * floatsPerVector);
+    let writePos = 0;
+
+    for (let i = 0; i < ilNlist; i++) {
+      const n = sizes[i];
+      if (n > 0) {
+        // codes: n * ilCodeSize bytes = n * floatsPerVector floats
+        const listCodes = r.readFloat32Array(n * floatsPerVector);
+        allVectors.set(listCodes, writePos);
+        writePos += n * floatsPerVector;
+        // ids: n * 8 bytes (int64)
+        r.skip(n * 8);
+      }
+    }
+
+    console.info(
+      `[faissParser] IVFFlat: ${totalVectors} vectors × ${floatsPerVector}D ` +
+      `from ${ilNlist} lists (${(allVectors.byteLength / 1024 / 1024).toFixed(1)} MB)`
+    );
+
+    return { data: allVectors, rows: totalVectors, cols: floatsPerVector };
+  }
+
+  // ── Legacy IVFFlat (IvFl, IvFL) ──
+  if (h === "IvFl" || h === "IvFL") {
+    const header = readIndexHeader(r);
+    const d = header.d;
+    const nlist = r.int64();
+    r.int64(); // nprobe
+
+    // Read nested quantizer
+    readFaissIndex(r);
+
+    // Legacy format: ids are stored inline in ivf_header
+    const ids: number[][] = [];
+    for (let i = 0; i < nlist; i++) {
+      const idCount = r.int64();
+      r.skip(idCount * 8); // skip int64 ids
+      ids.push([]); // we don't need the actual ids
+    }
+
+    // read_direct_map
+    readDirectMap(r);
+
+    // Read codes for each list
+    const allCodes: Float32Array[] = [];
+    let totalN = 0;
+
+    for (let i = 0; i < nlist; i++) {
+      if (h === "IvFL") {
+        // codes stored as uint8 vector
+        const codeBytes = r.int64();
+        const floatCount = codeBytes / 4;
+        allCodes.push(r.readFloat32Array(floatCount));
+        totalN += floatCount / d;
+      } else {
+        // Old format: codes stored as float vector
+        const floatCount = r.int64();
+        allCodes.push(r.readFloat32Array(floatCount));
+        totalN += floatCount / d;
+      }
+    }
+
+    // Concatenate
+    const result = new Float32Array(totalN * d);
+    let off = 0;
+    for (const chunk of allCodes) {
+      result.set(chunk, off);
+      off += chunk.length;
+    }
+
+    console.info(`[faissParser] Legacy IVFFlat: ${totalN} vectors × ${d}D`);
+    return { data: result, rows: totalN, cols: d };
+  }
+
+  // Unsupported index type — try to give a helpful message
+  throw new Error(
+    `[faissParser] Unsupported FAISS index type: "${h}". ` +
+    `Supported: IxFl/IxF2/IxFI (IndexFlat), IwFl (IndexIVFFlat), IvFl/IvFL (legacy IVFFlat).`
+  );
+}
+
+/**
+ * Parse a FAISS .index file and extract all training vectors as a flat Float32Array.
+ * Supports IndexFlatL2, IndexFlatIP, IndexIVFFlat (modern and legacy formats).
+ *
+ * @param buffer - Raw .index file contents
+ * @returns { data, rows, cols } — training vectors suitable for KNN search
+ */
+export function parseFaissIndex(buffer: ArrayBuffer): { data: Float32Array; rows: number; cols: number } {
+  const r = new FaissReader(buffer);
+  const result = readFaissIndex(r);
+  if (!result || result.rows === 0) {
+    throw new Error("[faissParser] No vectors found in FAISS index file");
+  }
+  console.info(
+    `[faissParser] Extracted ${result.rows.toLocaleString()} vectors × ${result.cols}D ` +
+    `(${(result.data.byteLength / 1024 / 1024).toFixed(1)} MB)`
+  );
+  return result;
+}
+
+/**
+ * Auto-detect file type and parse accordingly.
+ * @param buffer - File contents
+ * @param fileName - Original file name (for extension detection)
+ */
+export function parseIndexFile(
+  buffer: ArrayBuffer, fileName: string,
+): { data: Float32Array; rows: number; cols: number } {
+  const ext = fileName.toLowerCase().split(".").pop() || "";
+
+  if (ext === "npy") {
+    return parseNpy(buffer);
+  }
+
+  if (ext === "index" || ext === "bin") {
+    return parseFaissIndex(buffer);
+  }
+
+  // Try to auto-detect: .npy starts with \x93NUMPY, FAISS starts with a fourcc
+  const magic = new Uint8Array(buffer, 0, Math.min(6, buffer.byteLength));
+  if (magic[0] === 0x93 && magic.length >= 6) {
+    const str = String.fromCharCode(...Array.from(magic.slice(1, 6)));
+    if (str === "NUMPY") return parseNpy(buffer);
+  }
+
+  // Try FAISS
+  try {
+    return parseFaissIndex(buffer);
+  } catch {
+    // Fall through
+  }
+
+  throw new Error(
+    `Cannot detect file format for "${fileName}". Supported: .npy (NumPy), .index (FAISS IndexFlatL2/IVFFlat).`
+  );
+}
+
+
 
 export interface KnnResult {
   /** Indices of k nearest neighbors for each query [queryCount × k] */
