@@ -20,7 +20,7 @@ import { useGpuDevices } from "@/hooks/useGpuDevices";
 import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import {
   VC_MODEL_REGISTRY, downloadAllModels, getModelStatus,
-  getTotalModelSize, clearAllModels,
+  getTotalModelSize, clearAllModels, VC_MODEL_CACHE_EVENT,
   type ModelDownloadProgress,
 } from "@/lib/vcModelCache";
 
@@ -53,15 +53,43 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
     pro.gpuStatus, pro.adapterInfo, pro.gpuDetails, pro.benchmarkResult,
   );
 
-  // Check cached model status on mount
+  // Check cached model status on mount and when cache changes elsewhere
   useEffect(() => {
-    getModelStatus().then(status => {
+    let cancelled = false;
+
+    const refreshStatuses = async () => {
+      const status = await getModelStatus();
+      if (cancelled) return;
+
       setModelStatuses(status);
       const allReady = VC_MODEL_REGISTRY.every(m => status[m.id]);
-      if (allReady && !pro.modelsReady) pro.setModelsReady(true);
-      if (!allReady && pro.modelsReady) pro.setModelsReady(false);
-    });
-  }, []);
+      if (allReady !== pro.modelsReady) {
+        pro.setModelsReady(allReady);
+      }
+    };
+
+    const handleCacheChange = () => {
+      void refreshStatuses();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshStatuses();
+      }
+    };
+
+    void refreshStatuses();
+    window.addEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
+    window.addEventListener("focus", handleCacheChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
+      window.removeEventListener("focus", handleCacheChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [pro.modelsReady, pro.setModelsReady]);
 
   const handleDownloadModels = useCallback(async () => {
     const ac = new AbortController();
