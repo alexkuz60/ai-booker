@@ -216,7 +216,48 @@ export function VoiceConversionTab({
     if (vcReferenceId === id) onUpdateVcConfig({ vc_reference_id: "" });
   }, [vcReferenceId, onUpdateVcConfig]);
 
-  // Preview reference audio
+  // ── Index file upload (.npy) ──
+  const handleIndexUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingIndex(true);
+    try {
+      const arrayBuf = await file.arrayBuffer();
+      const { rows, cols } = parseNpy(arrayBuf);
+      if (cols !== 768 && cols !== 256) {
+        throw new Error(isRu
+          ? `Неподдерживаемая размерность: ${cols}. Ожидается 768 (ContentVec) или 256 (HuBERT v1).`
+          : `Unsupported dimension: ${cols}. Expected 768 (ContentVec) or 256 (HuBERT v1).`);
+      }
+      const id = crypto.randomUUID();
+      const name = file.name.replace(/\.[^.]+$/, "");
+      const entry: VcIndexEntry = {
+        id, name, vectorCount: rows, dim: cols,
+        sizeBytes: file.size,
+        addedAt: new Date().toISOString(),
+      };
+      await saveVcIndex(id, new Blob([arrayBuf]), entry);
+      setLocalIndexes(await listVcIndexes());
+      onUpdateVcConfig({ vc_index_id: id });
+      toast.success(isRu
+        ? `Индекс "${name}" загружен: ${rows.toLocaleString()} векторов × ${cols}D`
+        : `Index "${name}" loaded: ${rows.toLocaleString()} vectors × ${cols}D`);
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? "Ошибка загрузки индекса" : "Index upload error"));
+    } finally {
+      setUploadingIndex(false);
+      if (indexInputRef.current) indexInputRef.current.value = "";
+    }
+  }, [isRu, onUpdateVcConfig]);
+
+  // Delete index
+  const handleDeleteIndex = useCallback(async (id: string) => {
+    await deleteVcIndex(id);
+    setLocalIndexes(await listVcIndexes());
+    if (vcIndexId === id) onUpdateVcConfig({ vc_index_id: "" });
+  }, [vcIndexId, onUpdateVcConfig]);
+
+
   const handlePreviewRef = useCallback(async (id: string) => {
     if (playing && audioRef) { audioRef.pause(); setPlaying(false); return; }
     try {
