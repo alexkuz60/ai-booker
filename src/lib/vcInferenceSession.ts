@@ -33,6 +33,9 @@ const sessionCache = new Map<string, ort.InferenceSession>();
 /** Track model buffer sizes for VRAM estimation */
 const sessionSizes = new Map<string, number>();
 
+/** Track which backend each session was created with */
+const sessionBackends = new Map<string, VcBackend>();
+
 /** Log estimated VRAM usage across all loaded sessions */
 function logVramUsage(action: string, modelId: string): void {
   let totalBytes = 0;
@@ -51,12 +54,35 @@ async function isWebGpuAvailable(): Promise<boolean> {
 
 let resolvedBackend: VcBackend | null = null;
 
-/** Get the best available backend (cached after first check) */
+/**
+ * User-forced backend override. When set, bypasses auto-detection.
+ * null = auto (WebGPU → WASM fallback), "wasm" = force CPU, "webgpu" = force GPU.
+ */
+let forcedBackend: VcBackend | null = null;
+
+/** Force a specific backend. Pass null to restore auto-detection. */
+export function setForcedBackend(backend: VcBackend | null): void {
+  forcedBackend = backend;
+  console.info(`[vcSession] Backend override: ${backend ?? "auto"}`);
+}
+
+/** Get current forced backend (null = auto) */
+export function getForcedBackend(): VcBackend | null {
+  return forcedBackend;
+}
+
+/** Get the best available backend (respects forced override) */
 export async function getAvailableBackend(): Promise<VcBackend> {
+  if (forcedBackend) return forcedBackend;
   if (resolvedBackend) return resolvedBackend;
   resolvedBackend = (await isWebGpuAvailable()) ? "webgpu" : "wasm";
   console.info(`[vcSession] Resolved backend: ${resolvedBackend}`);
   return resolvedBackend;
+}
+
+/** Get the backend used for a loaded session */
+export function getSessionBackend(modelId: string): VcBackend | null {
+  return sessionBackends.get(modelId) ?? null;
 }
 
 /**
@@ -96,10 +122,12 @@ export async function createVcSession(
   );
 
   const elapsed = Math.round(performance.now() - startMs);
-  console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms`);
+  const actualBackend = executionProviders[0] as VcBackend;
+  console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms (backend: ${actualBackend})`);
 
   sessionCache.set(modelId, session);
   sessionSizes.set(modelId, buffer.byteLength);
+  sessionBackends.set(modelId, actualBackend);
   logVramUsage("load", modelId);
   return session;
 }
