@@ -30,6 +30,19 @@ export interface VcSessionOptions {
 /** Cached sessions keyed by modelId */
 const sessionCache = new Map<string, ort.InferenceSession>();
 
+/** Track model buffer sizes for VRAM estimation */
+const sessionSizes = new Map<string, number>();
+
+/** Log estimated VRAM usage across all loaded sessions */
+function logVramUsage(action: string, modelId: string): void {
+  let totalBytes = 0;
+  for (const sz of sessionSizes.values()) totalBytes += sz;
+  const models = Array.from(sessionSizes.keys()).join(", ");
+  console.info(
+    `[vcSession] 💾 VRAM after ${action} "${modelId}": ~${(totalBytes / 1e6).toFixed(1)} MB total | loaded: [${models}]`,
+  );
+}
+
 /** Detect if WebGPU execution provider is available (uses shared adapter) */
 async function isWebGpuAvailable(): Promise<boolean> {
   const adapter = await getSharedAdapter();
@@ -86,6 +99,8 @@ export async function createVcSession(
   console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms`);
 
   sessionCache.set(modelId, session);
+  sessionSizes.set(modelId, buffer.byteLength);
+  logVramUsage("load", modelId);
   return session;
 }
 
@@ -95,17 +110,20 @@ export async function releaseVcSession(modelId: string): Promise<void> {
   if (session) {
     await session.release();
     sessionCache.delete(modelId);
-    console.info(`[vcSession] Released session "${modelId}"`);
+    sessionSizes.delete(modelId);
+    logVramUsage("release", modelId);
   }
 }
 
 /** Release all cached sessions */
 export async function releaseAllVcSessions(): Promise<void> {
+  const ids = Array.from(sessionCache.keys());
   for (const [id, session] of sessionCache) {
     try { await session.release(); } catch { /* ok */ }
-    console.info(`[vcSession] Released session "${id}"`);
   }
   sessionCache.clear();
+  sessionSizes.clear();
+  console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
 }
 
 /** Get info about loaded sessions */
