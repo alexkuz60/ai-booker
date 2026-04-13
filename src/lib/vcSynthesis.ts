@@ -21,6 +21,7 @@
 import * as ort from "onnxruntime-web";
 import { createVcSession } from "./vcInferenceSession";
 import { alignPitchToEmbeddings } from "./vcPipeline";
+import { applyFeatureRetrieval } from "./vcIndexSearch";
 import type { VcFeatures } from "./vcPipeline";
 
 // RVC v2 constants — mel-scale pitch quantization (matches Applio/RVC reference)
@@ -88,6 +89,16 @@ export interface VcSynthesisOptions {
    * Applied by zeroing F0 for frames below a voicing confidence threshold.
    */
   protect?: number;
+  /**
+   * Pre-loaded training embeddings for feature retrieval.
+   * If provided along with indexRate > 0, applies KNN-based blending
+   * to make output more similar to training voice.
+   */
+  indexData?: {
+    data: Float32Array;
+    rows: number;
+    cols: number;
+  };
 }
 
 /**
@@ -232,6 +243,18 @@ export async function synthesizeVoice(
     for (let d = 0; d < features.embeddingDim; d++) {
       upEmb[offOut + d] = features.embeddings[offLo + d] * (1 - frac)
                         + features.embeddings[offHi + d] * frac;
+    }
+  }
+
+  // ── Feature Retrieval (index_rate) ───────────────────────────────────
+  // If training data index is loaded, blend source embeddings with
+  // KNN-retrieved training embeddings. Modifies upEmb in-place.
+  if (indexRate > 0 && options?.indexData) {
+    const { data: trainData, rows: trainN, cols: trainDim } = options.indexData;
+    if (trainDim === features.embeddingDim) {
+      applyFeatureRetrieval(upEmb, T, features.embeddingDim, trainData, trainN, indexRate);
+    } else {
+      console.warn(`[vcSynthesis] Index dim mismatch: ${trainDim} vs ${features.embeddingDim}, skipping retrieval`);
     }
   }
 

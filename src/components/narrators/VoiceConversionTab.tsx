@@ -19,9 +19,13 @@ import {
   type VcReferenceEntry,
 } from "@/lib/vcReferenceCache";
 import {
+  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseNpy,
+  type VcIndexEntry,
+} from "@/lib/vcIndexSearch";
+import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
   CheckCircle2, Wand2, ArrowRight, Upload, Music, Trash2,
-  Download, Library,
+  Download, Library, Database,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
@@ -67,6 +71,7 @@ export function VoiceConversionTab({
   const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
   const indexRate = (voiceConfig.vc_index_rate as number) ?? 0.75;
+  const vcIndexId = (voiceConfig.vc_index_id as string) || "";
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
 
   // Test pipeline state
@@ -84,11 +89,17 @@ export function VoiceConversionTab({
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Index state
+  const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
+  const [uploadingIndex, setUploadingIndex] = useState(false);
+  const indexInputRef = useRef<HTMLInputElement>(null);
+
   const isProcessing = stage !== "idle" && stage !== "done" && stage !== "error";
 
   // Load local references on mount
   useEffect(() => {
     listVcReferences().then(setLocalRefs);
+    listVcIndexes().then(setLocalIndexes);
   }, []);
 
   // Load collection from voice_references table
@@ -205,7 +216,48 @@ export function VoiceConversionTab({
     if (vcReferenceId === id) onUpdateVcConfig({ vc_reference_id: "" });
   }, [vcReferenceId, onUpdateVcConfig]);
 
-  // Preview reference audio
+  // ── Index file upload (.npy) ──
+  const handleIndexUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingIndex(true);
+    try {
+      const arrayBuf = await file.arrayBuffer();
+      const { rows, cols } = parseNpy(arrayBuf);
+      if (cols !== 768 && cols !== 256) {
+        throw new Error(isRu
+          ? `Неподдерживаемая размерность: ${cols}. Ожидается 768 (ContentVec) или 256 (HuBERT v1).`
+          : `Unsupported dimension: ${cols}. Expected 768 (ContentVec) or 256 (HuBERT v1).`);
+      }
+      const id = crypto.randomUUID();
+      const name = file.name.replace(/\.[^.]+$/, "");
+      const entry: VcIndexEntry = {
+        id, name, vectorCount: rows, dim: cols,
+        sizeBytes: file.size,
+        addedAt: new Date().toISOString(),
+      };
+      await saveVcIndex(id, new Blob([arrayBuf]), entry);
+      setLocalIndexes(await listVcIndexes());
+      onUpdateVcConfig({ vc_index_id: id });
+      toast.success(isRu
+        ? `Индекс "${name}" загружен: ${rows.toLocaleString()} векторов × ${cols}D`
+        : `Index "${name}" loaded: ${rows.toLocaleString()} vectors × ${cols}D`);
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? "Ошибка загрузки индекса" : "Index upload error"));
+    } finally {
+      setUploadingIndex(false);
+      if (indexInputRef.current) indexInputRef.current.value = "";
+    }
+  }, [isRu, onUpdateVcConfig]);
+
+  // Delete index
+  const handleDeleteIndex = useCallback(async (id: string) => {
+    await deleteVcIndex(id);
+    setLocalIndexes(await listVcIndexes());
+    if (vcIndexId === id) onUpdateVcConfig({ vc_index_id: "" });
+  }, [vcIndexId, onUpdateVcConfig]);
+
+
   const handlePreviewRef = useCallback(async (id: string) => {
     if (playing && audioRef) { audioRef.pause(); setPlaying(false); return; }
     try {
@@ -253,9 +305,20 @@ export function VoiceConversionTab({
       if (!ttsResp.ok) { const txt = await ttsResp.text().catch(() => ""); throw new Error(`TTS: ${ttsResp.status} ${txt.slice(0, 100)}`); }
       const ttsBlob = await ttsResp.blob();
       setStageProgress(100);
+
+      // Load index data if configured
+      let indexData: { data: Float32Array; rows: number; cols: number } | undefined;
+      if (vcIndexId && indexRate > 0) {
+        const loaded = await loadVcIndex(vcIndexId);
+        if (loaded) {
+          indexData = loaded;
+          console.info(`[VcTest] Index loaded: ${loaded.rows} vectors × ${loaded.cols}D`);
+        }
+      }
+
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
@@ -280,7 +343,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -461,6 +524,76 @@ export function VoiceConversionTab({
         <p className="text-muted-foreground/60 text-sm text-center">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
         </p>
+      </div>
+
+      <Separator />
+
+      {/* ─── Training Index (.npy) ─── */}
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <Database className="h-3 w-3 inline mr-1 -mt-0.5" />
+          {isRu ? "Индекс обучения (Feature Retrieval)" : "Training Index (Feature Retrieval)"}
+        </p>
+
+        {/* Current index */}
+        {vcIndexId && localIndexes.find(ix => ix.id === vcIndexId) ? (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20">
+            <Database className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{localIndexes.find(ix => ix.id === vcIndexId)!.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {localIndexes.find(ix => ix.id === vcIndexId)!.vectorCount.toLocaleString()} {isRu ? "векторов" : "vectors"} × {localIndexes.find(ix => ix.id === vcIndexId)!.dim}D
+                {" • "}{(localIndexes.find(ix => ix.id === vcIndexId)!.sizeBytes / 1024 / 1024).toFixed(1)} MB
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onUpdateVcConfig({ vc_index_id: "" })}>
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            {isRu
+              ? "Индекс не загружен. Загрузите .npy файл (total_fea.npy из RVC-обучения) для активации Feature Ratio."
+              : "No index loaded. Upload a .npy file (total_fea.npy from RVC training) to activate Feature Ratio."}
+          </p>
+        )}
+
+        {/* Upload button */}
+        <div className="flex gap-2">
+          <input ref={indexInputRef} type="file" accept=".npy" className="hidden" onChange={handleIndexUpload} />
+          <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => indexInputRef.current?.click()} disabled={uploadingIndex}>
+            {uploadingIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {isRu ? "Загрузить .npy" : "Upload .npy"}
+          </Button>
+        </div>
+
+        {/* Local indexes list */}
+        {localIndexes.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{isRu ? "Загруженные индексы:" : "Loaded indexes:"}</p>
+            {localIndexes.map(ix => (
+              <div
+                key={ix.id}
+                className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+                  ix.id === vcIndexId ? "bg-primary/10 border border-primary/30" : "bg-muted/20 hover:bg-muted/40"
+                }`}
+                onClick={() => onUpdateVcConfig({ vc_index_id: ix.id })}
+              >
+                <Database className="h-3 w-3 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate font-mono">{ix.name}</span>
+                <span className="text-muted-foreground tabular-nums">{ix.vectorCount.toLocaleString()}</span>
+                <span className="text-muted-foreground">{(ix.sizeBytes / 1024 / 1024).toFixed(1)}MB</span>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={e => { e.stopPropagation(); handleDeleteIndex(ix.id); }}
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Separator />
