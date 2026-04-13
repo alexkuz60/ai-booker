@@ -279,6 +279,21 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
                 </div>
               </div>
             ))}
+            <p className="text-[11px] text-muted-foreground pt-1 px-2">
+              {isRu ? "Алгоритмы определения тона (F0)" : "Pitch Detection (F0)"}
+            </p>
+            {VC_PITCH_MODELS.map(m => (
+              <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-muted/20">
+                <span className="text-muted-foreground font-mono">{m.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{formatBytes(m.sizeBytes)}</span>
+                  {modelStatuses[m.id]
+                    ? <CheckCircle2 className="h-3 w-3 text-primary" />
+                    : <XCircle className="h-3 w-3 text-muted-foreground/50" />
+                  }
+                </div>
+              </div>
+            ))}
           </div>
 
           {downloading && (
