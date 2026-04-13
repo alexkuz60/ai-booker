@@ -40,6 +40,15 @@ export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 /** Project-standard sample rate for Studio timeline compatibility */
 export const PROJECT_OUTPUT_SR = 44_100;
 
+export interface VcResampleMetrics {
+  inputSamples: number;
+  outputSamples: number;
+  inputSR: number;
+  outputSR: number;
+  durationSec: number;
+  resampleMs: number;
+}
+
 export interface VcSynthesisResult {
   /** Synthesized audio samples (Float32Array) */
   audio: Float32Array;
@@ -51,6 +60,8 @@ export interface VcSynthesisResult {
   inferenceMs: number;
   /** Whether SR was auto-detected from model metadata */
   srAutoDetected: boolean;
+  /** Output resampling metrics */
+  resampleMetrics: VcResampleMetrics;
 }
 
 export interface VcSynthesisOptions {
@@ -118,14 +129,23 @@ function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | n
 
 /**
  * Resample raw RVC output to project-standard 44.1 kHz using OfflineAudioContext.
+ * Returns resampled audio + metrics.
  */
-async function resampleToProjectSR(samples: Float32Array, sourceSR: number): Promise<Float32Array> {
-  if (sourceSR === PROJECT_OUTPUT_SR) return samples;
+async function resampleToProjectSR(
+  samples: Float32Array, sourceSR: number,
+): Promise<{ resampled: Float32Array; metrics: VcResampleMetrics }> {
+  const t0 = performance.now();
+  const inputSamples = samples.length;
+  const durationSec = inputSamples / sourceSR;
 
-  const duration = samples.length / sourceSR;
-  const outLength = Math.ceil(duration * PROJECT_OUTPUT_SR);
+  if (sourceSR === PROJECT_OUTPUT_SR) {
+    return {
+      resampled: samples,
+      metrics: { inputSamples, outputSamples: inputSamples, inputSR: sourceSR, outputSR: PROJECT_OUTPUT_SR, durationSec, resampleMs: 0 },
+    };
+  }
 
-  // Create a buffer at the source SR, then resample via OfflineAudioContext
+  const outLength = Math.ceil(durationSec * PROJECT_OUTPUT_SR);
   const offCtx = new OfflineAudioContext(1, outLength, PROJECT_OUTPUT_SR);
   const buf = offCtx.createBuffer(1, samples.length, sourceSR);
   buf.getChannelData(0).set(samples);
@@ -136,7 +156,13 @@ async function resampleToProjectSR(samples: Float32Array, sourceSR: number): Pro
   src.start(0);
 
   const rendered = await offCtx.startRendering();
-  return rendered.getChannelData(0);
+  const resampled = rendered.getChannelData(0);
+  const resampleMs = Math.round(performance.now() - t0);
+
+  return {
+    resampled,
+    metrics: { inputSamples, outputSamples: resampled.length, inputSR: sourceSR, outputSR: PROJECT_OUTPUT_SR, durationSec, resampleMs },
+  };
 }
 
 
