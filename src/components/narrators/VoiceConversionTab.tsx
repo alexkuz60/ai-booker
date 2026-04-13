@@ -257,9 +257,15 @@ export function VoiceConversionTab({
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
+      const rs = result.resample;
+      const srIn = rs.inputSR >= 1000 ? `${(rs.inputSR / 1000).toFixed(rs.inputSR % 1000 === 0 ? 0 : 1)}k` : `${rs.inputSR}`;
+      const srOut = rs.outputSR >= 1000 ? `${(rs.outputSR / 1000).toFixed(rs.outputSR % 1000 === 0 ? 0 : 1)}k` : `${rs.outputSR}`;
       const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
-      setTimingInfo(`${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}`);
+      setTimingInfo(
+        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}\n` +
+        `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
+      );
       setStage("done");
       const url = URL.createObjectURL(result.wav);
       const audio = new Audio(url);
