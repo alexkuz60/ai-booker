@@ -449,11 +449,8 @@ export interface KnnResult {
 }
 
 /**
- * Brute-force L2 KNN search.
- * @param queries - [Q, D] query vectors
- * @param database - [N, D] database vectors
- * @param k - number of nearest neighbors
- * @returns indices and distances for each query
+ * Brute-force L2 KNN search (synchronous, main-thread).
+ * Kept for small datasets or fallback.
  */
 export function searchL2(
   queries: Float32Array, queryCount: number,
@@ -462,32 +459,23 @@ export function searchL2(
 ): KnnResult {
   const indices = new Uint32Array(queryCount * k);
   const distances = new Float32Array(queryCount * k);
-
-  // Temp arrays for per-query top-k tracking
   const topDist = new Float32Array(k);
   const topIdx = new Uint32Array(k);
 
   for (let q = 0; q < queryCount; q++) {
     const qOff = q * dim;
-
-    // Initialize with max distances
     topDist.fill(Infinity);
     topIdx.fill(0);
 
     for (let n = 0; n < dbCount; n++) {
       const nOff = n * dim;
-
-      // Compute L2 squared distance
       let dist = 0;
       for (let d = 0; d < dim; d++) {
         const diff = queries[qOff + d] - database[nOff + d];
         dist += diff * diff;
       }
 
-      // Check if this is closer than current worst in top-k
-      // top-k is maintained as a simple sorted array (k is small, typically 8)
       if (dist < topDist[k - 1]) {
-        // Insert in sorted position
         let pos = k - 1;
         while (pos > 0 && dist < topDist[pos - 1]) {
           topDist[pos] = topDist[pos - 1];
@@ -499,7 +487,6 @@ export function searchL2(
       }
     }
 
-    // Write results
     const outOff = q * k;
     for (let i = 0; i < k; i++) {
       indices[outOff + i] = topIdx[i];
@@ -510,14 +497,78 @@ export function searchL2(
   return { indices, distances };
 }
 
+// ── Web Worker KNN ────────────────────────────────────────────────────────
+
+/** Threshold: use Worker for datasets larger than this */
+const WORKER_THRESHOLD = 10_000;
+
+let workerInstance: Worker | null = null;
+
+function getKnnWorker(): Worker | null {
+  if (typeof Worker === "undefined") return null;
+  if (!workerInstance) {
+    try {
+      workerInstance = new Worker(
+        new URL("./knnWorker.ts", import.meta.url),
+        { type: "module" },
+      );
+    } catch {
+      console.warn("[vcIndex] Failed to create KNN Worker, falling back to main thread");
+      return null;
+    }
+  }
+  return workerInstance;
+}
+
+/**
+ * Async L2 KNN search — uses Web Worker for large datasets,
+ * falls back to synchronous for small ones.
+ */
+async function searchL2Async(
+  queries: Float32Array, queryCount: number,
+  database: Float32Array, dbCount: number,
+  dim: number, k: number,
+): Promise<KnnResult> {
+  // For small datasets, run synchronously — Worker overhead not worth it
+  if (dbCount < WORKER_THRESHOLD) {
+    return searchL2(queries, queryCount, database, dbCount, dim, k);
+  }
+
+  const worker = getKnnWorker();
+  if (!worker) {
+    return searchL2(queries, queryCount, database, dbCount, dim, k);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("KNN Worker timeout (60s)"));
+    }, 60_000);
+
+    worker.onmessage = (e: MessageEvent<KnnResult>) => {
+      clearTimeout(timeout);
+      resolve(e.data);
+    };
+    worker.onerror = (err) => {
+      clearTimeout(timeout);
+      console.warn("[vcIndex] Worker error, falling back:", err.message);
+      resolve(searchL2(queries, queryCount, database, dbCount, dim, k));
+    };
+
+    // Transfer copies to avoid neutering source arrays
+    const qCopy = new Float32Array(queries);
+    const dbCopy = new Float32Array(database);
+    worker.postMessage(
+      { queries: qCopy, queryCount, database: dbCopy, dbCount, dim, k },
+      [qCopy.buffer, dbCopy.buffer],
+    );
+  });
+}
+
 // ── Feature retrieval (RVC algorithm) ─────────────────────────────────────
 
 /**
  * Apply FAISS-style feature retrieval to ContentVec embeddings.
- *
- * For each frame embedding, find k=8 nearest neighbors in the training set,
- * compute inverse-square-distance weighted average, and blend with source
- * at the given index_rate.
+ * Uses Web Worker for large indexes (>10K vectors) to avoid blocking UI.
  *
  * @param embeddings - Source embeddings [T, dim] (will be modified in-place)
  * @param T - Number of frames
@@ -527,19 +578,20 @@ export function searchL2(
  * @param indexRate - Blend factor 0..1 (0 = no retrieval, 1 = full retrieval)
  * @returns Number of frames processed
  */
-export function applyFeatureRetrieval(
+export async function applyFeatureRetrieval(
   embeddings: Float32Array,
   T: number, dim: number,
   trainingData: Float32Array,
   N: number,
   indexRate: number,
-): number {
+): Promise<number> {
   if (indexRate <= 0 || N === 0) return 0;
 
-  const k = Math.min(8, N); // RVC default: k=8
+  const k = Math.min(8, N);
 
   const t0 = performance.now();
-  const { indices, distances } = searchL2(embeddings, T, trainingData, N, dim, k);
+  const useWorker = N >= WORKER_THRESHOLD;
+  const { indices, distances } = await searchL2Async(embeddings, T, trainingData, N, dim, k);
   const searchMs = Math.round(performance.now() - t0);
 
   // Weighted blending: inverse square distance
@@ -547,7 +599,6 @@ export function applyFeatureRetrieval(
     const resOff = q * k;
     const embOff = q * dim;
 
-    // Compute weights (1 / dist²), with epsilon to avoid div-by-zero
     let weightSum = 0;
     const weights = new Float32Array(k);
     for (let i = 0; i < k; i++) {
@@ -557,26 +608,23 @@ export function applyFeatureRetrieval(
       weightSum += w;
     }
 
-    // Normalize weights
     if (weightSum > 0) {
       for (let i = 0; i < k; i++) weights[i] /= weightSum;
     }
 
-    // Compute weighted average of retrieved embeddings
     for (let d = 0; d < dim; d++) {
       let retrieved = 0;
       for (let i = 0; i < k; i++) {
         const dbIdx = indices[resOff + i];
         retrieved += trainingData[dbIdx * dim + d] * weights[i];
       }
-      // Blend: retrieved * index_rate + source * (1 - index_rate)
       embeddings[embOff + d] = retrieved * indexRate + embeddings[embOff + d] * (1 - indexRate);
     }
   }
 
   console.info(
     `[vcIndex] Feature retrieval: ${T} frames × ${N} db vectors, k=${k}, ` +
-    `rate=${indexRate}, search ${searchMs}ms`
+    `rate=${indexRate}, search ${searchMs}ms${useWorker ? " (Worker)" : " (main)"}`
   );
 
   return T;

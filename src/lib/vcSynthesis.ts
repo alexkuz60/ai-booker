@@ -252,7 +252,7 @@ export async function synthesizeVoice(
   if (indexRate > 0 && options?.indexData) {
     const { data: trainData, rows: trainN, cols: trainDim } = options.indexData;
     if (trainDim === features.embeddingDim) {
-      applyFeatureRetrieval(upEmb, T, features.embeddingDim, trainData, trainN, indexRate);
+      await applyFeatureRetrieval(upEmb, T, features.embeddingDim, trainData, trainN, indexRate);
     } else {
       console.warn(`[vcSynthesis] Index dim mismatch: ${trainDim} vs ${features.embeddingDim}, skipping retrieval`);
     }
