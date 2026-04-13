@@ -506,9 +506,9 @@ export function VoiceConversionTab({
           </div>
         )}
         {stage === "done" && timingInfo && (
-          <div className="flex items-center gap-2 text-xs text-primary">
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="font-mono text-xs">{timingInfo}</span>
+          <div className="flex items-start gap-2 text-xs text-primary">
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span className="font-mono text-xs whitespace-pre-line">{timingInfo}</span>
           </div>
         )}
         {stage === "error" && errorMsg && (
