@@ -3,6 +3,7 @@
  * Used to gate Booker Pro features that require GPU compute.
  */
 import { useState, useEffect, useCallback } from "react";
+import { getSharedAdapter } from "@/lib/webgpuAdapter";
 
 export type GpuStatus = "checking" | "supported" | "no-api" | "no-adapter";
 
@@ -45,7 +46,7 @@ export function useWebGPU() {
         return;
       }
       try {
-        const adapter = await navigator.gpu.requestAdapter();
+        const adapter = await getSharedAdapter();
         if (cancelled) return;
         if (!adapter) {
           setStatus("no-adapter");
@@ -101,19 +102,22 @@ export function useWebGPU() {
   const runBenchmark = useCallback(async () => {
     if (!navigator.gpu) return;
     setBenchmarking(true);
+    let device: GPUDevice | null = null;
+    let buffer: GPUBuffer | null = null;
+    let resultBuffer: GPUBuffer | null = null;
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await getSharedAdapter();
       if (!adapter) throw new Error("No adapter");
-      const device = await adapter.requestDevice();
+      device = await adapter.requestDevice();
 
       const size = 1024 * 1024; // 1M elements
       const STORAGE = 0x0080; // GPUBufferUsage.STORAGE
       const COPY_SRC = 0x0004; // GPUBufferUsage.COPY_SRC
-      const buffer = device.createBuffer({
+      buffer = device.createBuffer({
         size: size * 4,
         usage: STORAGE | COPY_SRC,
       });
-      const resultBuffer = device.createBuffer({
+      resultBuffer = device.createBuffer({
         size: size * 4,
         usage: STORAGE | COPY_SRC,
       });
@@ -178,15 +182,15 @@ export function useWebGPU() {
       const flops = (2 * 100 * size * iterations) / (elapsed / 1000);
       const gflops = Math.round(flops / 1e9 * 10) / 10;
 
-      buffer.destroy();
-      resultBuffer.destroy();
-      device.destroy();
-
       setBenchmarkResult(gflops);
     } catch (e) {
       console.error("GPU benchmark failed:", e);
       setBenchmarkResult(-1);
     } finally {
+      // Clean up GPU resources in correct order: buffers first, then device
+      try { buffer?.destroy(); } catch { /* ok */ }
+      try { resultBuffer?.destroy(); } catch { /* ok */ }
+      try { device?.destroy(); } catch { /* ok */ }
       setBenchmarking(false);
     }
   }, []);

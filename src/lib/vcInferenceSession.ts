@@ -8,6 +8,7 @@
  */
 import * as ort from "onnxruntime-web";
 import { readModel } from "./vcModelCache";
+import { getSharedAdapter } from "./webgpuAdapter";
 
 // Configure ONNX Runtime Web paths for WASM backend
 // WASM files must be served from CDN because Vite does not serve node_modules assets
@@ -29,15 +30,10 @@ export interface VcSessionOptions {
 /** Cached sessions keyed by modelId */
 const sessionCache = new Map<string, ort.InferenceSession>();
 
-/** Detect if WebGPU execution provider is available */
+/** Detect if WebGPU execution provider is available (uses shared adapter) */
 async function isWebGpuAvailable(): Promise<boolean> {
-  if (!navigator.gpu) return false;
-  try {
-    const adapter = await navigator.gpu.requestAdapter();
-    return !!adapter;
-  } catch {
-    return false;
-  }
+  const adapter = await getSharedAdapter();
+  return !!adapter;
 }
 
 let resolvedBackend: VcBackend | null = null;
