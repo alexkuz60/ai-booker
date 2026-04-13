@@ -186,8 +186,8 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
               <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
                 <li>dom.webgpu.enabled → true <span className="font-sans opacity-60">— {isRu ? "WebGPU для ONNX-инференса" : "WebGPU for ONNX inference"}</span></li>
                 <li>gfx.webgpu.ignore-blocklist → true <span className="font-sans opacity-60">— {isRu ? "разблокировка GPU" : "unblock GPU"}</span></li>
-                <li>javascript.options.wasm_simd → true <span className="font-sans opacity-60">— {isRu ? "SIMD-ускорение WASM (×2-3)" : "SIMD acceleration (×2-3)"}</span></li>
-                <li>javascript.options.wasm_memory64 → true <span className="font-sans opacity-60">— {isRu ? "память >4 ГБ для моделей" : "memory >4 GB for models"}</span></li>
+                <li>javascript.options.wasm_simd_avx → true <span className="font-sans opacity-60">— {isRu ? "SIMD/AVX-ускорение WASM (×2-3)" : "SIMD/AVX acceleration (×2-3)"}</span></li>
+                <li>javascript.options.wasm_memory_control → true <span className="font-sans opacity-60">— {isRu ? "управление памятью для моделей" : "memory control for models"}</span></li>
                 <li>javascript.options.wasm_threads → true <span className="font-sans opacity-60">— {isRu ? "многопоточность ONNX Runtime" : "ONNX Runtime multi-threading"}</span></li>
               </ul>
               <p className="font-medium mt-1">
