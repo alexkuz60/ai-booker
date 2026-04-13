@@ -3,6 +3,7 @@
  * Used to gate Booker Pro features that require GPU compute.
  */
 import { useState, useEffect, useCallback } from "react";
+import { getSharedAdapter } from "@/lib/webgpuAdapter";
 
 export type GpuStatus = "checking" | "supported" | "no-api" | "no-adapter";
 
@@ -45,7 +46,7 @@ export function useWebGPU() {
         return;
       }
       try {
-        const adapter = await navigator.gpu.requestAdapter();
+        const adapter = await getSharedAdapter();
         if (cancelled) return;
         if (!adapter) {
           setStatus("no-adapter");
