@@ -528,6 +528,76 @@ export function VoiceConversionTab({
 
       <Separator />
 
+      {/* ─── Training Index (.npy) ─── */}
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <Database className="h-3 w-3 inline mr-1 -mt-0.5" />
+          {isRu ? "Индекс обучения (Feature Retrieval)" : "Training Index (Feature Retrieval)"}
+        </p>
+
+        {/* Current index */}
+        {vcIndexId && localIndexes.find(ix => ix.id === vcIndexId) ? (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20">
+            <Database className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{localIndexes.find(ix => ix.id === vcIndexId)!.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {localIndexes.find(ix => ix.id === vcIndexId)!.vectorCount.toLocaleString()} {isRu ? "векторов" : "vectors"} × {localIndexes.find(ix => ix.id === vcIndexId)!.dim}D
+                {" • "}{(localIndexes.find(ix => ix.id === vcIndexId)!.sizeBytes / 1024 / 1024).toFixed(1)} MB
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onUpdateVcConfig({ vc_index_id: "" })}>
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            {isRu
+              ? "Индекс не загружен. Загрузите .npy файл (total_fea.npy из RVC-обучения) для активации Feature Ratio."
+              : "No index loaded. Upload a .npy file (total_fea.npy from RVC training) to activate Feature Ratio."}
+          </p>
+        )}
+
+        {/* Upload button */}
+        <div className="flex gap-2">
+          <input ref={indexInputRef} type="file" accept=".npy" className="hidden" onChange={handleIndexUpload} />
+          <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => indexInputRef.current?.click()} disabled={uploadingIndex}>
+            {uploadingIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {isRu ? "Загрузить .npy" : "Upload .npy"}
+          </Button>
+        </div>
+
+        {/* Local indexes list */}
+        {localIndexes.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{isRu ? "Загруженные индексы:" : "Loaded indexes:"}</p>
+            {localIndexes.map(ix => (
+              <div
+                key={ix.id}
+                className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+                  ix.id === vcIndexId ? "bg-primary/10 border border-primary/30" : "bg-muted/20 hover:bg-muted/40"
+                }`}
+                onClick={() => onUpdateVcConfig({ vc_index_id: ix.id })}
+              >
+                <Database className="h-3 w-3 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate font-mono">{ix.name}</span>
+                <span className="text-muted-foreground tabular-nums">{ix.vectorCount.toLocaleString()}</span>
+                <span className="text-muted-foreground">{(ix.sizeBytes / 1024 / 1024).toFixed(1)}MB</span>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={e => { e.stopPropagation(); handleDeleteIndex(ix.id); }}
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
       {/* Feature Ratio (index_rate) */}
       <div className="space-y-2">
         <div className="flex justify-between">
