@@ -71,9 +71,12 @@ export interface VcSynthesisOptions {
   pitchShift?: number;
   /** Custom RVC model ID in OPFS cache (default "rvc-v2") */
   modelId?: string;
-  /** RVC model native sample rate — used to correctly interpret model output.
-   *  Actual output is always resampled to PROJECT_OUTPUT_SR (44.1 kHz). */
+  /** RVC model native sample rate — used as fallback hint only.
+   *  Actual output SR is derived from inputDurationSec when provided. */
   outputSampleRate?: RvcOutputSR;
+  /** Duration of input audio in seconds — used to derive true output SR
+   *  from model output sample count (outputSamples / inputDuration). */
+  inputDurationSec?: number;
 }
 
 /**
