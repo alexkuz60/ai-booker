@@ -137,7 +137,7 @@ async function resolveModelFile(modelId: string): Promise<ResolvedModelFile | nu
   const dir = await getVcCacheDir();
   if (!dir) return null;
 
-  const entry = VC_MODEL_REGISTRY.find(model => model.id === modelId);
+  const entry = VC_ALL_MODELS.find(model => model.id === modelId);
   if (!entry) return null;
 
   for (const fileName of getModelFileNames(entry)) {
@@ -308,7 +308,7 @@ export async function deleteModel(modelId: string): Promise<boolean> {
   const dir = await getVcCacheDir();
   if (!dir) return false;
 
-  const entry = VC_MODEL_REGISTRY.find(model => model.id === modelId);
+  const entry = VC_ALL_MODELS.find(model => model.id === modelId);
   if (!entry) return false;
 
   let removed = false;
@@ -329,7 +329,7 @@ export async function deleteModel(modelId: string): Promise<boolean> {
 export async function clearAllModels(): Promise<void> {
   const dir = await getVcCacheDir();
   if (!dir) return;
-  for (const entry of VC_MODEL_REGISTRY) {
+  for (const entry of VC_ALL_MODELS) {
     for (const fileName of getModelFileNames(entry)) {
       try { await dir.removeEntry(fileName); } catch { /* ok */ }
     }
