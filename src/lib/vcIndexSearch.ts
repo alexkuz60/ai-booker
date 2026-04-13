@@ -100,6 +100,26 @@ export function parseNpy(buffer: ArrayBuffer): { data: Float32Array; rows: numbe
   return { data, rows, cols };
 }
 
+/**
+ * Build a minimal .npy file blob from a Float32Array + dimensions.
+ */
+export function buildNpyBlob(data: Float32Array, rows: number, cols: number): Blob {
+  const header = `{'descr': '<f4', 'fortran_order': False, 'shape': (${rows}, ${cols}), }`;
+  const prefixLen = 12; // magic(6) + version(2) + headerLen(4)
+  const padded = Math.ceil((prefixLen + header.length + 1) / 64) * 64;
+  const headerPadded = header.padEnd(padded - prefixLen - 1) + "\n";
+  const headerBytes = new TextEncoder().encode(headerPadded);
+  const buf = new ArrayBuffer(prefixLen + headerBytes.length + data.byteLength);
+  const view = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  u8[0] = 0x93; u8[1] = 0x4E; u8[2] = 0x55; u8[3] = 0x4D; u8[4] = 0x50; u8[5] = 0x59;
+  u8[6] = 2; u8[7] = 0;
+  view.setUint32(8, headerBytes.length, true);
+  u8.set(headerBytes, 12);
+  new Uint8Array(buf, 12 + headerBytes.length).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+  return new Blob([buf], { type: "application/octet-stream" });
+}
+
 // ── FAISS .index parser ───────────────────────────────────────────────────
 
 /**
