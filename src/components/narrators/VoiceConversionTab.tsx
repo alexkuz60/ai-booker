@@ -12,12 +12,13 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, PITCH_ALGORITHM_LABELS, type PitchAlgorithm } from "@/lib/vcModelCache";
+import { hasModel, downloadModel } from "@/lib/vcModelCache";
 import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
