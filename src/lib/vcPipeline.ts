@@ -58,6 +58,8 @@ async function extractPitchWithAlgorithm(
       return extractPitch(samples, 16_000, hopMs, "crepe-tiny");
     case "crepe-full":
       return extractPitch(samples, 16_000, hopMs, "crepe-full");
+    case "swiftf0":
+      return extractPitchSwiftF0(samples, 16_000);
     case "rmvpe":
       return extractPitchRmvpe(samples, 16_000);
     default:
