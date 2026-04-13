@@ -557,8 +557,8 @@ export function VoiceConversionTab({
         ) : (
           <p className="text-xs text-muted-foreground italic">
             {isRu
-              ? "Индекс не загружен. Загрузите .npy файл (total_fea.npy из RVC-обучения) для активации Feature Ratio."
-              : "No index loaded. Upload a .npy file (total_fea.npy from RVC training) to activate Feature Ratio."}
+              ? "Индекс не загружен. Загрузите .npy (total_fea.npy) или .index файл из RVC-обучения для активации Feature Ratio."
+              : "No index loaded. Upload a .npy (total_fea.npy) or .index file from RVC training to activate Feature Ratio."}
           </p>
         )}
 
