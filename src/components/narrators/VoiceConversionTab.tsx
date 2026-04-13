@@ -48,7 +48,7 @@ const STAGE_LABELS: Record<VcStage, { ru: string; en: string }> = {
   tts: { ru: "Генерация TTS...", en: "Generating TTS..." },
   resample: { ru: "Ресемплинг 16kHz...", en: "Resampling 16kHz..." },
   contentvec: { ru: "ContentVec эмбеддинги...", en: "ContentVec embeddings..." },
-  crepe: { ru: "CREPE F0 pitch...", en: "CREPE F0 pitch..." },
+  crepe: { ru: "Извлечение F0 pitch...", en: "F0 pitch extraction..." },
   synthesis: { ru: "RVC v2 синтез...", en: "RVC v2 synthesis..." },
   done: { ru: "Готово", en: "Done" },
   error: { ru: "Ошибка", en: "Error" },
