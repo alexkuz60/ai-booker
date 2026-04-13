@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp, GripVertical, Zap } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp, Zap } from "lucide-react";
 import { TheaterMasks } from "@/components/icons/TheaterMasks";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +18,7 @@ import { usePageHeader } from "@/hooks/usePageHeader";
 import { YANDEX_VOICES, ROLE_LABELS } from "@/config/yandexVoices";
 import { ELEVENLABS_VOICES } from "@/config/elevenlabsVoices";
 import { SALUTESPEECH_VOICES } from "@/config/salutespeechVoices";
-import { PROXYAPI_TTS_VOICES, PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
-import { ElevenLabsCreditsWidget } from "@/components/studio/ElevenLabsCreditsWidget";
+import { PROXYAPI_TTS_MODELS, getVoicesForModel } from "@/config/proxyapiVoices";
 import { useSaveBookToProject } from "@/hooks/useSaveBookToProject";
 import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
@@ -30,6 +28,8 @@ import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import type { CharacterIndex } from "@/pages/parser/types";
+import { SliderField } from "@/components/ui/SliderField";
+import { matchVoice, matchRole, PROVIDER_LABELS, getVoiceDisplayName } from "@/lib/voiceMatching";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -67,77 +67,6 @@ interface SceneRow {
   id: string;
   chapter_id: string;
   scene_number: number;
-}
-
-// ─── Voice matching helpers ─────────────────────────────
-
-function matchVoice(gender: string, ageGroup: string): string {
-  const genderVoices = gender !== "unknown"
-    ? YANDEX_VOICES.filter(v => v.gender === gender)
-    : YANDEX_VOICES;
-  if (genderVoices.length === 0) return "marina";
-  const agePrefs: Record<string, Record<string, string[]>> = {
-    female: {
-      child: ["masha", "julia"], teen: ["masha", "lera"], young: ["dasha", "lera", "marina"],
-      adult: ["alena", "jane", "marina"], elder: ["omazh", "julia"], infant: ["masha"],
-    },
-    male: {
-      child: ["filipp"], teen: ["filipp", "anton"], young: ["anton", "alexander"],
-      adult: ["kirill", "alexander", "madirus"], elder: ["zahar", "ermil"], infant: ["filipp"],
-    },
-  };
-  const g = gender === "female" ? "female" : "male";
-  const prefs = agePrefs[g]?.[ageGroup];
-  if (prefs) {
-    const found = prefs.find(id => genderVoices.some(v => v.id === id));
-    if (found) return found;
-  }
-  return genderVoices[0].id;
-}
-
-function matchRole(voiceId: string, temperament: string | null): string {
-  const v = YANDEX_VOICES.find(x => x.id === voiceId);
-  if (!v?.roles || v.roles.length <= 1) return "neutral";
-  const tempRoleMap: Record<string, string[]> = {
-    sanguine: ["good", "friendly"], choleric: ["strict", "evil"],
-    melancholic: ["neutral", "whisper"], phlegmatic: ["neutral", "friendly"],
-  };
-  const preferred = tempRoleMap[temperament ?? ""] ?? [];
-  const found = preferred.find(r => v.roles!.includes(r));
-  return found ?? "neutral";
-}
-
-// ─── Voice name helpers ─────────────────────────────────
-
-const PROVIDER_LABELS: Record<string, string> = {
-  yandex: "Yandex",
-  salutespeech: "Salute",
-  elevenlabs: "ElevenLabs",
-  proxyapi: "OpenAI",
-};
-
-function getVoiceDisplayName(provider: string | undefined, voiceId: string | undefined, isRu: boolean): string {
-  if (!voiceId) return "—";
-  switch (provider) {
-    case "yandex": {
-      const v = YANDEX_VOICES.find(x => x.id === voiceId);
-      return v ? (isRu ? v.name.ru : v.name.en) : voiceId;
-    }
-    case "salutespeech": {
-      const v = SALUTESPEECH_VOICES.find(x => x.id === voiceId);
-      return v ? (isRu ? v.name.ru : v.name.en) : voiceId;
-    }
-    case "elevenlabs": {
-      const v = ELEVENLABS_VOICES.find(x => x.id === voiceId);
-      return v?.name ?? voiceId;
-    }
-    case "proxyapi": {
-      const v = PROXYAPI_TTS_VOICES.find(x => x.id === voiceId);
-      return v?.name ?? voiceId;
-    }
-    default:
-      return voiceId;
-  }
 }
 
 // ─── Component ──────────────────────────────────────────────
@@ -320,7 +249,6 @@ const Narrators = () => {
       const isLocalProject = projectStorage && projectMeta?.bookId === selectedBookId;
 
       if (isLocalProject) {
-        // ── K4: Local-Only — read from OPFS ──
         const localChars = await readCharacterIndex(projectStorage);
         const chars: BookCharacter[] = localChars.map(c => ({
           id: c.id,
@@ -337,7 +265,6 @@ const Narrators = () => {
         }));
         setCharacters(chars);
 
-        // Try local appearances first
         const hasLocalAppearances = localChars.some(c => c.appearances?.length > 0);
         if (hasLocalAppearances) {
           const sceneIdx = await readSceneIndex(projectStorage);
@@ -358,11 +285,9 @@ const Narrators = () => {
           }
           setAppearances(appMap);
         } else {
-          // Supplement: load appearances from DB for display
           await loadAppearancesFromDB(chars.map(c => c.id), selectedBookId);
         }
       } else {
-        // Fallback: load from DB for books without open OPFS project
         const { data } = await supabase
           .from("book_characters")
           .select("id, name, gender, age_group, temperament, description, speech_style, speech_tags, psycho_tags, aliases, voice_config")
@@ -391,7 +316,6 @@ const Narrators = () => {
     const provider = (vc.provider as string) || "yandex";
     const resolvedProvider = provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex";
     setVoiceProvider(resolvedProvider);
-    // Only reset voiceTab to provider if not on VC tab
     if (voiceTab !== "vc") setVoiceTab(resolvedProvider);
 
     if (provider === "salutespeech") {
@@ -421,7 +345,6 @@ const Narrators = () => {
       setPitch((vc.pitch as number) ?? 0);
       setVolume((vc.volume as number) ?? 0);
     }
-    // If character has no saved voice yet, mark dirty so user can save initial assignment
     const hasVoice = !!(vc.voice_id);
     setDirty(!hasVoice);
   }, [selectedId]);
@@ -433,7 +356,6 @@ const Narrators = () => {
     try {
       const currentChar = characters.find(c => c.id === selectedId);
       const isExtra = currentChar?.voice_config?.is_extra as boolean | undefined;
-      // Preserve VC fields from current state
       const vcFields: Record<string, unknown> = {};
       if (currentChar?.voice_config?.vc_enabled != null) vcFields.vc_enabled = currentChar.voice_config.vc_enabled;
       if (currentChar?.voice_config?.vc_pitch_shift != null) vcFields.vc_pitch_shift = currentChar.voice_config.vc_pitch_shift;
@@ -450,7 +372,6 @@ const Narrators = () => {
         ...vcFields,
       };
 
-      // ── K4: Local-Only — write voice_config to OPFS only ──
       if (!projectStorage || projectMeta?.bookId !== selectedBookId) {
         throw new Error(isRu ? "Проект не открыт" : "Project not open");
       }
@@ -665,7 +586,6 @@ const Narrators = () => {
                               {ch.gender === "female" ? "♀" : "♂"}
                             </span>
                           )}
-                          {/* Profile indicator */}
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className={cn(
@@ -706,7 +626,6 @@ const Narrators = () => {
                             </Tooltip>
                           )}
                         </div>
-                        {/* Voice info line */}
                         {hasVoice && (
                           <div className="flex items-center gap-1.5 mt-0.5 ml-0.5">
                             <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 leading-none">
@@ -999,28 +918,3 @@ const Narrators = () => {
 };
 
 export default Narrators;
-
-// ─── Reusable slider field ──────────────────────────────────
-
-function SliderField({ label, value, min, max, step, suffix, default_, showSign, multiplier, decimals, onChange, onReset }: {
-  label: string; value: number; min: number; max: number; step: number;
-  suffix?: string; default_: number; showSign?: boolean; multiplier?: number; decimals?: number;
-  onChange: (v: number) => void; onReset: () => void;
-}) {
-  const display = multiplier ? (value * multiplier).toFixed(decimals ?? 0) : value.toFixed(decimals ?? 1);
-  const sign = showSign && value > 0 ? "+" : "";
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
-        <span className="text-xs text-muted-foreground tabular-nums">{sign}{display}{suffix ?? ""}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Slider min={min} max={max} step={step} value={[value]} onValueChange={([v]) => onChange(v)} className="flex-1" />
-        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={onReset} disabled={value === default_}>
-          <RotateCcw className="h-3 w-3" />
-        </Button>
-      </div>
-    </div>
-  );
-}
