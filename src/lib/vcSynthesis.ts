@@ -315,7 +315,7 @@ export async function synthesizeVoice(
   const durationSec = finalAudio.length / finalSR;
 
   console.info(
-    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${Math.round(effectiveSR)}Hz → ` +
+    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
     `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
     `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
   );
