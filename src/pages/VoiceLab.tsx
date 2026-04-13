@@ -41,10 +41,10 @@ export default function VoiceLab() {
   const navigate = useNavigate();
   const pro = useBookerPro();
 
-  usePageHeader(
-    isRu ? "Голосовая лаборатория" : "Voice Lab",
-    isRu ? "Управление моделями, референсами и обучающими индексами" : "Manage models, references, and training indexes"
-  );
+  usePageHeader({
+    title: isRu ? "Голосовая лаборатория" : "Voice Lab",
+    subtitle: isRu ? "Управление моделями, референсами и обучающими индексами" : "Manage models, references, and training indexes",
+  });
 
   // ── Model status ──
   const [modelStatus, setModelStatus] = useState<Record<string, boolean>>({});

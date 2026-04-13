@@ -27,6 +27,7 @@ const Montage = lazy(() => import("./pages/Montage"));
 const Narrators = lazy(() => import("./pages/Narrators"));
 const Soundscape = lazy(() => import("./pages/Soundscape"));
 const Translation = lazy(() => import("./pages/Translation"));
+const VoiceLab = lazy(() => import("./pages/VoiceLab"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
 
@@ -94,6 +95,7 @@ function ProtectedRoutes() {
               <Route path="/translation" element={
                 <GatedRoute route="/translation"><Translation /></GatedRoute>
               } />
+              <Route path="/voice-lab" element={<VoiceLab />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
