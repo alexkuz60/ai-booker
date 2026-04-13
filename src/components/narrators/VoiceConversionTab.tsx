@@ -71,6 +71,7 @@ export function VoiceConversionTab({
   const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
   const indexRate = (voiceConfig.vc_index_rate as number) ?? 0.75;
+  const vcIndexId = (voiceConfig.vc_index_id as string) || "";
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
 
   // Test pipeline state
@@ -88,11 +89,17 @@ export function VoiceConversionTab({
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Index state
+  const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
+  const [uploadingIndex, setUploadingIndex] = useState(false);
+  const indexInputRef = useRef<HTMLInputElement>(null);
+
   const isProcessing = stage !== "idle" && stage !== "done" && stage !== "error";
 
   // Load local references on mount
   useEffect(() => {
     listVcReferences().then(setLocalRefs);
+    listVcIndexes().then(setLocalIndexes);
   }, []);
 
   // Load collection from voice_references table
