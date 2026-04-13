@@ -52,11 +52,12 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
 ];
 
 /** Pitch algorithm options */
-export type PitchAlgorithm = "crepe-tiny" | "crepe-full" | "rmvpe";
+export type PitchAlgorithm = "crepe-tiny" | "crepe-full" | "swiftf0" | "rmvpe";
 
 export const PITCH_ALGORITHM_LABELS: Record<PitchAlgorithm, { ru: string; en: string; size: string }> = {
   "crepe-tiny": { ru: "CREPE Tiny (быстро)", en: "CREPE Tiny (fast)", size: "~2 MB" },
   "crepe-full": { ru: "CREPE Full (качество)", en: "CREPE Full (quality)", size: "~89 MB" },
+  "swiftf0": { ru: "SwiftF0 (сверхбыстро)", en: "SwiftF0 (ultra-fast)", size: "~400 KB" },
   "rmvpe": { ru: "RMVPE (золотой стандарт)", en: "RMVPE (gold standard)", size: "~362 MB" },
 };
 
