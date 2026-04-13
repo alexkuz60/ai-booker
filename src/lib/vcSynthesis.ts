@@ -194,6 +194,8 @@ export async function synthesizeVoice(
   const modelId = options?.modelId ?? "rvc-v2";
   const speakerId = options?.speakerId ?? 0;
   const pitchShift = options?.pitchShift ?? 0;
+  const protect = Math.max(0, Math.min(0.5, options?.protect ?? 0.33));
+  const indexRate = Math.max(0, Math.min(1, options?.indexRate ?? 0.75));
 
   const session = await createVcSession(modelId);
 
