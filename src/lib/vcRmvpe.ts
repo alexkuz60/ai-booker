@@ -106,16 +106,22 @@ function computeMelSpectrogram(
   nFft: number,
   hopLength: number,
   nMels: number,
-): { data: Float32Array; numFrames: number } {
+): { data: Float32Array; numFrames: number; paddedFrames: number } {
   const filterbank = createMelFilterbank(sr, nFft, nMels);
   const nBins = Math.floor(nFft / 2) + 1;
   const numFrames = Math.floor((samples.length - nFft) / hopLength) + 1;
 
   if (numFrames <= 0) {
-    return { data: new Float32Array(0), numFrames: 0 };
+    return { data: new Float32Array(0), numFrames: 0, paddedFrames: 0 };
   }
 
-  const melData = new Float32Array(numFrames * nMels);
+  // RMVPE U-Net has multiple down/up-sampling stages (typically 5).
+  // Frame count must be a multiple of 2^5 = 32 to avoid dimension mismatches
+  // in skip connections (e.g. 31 vs 30 after floor-division rounding).
+  const PAD_MULTIPLE = 32;
+  const paddedFrames = Math.ceil(numFrames / PAD_MULTIPLE) * PAD_MULTIPLE;
+
+  const melData = new Float32Array(paddedFrames * nMels);
 
   for (let t = 0; t < numFrames; t++) {
     const center = t * hopLength + Math.floor(nFft / 2);
@@ -131,8 +137,9 @@ function computeMelSpectrogram(
       melData[t * nMels + m] = Math.log(Math.max(sum, 1e-10));
     }
   }
+  // Padding frames (numFrames..paddedFrames) remain zero-filled
 
-  return { data: melData, numFrames };
+  return { data: melData, numFrames, paddedFrames };
 }
 
 // ─── RMVPE F0 Decoding ──────────────────────────────────────────────────
@@ -203,7 +210,7 @@ export async function extractPitchRmvpe(
   }
 
   const melMs = Math.round(performance.now() - startMs);
-  console.info(`[RMVPE] Mel spectrogram: ${mel.numFrames} frames in ${melMs}ms`);
+  console.info(`[RMVPE] Mel spectrogram: ${mel.numFrames} frames (padded to ${mel.paddedFrames}) in ${melMs}ms`);
 
   // Step 2: Run RMVPE inference
   const session = await createVcSession("rmvpe");
@@ -212,14 +219,14 @@ export async function extractPitchRmvpe(
   // RMVPE expects [1, n_mels, n_frames] or [1, 1, n_mels, n_frames]
   // Try [1, 1, n_frames, n_mels] first (common ONNX layout)
   // Transpose mel data from [frames, mels] to [mels, frames] for model input
-  const transposed = new Float32Array(mel.numFrames * N_MELS);
-  for (let t = 0; t < mel.numFrames; t++) {
+  const transposed = new Float32Array(mel.paddedFrames * N_MELS);
+  for (let t = 0; t < mel.paddedFrames; t++) {
     for (let m = 0; m < N_MELS; m++) {
-      transposed[m * mel.numFrames + t] = mel.data[t * N_MELS + m];
+      transposed[m * mel.paddedFrames + t] = mel.data[t * N_MELS + m];
     }
   }
 
-  const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.numFrames]);
+  const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.paddedFrames]);
   const results = await session.run({ [inputName]: tensor });
 
   const outputName = session.outputNames[0] ?? "output";
