@@ -77,6 +77,31 @@ export function VoiceConversionTab({
   const [timingInfo, setTimingInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Backend selection: "auto" | "webgpu" | "wasm"
+  const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
+    getForcedBackend() ?? "auto"
+  );
+  const [activeBackend, setActiveBackend] = useState<VcBackend | null>(null);
+
+  // Resolve active backend on mount and after change
+  useEffect(() => {
+    getAvailableBackend().then(setActiveBackend);
+  }, [backendChoice]);
+
+  // Handle backend switch — release existing sessions first
+  const handleBackendChange = useCallback(async (val: string) => {
+    const choice = val as "auto" | VcBackend;
+    // Release all cached sessions since they were created with the old backend
+    await releaseAllVcSessions();
+    setForcedBackend(choice === "auto" ? null : choice);
+    setBackendChoice(choice);
+    toast.info(
+      isRu
+        ? `Бэкенд переключён: ${choice === "auto" ? "авто" : choice === "wasm" ? "CPU (WASM)" : "GPU (WebGPU)"}`
+        : `Backend switched: ${choice === "auto" ? "auto" : choice === "wasm" ? "CPU (WASM)" : "GPU (WebGPU)"}`
+    );
+  }, [isRu]);
+
   // Available references & indexes (read-only lists from OPFS)
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
   const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
