@@ -165,7 +165,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
     pro.setEnabled(checked);
   };
 
-  const cachedCount = Object.values(modelStatuses).filter(Boolean).length;
+  const cachedCount = VC_ALL_MODELS.filter(m => modelStatuses[m.id]).length;
 
   return (
     <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
