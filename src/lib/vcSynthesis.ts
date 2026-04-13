@@ -89,6 +89,16 @@ export interface VcSynthesisOptions {
    * Applied by zeroing F0 for frames below a voicing confidence threshold.
    */
   protect?: number;
+  /**
+   * Pre-loaded training embeddings for feature retrieval.
+   * If provided along with indexRate > 0, applies KNN-based blending
+   * to make output more similar to training voice.
+   */
+  indexData?: {
+    data: Float32Array;
+    rows: number;
+    cols: number;
+  };
 }
 
 /**
