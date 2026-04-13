@@ -26,8 +26,9 @@ import {
 import {
   Zap, Play, Square, Loader2, AlertTriangle, CheckCircle2, Wand2,
   Upload, Music, Trash2, Download, Library, Database, ArrowRight,
-  HardDrive, FlaskConical,
+  HardDrive, FlaskConical, BarChart3,
 } from "lucide-react";
+import { IndexStatsPanel } from "@/components/voicelab/IndexStatsPanel";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -522,6 +523,11 @@ export default function VoiceLab() {
               )}
             </CardContent>
           </Card>
+
+          {/* Index analysis panels */}
+          {localIndexes.map(ix => (
+            <IndexStatsPanel key={ix.id} index={ix} isRu={isRu} />
+          ))}
         </TabsContent>
       </Tabs>
 
