@@ -110,17 +110,20 @@ export async function releaseVcSession(modelId: string): Promise<void> {
   if (session) {
     await session.release();
     sessionCache.delete(modelId);
-    console.info(`[vcSession] Released session "${modelId}"`);
+    sessionSizes.delete(modelId);
+    logVramUsage("release", modelId);
   }
 }
 
 /** Release all cached sessions */
 export async function releaseAllVcSessions(): Promise<void> {
+  const ids = Array.from(sessionCache.keys());
   for (const [id, session] of sessionCache) {
     try { await session.release(); } catch { /* ok */ }
-    console.info(`[vcSession] Released session "${id}"`);
   }
   sessionCache.clear();
+  sessionSizes.clear();
+  console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
 }
 
 /** Get info about loaded sessions */
