@@ -752,4 +752,53 @@ Source → EQ (3-band) → Compressor → Limiter → Panner3D → Convolver (IR
 
 ---
 
+---
+
+## 8. Voice Conversion — Voice Lab
+
+### 8.1. Архитектура VC-пайплайна
+
+| Компонент | Файл | Статус |
+|-----------|------|--------|
+| Кэш ONNX-моделей (OPFS) | `vcModelCache.ts` | ✅ ContentVec + CREPE-tiny + RVC v2 |
+| ONNX-сессии (WebGPU/WASM) | `vcInferenceSession.ts` | ✅ Авто-фоллбэк WebGPU → WASM |
+| ContentVec эмбеддинги | `vcContentVec.ts` | ✅ 768-dim, ~50 fps |
+| CREPE pitch extraction | `vcCrepe.ts` | ✅ Tiny model, hop 10ms |
+| RVC v2 синтез | `vcSynthesis.ts` | ✅ 2x upsample, consonant protect, resample → 44.1kHz |
+| Feature Retrieval (KNN) | `vcIndexSearch.ts` | ✅ L2 KNN (k=8), Web Worker для >10K |
+| Unified pipeline | `vcPipeline.ts` | ✅ resample → CV → CREPE → synthesis → WAV |
+| Кэш референсов (OPFS) | `vcReferenceCache.ts` | ✅ WAV + JSON метаданные |
+| KNN Web Worker | `knnWorker.ts` | ✅ Brute-force L2, transferable objects |
+
+### 8.2. Voice Lab (страница)
+
+- **Модели**: таблица статуса, загрузка с прогрессом, OPFS-кэширование
+- **Референсы**: загрузка аудио, конвертация в WAV, публичная коллекция из Supabase Storage
+- **Индексы**: загрузка .index/.npy, визуализация (L2-нормы, k-means кластеризация)
+- **Анализ индекса** (`IndexStatsPanel`): гистограмма норм (24 бина), статистика (min/max/mean/std), фонетическая кластеризация (k=8, subsampling 20K)
+
+### 8.3. VC-таб на странице Дикторов
+
+- Переключатель `vc_enabled` per-character
+- Выбор референса/индекса из OPFS-кэша
+- Слайдеры: Pitch Shift, Feature Ratio (index_rate), Consonant Protection (protect)
+- Селектор RVC Model Sample Rate (32/40/44.1/48 kHz)
+- Тест «TTS → VC» с 5-этапным прогрессом и метриками
+
+### 8.4. Форматы ресурсов
+
+| Ресурс | Формат | Назначение |
+|--------|--------|------------|
+| Веса модели | `.pth` (PyTorch) | Уникальный тембр — **не поддержан** (требует конвертации в .onnx) |
+| Веса модели | `.onnx` | Браузерный инференс через onnxruntime-web — **TODO: кастомные модели** |
+| Индекс | `.index` (FAISS) / `.npy` (NumPy) | Feature Retrieval — улучшение натуральности |
+| Референс | `.wav` | Аудио-образец целевого голоса |
+
+### 8.5. Нерешённые задачи
+
+- Загрузка кастомных .onnx RVC-моделей (уникальный тембр вместо универсальной модели)
+- Серверная конвертация .pth → .onnx (Edge Function)
+- SIMD-оптимизация KNN через WASM
+- Визуализация прогресса KNN в UI при длительных операциях (>500ms)
+
 **Инструкция для AI:** При обнаружении регрессии или повторяющейся ошибки добавляй запись в этот раздел с датой, описанием и паттерном. Это поможет учиться на ошибках и предотвращать их в будущем. **НИКОГДА** не удаляй runtime guard'ы и тесты контрактов при рефакторинге.
