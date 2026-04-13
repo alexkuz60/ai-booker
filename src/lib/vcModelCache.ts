@@ -49,6 +49,65 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
 ];
 
 const VC_CACHE_DIR = "vc-models";
+export const VC_MODEL_CACHE_EVENT = "booker-pro:vc-model-cache-changed";
+
+const LEGACY_MODEL_FILE_NAMES: Partial<Record<VcModelEntry["id"], string[]>> = {
+  contentvec: ["hubert_base.onnx", "hubert-base.onnx"],
+  "crepe-tiny": ["crepe_tiny.onnx"],
+  "rvc-v2": ["rvc_full.onnx", "rvc.onnx"],
+};
+
+interface ResolvedModelFile {
+  file: File;
+  fileName: string;
+  handle: FileSystemFileHandle;
+}
+
+export function notifyVcModelCacheChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(VC_MODEL_CACHE_EVENT));
+  }
+}
+
+function getModelFileNames(entry: VcModelEntry): string[] {
+  const fileNames = new Set<string>([
+    `${entry.id}.onnx`,
+    ...(LEGACY_MODEL_FILE_NAMES[entry.id] ?? []),
+  ]);
+
+  try {
+    const baseName = new URL(entry.url).pathname.split("/").pop();
+    if (baseName?.endsWith(".onnx")) {
+      fileNames.add(baseName);
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+
+  return Array.from(fileNames);
+}
+
+async function resolveModelFile(modelId: string): Promise<ResolvedModelFile | null> {
+  const dir = await getVcCacheDir();
+  if (!dir) return null;
+
+  const entry = VC_MODEL_REGISTRY.find(model => model.id === modelId);
+  if (!entry) return null;
+
+  for (const fileName of getModelFileNames(entry)) {
+    try {
+      const handle = await dir.getFileHandle(fileName);
+      const file = await handle.getFile();
+      if (file.size > 0) {
+        return { file, fileName, handle };
+      }
+    } catch {
+      /* try next alias */
+    }
+  }
+
+  return null;
+}
 
 // ---------- OPFS directory helpers ----------
 
@@ -81,27 +140,13 @@ export type ProgressCallback = (progress: ModelDownloadProgress) => void;
 
 /** Check if a model is already cached in OPFS */
 export async function hasModel(modelId: string): Promise<boolean> {
-  const dir = await getVcCacheDir();
-  if (!dir) return false;
-  try {
-    await dir.getFileHandle(`${modelId}.onnx`);
-    return true;
-  } catch {
-    return false;
-  }
+  return !!(await resolveModelFile(modelId));
 }
 
 /** Get cached model as ArrayBuffer (for ort.InferenceSession.create) */
 export async function readModel(modelId: string): Promise<ArrayBuffer | null> {
-  const dir = await getVcCacheDir();
-  if (!dir) return null;
-  try {
-    const fh = await dir.getFileHandle(`${modelId}.onnx`);
-    const file = await fh.getFile();
-    return await file.arrayBuffer();
-  } catch {
-    return null;
-  }
+  const resolved = await resolveModelFile(modelId);
+  return resolved ? resolved.file.arrayBuffer() : null;
 }
 
 /** Download a model from remote URL and cache it in OPFS */
@@ -159,6 +204,7 @@ export async function downloadModel(
     const writable = await fh.createWritable();
     await writable.write(blob);
     await writable.close();
+    notifyVcModelCacheChanged();
 
     onProgress?.({
       modelId: entry.id, label: entry.label,
@@ -204,23 +250,33 @@ export async function downloadAllModels(
 
 /** Check which models are already cached */
 export async function getModelStatus(): Promise<Record<string, boolean>> {
-  const result: Record<string, boolean> = {};
-  for (const entry of VC_MODEL_REGISTRY) {
-    result[entry.id] = await hasModel(entry.id);
-  }
-  return result;
+  const entries = await Promise.all(
+    VC_MODEL_REGISTRY.map(async (entry) => [entry.id, await hasModel(entry.id)] as const),
+  );
+
+  return Object.fromEntries(entries);
 }
 
 /** Delete a cached model */
 export async function deleteModel(modelId: string): Promise<boolean> {
   const dir = await getVcCacheDir();
   if (!dir) return false;
-  try {
-    await dir.removeEntry(`${modelId}.onnx`);
-    return true;
-  } catch {
-    return false;
+
+  const entry = VC_MODEL_REGISTRY.find(model => model.id === modelId);
+  if (!entry) return false;
+
+  let removed = false;
+  for (const fileName of getModelFileNames(entry)) {
+    try {
+      await dir.removeEntry(fileName);
+      removed = true;
+    } catch {
+      /* file alias may not exist */
+    }
   }
+
+  if (removed) notifyVcModelCacheChanged();
+  return removed;
 }
 
 /** Delete all cached VC models */
@@ -228,8 +284,11 @@ export async function clearAllModels(): Promise<void> {
   const dir = await getVcCacheDir();
   if (!dir) return;
   for (const entry of VC_MODEL_REGISTRY) {
-    try { await dir.removeEntry(`${entry.id}.onnx`); } catch { /* ok */ }
+    for (const fileName of getModelFileNames(entry)) {
+      try { await dir.removeEntry(fileName); } catch { /* ok */ }
+    }
   }
+  notifyVcModelCacheChanged();
 }
 
 /** Total size of all models in registry (bytes) */
