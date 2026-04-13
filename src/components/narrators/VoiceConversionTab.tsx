@@ -1,7 +1,7 @@
 /**
- * VoiceConversionTab — Booker Pro Voice Conversion settings tab for Narrators page.
- * Per-character VC enable/disable, pitch shift, reference voice selection,
- * upload custom voice, browse collection, test pipeline.
+ * VoiceConversionTab — Simplified VC settings tab for Narrators page.
+ * Voice selection (references/indexes) + synthesis params + test pipeline.
+ * Full management (upload, models) lives on the Voice Lab page.
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,26 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
-import {
-  listVcReferences, saveVcReference, deleteVcReference, hasVcReference,
-  type VcReferenceEntry,
-} from "@/lib/vcReferenceCache";
-import {
-  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseIndexFile, buildNpyBlob,
-  type VcIndexEntry,
-} from "@/lib/vcIndexSearch";
+import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
+import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, Upload, Music, Trash2,
-  Download, Library, Database,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
-import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, vcAudioToWav, type RvcOutputSR } from "@/lib/vcSynthesis";
+import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -63,7 +55,6 @@ export function VoiceConversionTab({
 }: VoiceConversionTabProps) {
   const pro = useBookerPro();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Per-character VC settings from voice_config
   const vcEnabled = (voiceConfig.vc_enabled as boolean) ?? false;
@@ -79,203 +70,20 @@ export function VoiceConversionTab({
   const [stageProgress, setStageProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
-  const [timingInfo, setTimingInfo] = useState<string>("");
+  const [timingInfo, setTimingInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Reference voice state
+  // Available references & indexes (read-only lists from OPFS)
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
-  const [collectionRefs, setCollectionRefs] = useState<{ id: string; name: string; category: string; durationMs: number }[]>([]);
-  const [showCollection, setShowCollection] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
-  // Index state
   const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
-  const [uploadingIndex, setUploadingIndex] = useState(false);
-  const indexInputRef = useRef<HTMLInputElement>(null);
 
   const isProcessing = stage !== "idle" && stage !== "done" && stage !== "error";
 
-  // Load local references on mount
+  // Load available refs & indexes
   useEffect(() => {
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
   }, []);
-
-  // Load collection from voice_references table
-  const loadCollection = useCallback(async () => {
-    const { data } = await supabase
-      .from("voice_references")
-      .select("id, name, category, duration_ms")
-      .eq("is_public", true)
-      .order("name");
-    if (data) {
-      setCollectionRefs(data.map(r => ({
-        id: r.id, name: r.name, category: r.category, durationMs: r.duration_ms,
-      })));
-    }
-  }, []);
-
-  // Handle file upload
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      // Decode to get audio info
-      const arrayBuf = await file.arrayBuffer();
-      const audioCtx = new AudioContext();
-      const decoded = await audioCtx.decodeAudioData(arrayBuf.slice(0));
-      audioCtx.close();
-
-      const id = crypto.randomUUID();
-      const name = file.name.replace(/\.[^.]+$/, "");
-      // Convert to mono WAV for consistency
-      const monoSamples = decoded.getChannelData(0);
-      const wavBlob = vcAudioToWav(monoSamples, decoded.sampleRate);
-
-      const entry: VcReferenceEntry = {
-        id,
-        name,
-        source: "upload",
-        durationMs: Math.round(decoded.duration * 1000),
-        sampleRate: decoded.sampleRate,
-        sizeBytes: wavBlob.size,
-        addedAt: new Date().toISOString(),
-      };
-
-      await saveVcReference(id, wavBlob, entry);
-      setLocalRefs(await listVcReferences());
-      onUpdateVcConfig({ vc_reference_id: id });
-      toast.success(isRu ? `Референс "${name}" загружен` : `Reference "${name}" uploaded`);
-    } catch (err: any) {
-      toast.error(err.message || (isRu ? "Ошибка загрузки" : "Upload error"));
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }, [isRu, onUpdateVcConfig]);
-
-  // Download from collection
-  const handleDownloadFromCollection = useCallback(async (refId: string, refName: string) => {
-    setDownloadingId(refId);
-    try {
-      // Check if already cached
-      if (await hasVcReference(refId)) {
-        onUpdateVcConfig({ vc_reference_id: refId });
-        toast.info(isRu ? "Уже в кэше" : "Already cached");
-        setDownloadingId(null);
-        return;
-      }
-
-      // Get signed URL
-      const { data: refRow } = await supabase
-        .from("voice_references")
-        .select("file_path, duration_ms, sample_rate")
-        .eq("id", refId)
-        .single();
-
-      if (!refRow) throw new Error("Reference not found");
-
-      const { data: signedData } = await supabase.storage
-        .from("voice-references")
-        .createSignedUrl(refRow.file_path, 300);
-
-      if (!signedData?.signedUrl) throw new Error("Failed to get signed URL");
-
-      const resp = await fetch(signedData.signedUrl);
-      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-      const blob = await resp.blob();
-
-      const entry: VcReferenceEntry = {
-        id: refId,
-        name: refName,
-        source: "collection",
-        sourceId: refId,
-        durationMs: refRow.duration_ms,
-        sampleRate: refRow.sample_rate,
-        sizeBytes: blob.size,
-        addedAt: new Date().toISOString(),
-      };
-
-      await saveVcReference(refId, blob, entry);
-      setLocalRefs(await listVcReferences());
-      onUpdateVcConfig({ vc_reference_id: refId });
-      toast.success(isRu ? `"${refName}" скачан` : `"${refName}" downloaded`);
-    } catch (err: any) {
-      toast.error(err.message || (isRu ? "Ошибка скачивания" : "Download error"));
-    } finally {
-      setDownloadingId(null);
-    }
-  }, [isRu, onUpdateVcConfig]);
-
-  // Delete local reference
-  const handleDeleteRef = useCallback(async (id: string) => {
-    await deleteVcReference(id);
-    setLocalRefs(await listVcReferences());
-    if (vcReferenceId === id) onUpdateVcConfig({ vc_reference_id: "" });
-  }, [vcReferenceId, onUpdateVcConfig]);
-
-  // ── Index file upload (.npy) ──
-  const handleIndexUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingIndex(true);
-    try {
-      const arrayBuf = await file.arrayBuffer();
-      const { rows, cols } = parseIndexFile(arrayBuf, file.name);
-      if (cols !== 768 && cols !== 256) {
-        throw new Error(isRu
-          ? `Неподдерживаемая размерность: ${cols}. Ожидается 768 (ContentVec) или 256 (HuBERT v1).`
-          : `Unsupported dimension: ${cols}. Expected 768 (ContentVec) or 256 (HuBERT v1).`);
-      }
-      // Convert to .npy for storage (always save as parsed float32)
-      const id = crypto.randomUUID();
-      const name = file.name.replace(/\.[^.]+$/, "");
-      const parsed = parseIndexFile(arrayBuf, file.name);
-      // Build a minimal .npy header + data blob for storage
-      const npyBlob = buildNpyBlob(parsed.data, parsed.rows, parsed.cols);
-      const entry: VcIndexEntry = {
-        id, name, vectorCount: rows, dim: cols,
-        sizeBytes: npyBlob.size,
-        addedAt: new Date().toISOString(),
-      };
-      await saveVcIndex(id, npyBlob, entry);
-      setLocalIndexes(await listVcIndexes());
-      onUpdateVcConfig({ vc_index_id: id });
-      toast.success(isRu
-        ? `Индекс "${name}" загружен: ${rows.toLocaleString()} векторов × ${cols}D`
-        : `Index "${name}" loaded: ${rows.toLocaleString()} vectors × ${cols}D`);
-    } catch (err: any) {
-      toast.error(err.message || (isRu ? "Ошибка загрузки индекса" : "Index upload error"));
-    } finally {
-      setUploadingIndex(false);
-      if (indexInputRef.current) indexInputRef.current.value = "";
-    }
-  }, [isRu, onUpdateVcConfig]);
-
-  // Delete index
-  const handleDeleteIndex = useCallback(async (id: string) => {
-    await deleteVcIndex(id);
-    setLocalIndexes(await listVcIndexes());
-    if (vcIndexId === id) onUpdateVcConfig({ vc_index_id: "" });
-  }, [vcIndexId, onUpdateVcConfig]);
-
-
-  const handlePreviewRef = useCallback(async (id: string) => {
-    if (playing && audioRef) { audioRef.pause(); setPlaying(false); return; }
-    try {
-      const { readVcReferenceBlob } = await import("@/lib/vcReferenceCache");
-      const blob = await readVcReferenceBlob(id);
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
-      setAudioRef(audio);
-      setPlaying(true);
-      await audio.play();
-    } catch { /* ignore */ }
-  }, [playing, audioRef]);
 
   const handleStop = useCallback(() => {
     if (audioRef) { audioRef.pause(); audioRef.currentTime = 0; }
@@ -370,6 +178,7 @@ export function VoiceConversionTab({
   }
 
   const selectedRef = localRefs.find(r => r.id === vcReferenceId);
+  const selectedIndex = localIndexes.find(ix => ix.id === vcIndexId);
 
   return (
     <div className="space-y-5 mt-4">
@@ -398,113 +207,64 @@ export function VoiceConversionTab({
 
       <Separator />
 
-      {/* ─── Reference Voice ─── */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          {isRu ? "Референсный голос" : "Reference Voice"}
-        </p>
-
-        {/* Current selection */}
-        {selectedRef ? (
-          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20">
-            <Music className="h-4 w-4 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{selectedRef.name}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {(selectedRef.durationMs / 1000).toFixed(1)}s • {selectedRef.source === "collection" ? (isRu ? "Коллекция" : "Collection") : (isRu ? "Загружен" : "Uploaded")}
-              </p>
-            </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handlePreviewRef(selectedRef.id)}>
-              <Play className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onUpdateVcConfig({ vc_reference_id: "" })}>
-              <RotateCcw className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">
-            {isRu ? "Референс не выбран. Загрузите аудио или выберите из коллекции." : "No reference selected. Upload audio or pick from collection."}
-          </p>
-        )}
-
-        {/* Upload + Collection buttons */}
-        <div className="flex gap-2">
-          <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleFileUpload} />
-          <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            {isRu ? "Загрузить файл" : "Upload file"}
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => { setShowCollection(!showCollection); if (!showCollection) loadCollection(); }}>
-            <Library className="h-3.5 w-3.5" />
-            {isRu ? "Коллекция" : "Collection"}
+      {/* ─── Reference Voice Select ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Референсный голос" : "Reference Voice"}
+          </label>
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs gap-1" onClick={() => navigate("/voice-lab")}>
+            <FlaskConical className="h-3 w-3" />
+            {isRu ? "Voice Lab" : "Voice Lab"}
           </Button>
         </div>
-
-        {/* Collection browser */}
-        {showCollection && (
-          <div className="rounded-md border border-border bg-muted/20 overflow-hidden">
-            <ScrollArea className="max-h-40">
-              {collectionRefs.length === 0 ? (
-                <p className="p-3 text-xs text-muted-foreground text-center">
-                  {isRu ? "Коллекция пуста" : "Collection is empty"}
-                </p>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {collectionRefs.map(r => {
-                    const isCached = localRefs.some(lr => lr.id === r.id);
-                    return (
-                      <div key={r.id} className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted/40">
-                        <Music className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="flex-1 truncate">{r.name}</span>
-                        <Badge variant="outline" className="text-[9px] px-1 py-0">{r.category}</Badge>
-                        <span className="text-muted-foreground tabular-nums">{(r.durationMs / 1000).toFixed(1)}s</span>
-                        {isCached ? (
-                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 text-primary" onClick={() => onUpdateVcConfig({ vc_reference_id: r.id })}>
-                            <CheckCircle2 className="h-3 w-3" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => handleDownloadFromCollection(r.id, r.name)} disabled={downloadingId === r.id}>
-                            {downloadingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-        )}
-
-        {/* Local references list */}
-        {localRefs.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              {isRu ? "Локальный пул:" : "Local pool:"}
-            </p>
+        <Select value={vcReferenceId || "__none__"} onValueChange={v => onUpdateVcConfig({ vc_reference_id: v === "__none__" ? "" : v })}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={isRu ? "Не выбран" : "Not selected"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">{isRu ? "— Без референса —" : "— No reference —"}</SelectItem>
             {localRefs.map(r => (
-              <div
-                key={r.id}
-                className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
-                  r.id === vcReferenceId ? "bg-primary/10 border border-primary/30" : "bg-muted/20 hover:bg-muted/40"
-                }`}
-                onClick={() => onUpdateVcConfig({ vc_reference_id: r.id })}
-              >
-                <Music className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="flex-1 truncate font-mono">{r.name}</span>
-                <span className="text-muted-foreground tabular-nums">{(r.durationMs / 1000).toFixed(1)}s</span>
-                <span className="text-muted-foreground">{(r.sizeBytes / 1024).toFixed(0)}KB</span>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={e => { e.stopPropagation(); handleDeleteRef(r.id); }}
-                >
-                  <Trash2 className="h-2.5 w-2.5" />
-                </Button>
-              </div>
+              <SelectItem key={r.id} value={r.id}>
+                {r.name} ({(r.durationMs / 1000).toFixed(1)}s)
+              </SelectItem>
             ))}
-          </div>
+          </SelectContent>
+        </Select>
+        {localRefs.length === 0 && (
+          <p className="text-xs text-muted-foreground italic">
+            {isRu ? "Нет референсов. Загрузите в " : "No references. Upload in "}
+            <button className="text-primary underline" onClick={() => navigate("/voice-lab")}>Voice Lab</button>.
+          </p>
         )}
+      </div>
+
+      <Separator />
+
+      {/* ─── Training Index Select ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Индекс обучения" : "Training Index"}
+          </label>
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs gap-1" onClick={() => navigate("/voice-lab")}>
+            <FlaskConical className="h-3 w-3" />
+            {isRu ? "Voice Lab" : "Voice Lab"}
+          </Button>
+        </div>
+        <Select value={vcIndexId || "__none__"} onValueChange={v => onUpdateVcConfig({ vc_index_id: v === "__none__" ? "" : v })}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={isRu ? "Не выбран" : "Not selected"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">{isRu ? "— Без индекса —" : "— No index —"}</SelectItem>
+            {localIndexes.map(ix => (
+              <SelectItem key={ix.id} value={ix.id}>
+                {ix.name} ({ix.vectorCount.toLocaleString()} × {ix.dim}D)
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Separator />
@@ -525,92 +285,18 @@ export function VoiceConversionTab({
             <RotateCcw className="h-3 w-3" />
           </Button>
         </div>
-        <p className="text-muted-foreground/60 text-sm text-center">
+        <p className="text-muted-foreground/60 text-xs text-center">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
         </p>
       </div>
 
       <Separator />
 
-      {/* ─── Training Index (.npy) ─── */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          <Database className="h-3 w-3 inline mr-1 -mt-0.5" />
-          {isRu ? "Индекс обучения (Feature Retrieval)" : "Training Index (Feature Retrieval)"}
-        </p>
-
-        {/* Current index */}
-        {vcIndexId && localIndexes.find(ix => ix.id === vcIndexId) ? (
-          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20">
-            <Database className="h-4 w-4 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{localIndexes.find(ix => ix.id === vcIndexId)!.name}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {localIndexes.find(ix => ix.id === vcIndexId)!.vectorCount.toLocaleString()} {isRu ? "векторов" : "vectors"} × {localIndexes.find(ix => ix.id === vcIndexId)!.dim}D
-                {" • "}{(localIndexes.find(ix => ix.id === vcIndexId)!.sizeBytes / 1024 / 1024).toFixed(1)} MB
-              </p>
-            </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onUpdateVcConfig({ vc_index_id: "" })}>
-              <RotateCcw className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">
-            {isRu
-              ? "Индекс не загружен. Загрузите .npy (total_fea.npy) или .index файл из RVC-обучения для активации Feature Ratio."
-              : "No index loaded. Upload a .npy (total_fea.npy) or .index file from RVC training to activate Feature Ratio."}
-          </p>
-        )}
-
-        {/* Upload button */}
-        <div className="flex gap-2">
-          <input ref={indexInputRef} type="file" accept=".npy,.index,.bin" className="hidden" onChange={handleIndexUpload} />
-          <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => indexInputRef.current?.click()} disabled={uploadingIndex}>
-            {uploadingIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            {isRu ? "Загрузить .npy / .index" : "Upload .npy / .index"}
-          </Button>
-        </div>
-
-        {/* Local indexes list */}
-        {localIndexes.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">{isRu ? "Загруженные индексы:" : "Loaded indexes:"}</p>
-            {localIndexes.map(ix => (
-              <div
-                key={ix.id}
-                className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
-                  ix.id === vcIndexId ? "bg-primary/10 border border-primary/30" : "bg-muted/20 hover:bg-muted/40"
-                }`}
-                onClick={() => onUpdateVcConfig({ vc_index_id: ix.id })}
-              >
-                <Database className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="flex-1 truncate font-mono">{ix.name}</span>
-                <span className="text-muted-foreground tabular-nums">{ix.vectorCount.toLocaleString()}</span>
-                <span className="text-muted-foreground">{(ix.sizeBytes / 1024 / 1024).toFixed(1)}MB</span>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={e => { e.stopPropagation(); handleDeleteIndex(ix.id); }}
-                >
-                  <Trash2 className="h-2.5 w-2.5" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <Separator />
-
-      {/* Feature Ratio (index_rate) */}
+      {/* Feature Ratio */}
       <div className="space-y-2">
         <div className="flex justify-between">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {isRu ? "Feature Ratio" : "Feature Ratio"}
-          </label>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {indexRate.toFixed(2)}
-          </span>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Feature Ratio</label>
+          <span className="text-xs text-muted-foreground tabular-nums">{indexRate.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-2">
           <Slider min={0} max={1} step={0.05} value={[indexRate]} onValueChange={([v]) => onUpdateVcConfig({ vc_index_rate: v })} className="flex-1" />
@@ -619,23 +305,19 @@ export function VoiceConversionTab({
           </Button>
         </div>
         <p className="text-muted-foreground/60 text-xs text-center">
-          {isRu
-            ? "0 = чистая артикуляция источника | 1 = максимальное сходство с целевым голосом"
-            : "0 = pure source articulation | 1 = max similarity to target voice"}
+          {isRu ? "0 = чистая артикуляция | 1 = макс. сходство с целевым голосом" : "0 = pure articulation | 1 = max target similarity"}
         </p>
       </div>
 
       <Separator />
 
-      {/* Consonant Protection (protect) */}
+      {/* Consonant Protection */}
       <div className="space-y-2">
         <div className="flex justify-between">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {isRu ? "Защита согласных" : "Consonant Protection"}
           </label>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {protect.toFixed(2)}
-          </span>
+          <span className="text-xs text-muted-foreground tabular-nums">{protect.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-2">
           <Slider min={0} max={0.5} step={0.01} value={[protect]} onValueChange={([v]) => onUpdateVcConfig({ vc_protect: v })} className="flex-1" />
@@ -644,9 +326,7 @@ export function VoiceConversionTab({
           </Button>
         </div>
         <p className="text-muted-foreground/60 text-xs text-center">
-          {isRu
-            ? "0 = без защиты | 0.5 = максимальное сохранение шипящих/взрывных"
-            : "0 = no protection | 0.5 = max preservation of sibilants/plosives"}
+          {isRu ? "0 = без защиты | 0.5 = макс. сохранение шипящих/взрывных" : "0 = no protection | 0.5 = max sibilant preservation"}
         </p>
       </div>
 
@@ -672,14 +352,11 @@ export function VoiceConversionTab({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground/60 text-xs text-center">
-          {isRu
-            ? "Нативный SR модели. Выход всегда 44.1 kHz. Если голос быстрый — попробуйте 32 kHz"
-            : "Model native SR. Output is always 44.1 kHz. If voice sounds fast — try 32 kHz"}
-        </p>
       </div>
 
       <Separator />
+
+      {/* Test Pipeline */}
       <div className="space-y-3">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {isRu ? "Тест пайплайна" : "Pipeline Test"}
@@ -706,15 +383,6 @@ export function VoiceConversionTab({
             <span className="break-all">{errorMsg}</span>
           </div>
         )}
-      </div>
-
-      {/* Info box */}
-      <div className="rounded-md border border-border bg-muted/30 p-2.5">
-        <p className="text-muted-foreground leading-relaxed text-xs">
-          {isRu
-            ? "🎙️ Voice Conversion преобразует TTS-аудио в уникальный тембр через ContentVec → CREPE → RVC v2. Обработка полностью на стороне клиента (WebGPU/WASM)."
-            : "🎙️ Voice Conversion transforms TTS audio into a unique timbre via ContentVec → CREPE → RVC v2. Processing is fully client-side (WebGPU/WASM)."}
-        </p>
       </div>
     </div>
   );
