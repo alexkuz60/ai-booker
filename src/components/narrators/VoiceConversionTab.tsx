@@ -160,6 +160,15 @@ export function VoiceConversionTab({
     listVcIndexes().then(setLocalIndexes);
   }, []);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
+    };
+  }, [resultBlobUrl]);
+
   const handleStop = useCallback(() => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     setPlaying(false);
