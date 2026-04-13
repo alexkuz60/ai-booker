@@ -19,7 +19,7 @@ import {
   type VcReferenceEntry,
 } from "@/lib/vcReferenceCache";
 import {
-  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseNpy,
+  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseIndexFile,
   type VcIndexEntry,
 } from "@/lib/vcIndexSearch";
 import {
@@ -223,20 +223,24 @@ export function VoiceConversionTab({
     setUploadingIndex(true);
     try {
       const arrayBuf = await file.arrayBuffer();
-      const { rows, cols } = parseNpy(arrayBuf);
+      const { rows, cols } = parseIndexFile(arrayBuf, file.name);
       if (cols !== 768 && cols !== 256) {
         throw new Error(isRu
           ? `Неподдерживаемая размерность: ${cols}. Ожидается 768 (ContentVec) или 256 (HuBERT v1).`
           : `Unsupported dimension: ${cols}. Expected 768 (ContentVec) or 256 (HuBERT v1).`);
       }
+      // Convert to .npy for storage (always save as parsed float32)
       const id = crypto.randomUUID();
       const name = file.name.replace(/\.[^.]+$/, "");
+      const parsed = parseIndexFile(arrayBuf, file.name);
+      // Build a minimal .npy header + data blob for storage
+      const npyBlob = buildNpyBlob(parsed.data, parsed.rows, parsed.cols);
       const entry: VcIndexEntry = {
         id, name, vectorCount: rows, dim: cols,
-        sizeBytes: file.size,
+        sizeBytes: npyBlob.size,
         addedAt: new Date().toISOString(),
       };
-      await saveVcIndex(id, new Blob([arrayBuf]), entry);
+      await saveVcIndex(id, npyBlob, entry);
       setLocalIndexes(await listVcIndexes());
       onUpdateVcConfig({ vc_index_id: id });
       toast.success(isRu
