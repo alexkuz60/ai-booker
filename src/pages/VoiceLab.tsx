@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getModelStatus, VC_MODEL_REGISTRY, downloadAllModels, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, downloadAllModels, downloadModel, deleteModel, hasModel, type ModelDownloadProgress } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
@@ -54,6 +54,8 @@ export default function VoiceLab() {
   const [modelStatus, setModelStatus] = useState<Record<string, boolean>>({});
   const [downloading, setDownloading] = useState(false);
   const [dlProgress, setDlProgress] = useState<ModelDownloadProgress | null>(null);
+  const [pitchBusy, setPitchBusy] = useState<string | null>(null);
+  const [pitchDlPct, setPitchDlPct] = useState(0);
 
   // ── References ──
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
@@ -73,18 +75,26 @@ export default function VoiceLab() {
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   // Load data on mount
+  const refreshModelStatus = useCallback(async () => {
+    const core = await getModelStatus();
+    const pitchEntries = await Promise.all(
+      VC_PITCH_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
+    );
+    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries) });
+  }, []);
+
   useEffect(() => {
-    getModelStatus().then(setModelStatus);
+    refreshModelStatus();
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
-  }, []);
+  }, [refreshModelStatus]);
 
   // ── Model download ──
   const handleDownloadModels = useCallback(async () => {
     setDownloading(true);
     try {
       await downloadAllModels((p) => setDlProgress(p));
-      setModelStatus(await getModelStatus());
+      await refreshModelStatus();
       toast.success(isRu ? "Все модели загружены" : "All models downloaded");
     } catch (err: any) {
       toast.error(err.message || (isRu ? "Ошибка загрузки моделей" : "Model download error"));
@@ -92,7 +102,30 @@ export default function VoiceLab() {
       setDownloading(false);
       setDlProgress(null);
     }
-  }, [isRu]);
+  }, [isRu, refreshModelStatus]);
+
+  const handleDownloadPitch = useCallback(async (entry: typeof VC_PITCH_MODELS[number]) => {
+    setPitchBusy(entry.id);
+    setPitchDlPct(0);
+    try {
+      const ok = await downloadModel(entry, (p) => setPitchDlPct(Math.round(p.fraction * 100)));
+      if (!ok) throw new Error("Download failed");
+      await refreshModelStatus();
+      toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+    } catch (err: any) {
+      toast.error(err.message || (isRu ? "Ошибка загрузки" : "Download error"));
+    } finally {
+      setPitchBusy(null);
+    }
+  }, [isRu, refreshModelStatus]);
+
+  const handleDeletePitch = useCallback(async (modelId: string, label: string) => {
+    const ok = await deleteModel(modelId);
+    if (ok) {
+      await refreshModelStatus();
+      toast.success(isRu ? `${label} удалена` : `${label} deleted`);
+    }
+  }, [isRu, refreshModelStatus]);
 
   // ── Reference upload ──
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -332,6 +365,71 @@ export default function VoiceLab() {
               {downloading && dlProgress && (
                 <Progress value={dlProgress.fraction * 100} className="h-1.5" />
               )}
+            </CardContent>
+          </Card>
+
+          {/* ── Pitch Models (optional) ── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                {isRu ? "Модели определения тона (F0)" : "Pitch Detection Models (F0)"}
+                <Badge variant="outline" className="text-[10px] ml-auto">
+                  {isRu ? "опционально" : "optional"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                {isRu
+                  ? "Дополнительные алгоритмы для более точного определения высоты тона. CREPE Tiny (~2 MB) включён в базовый набор."
+                  : "Additional algorithms for higher-quality pitch detection. CREPE Tiny (~2 MB) is included in the core set."}
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
+                    <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
+                    <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                    <TableHead className="text-xs w-20"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {VC_PITCH_MODELS.map(m => {
+                    const cached = !!modelStatus[m.id];
+                    const busy = pitchBusy === m.id;
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="py-2">
+                          <p className="text-sm font-medium">{m.label}</p>
+                          <p className="text-xs text-muted-foreground">{m.description}</p>
+                        </TableCell>
+                        <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                          {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {cached
+                            ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
+                            : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {cached ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeletePitch(m.id, m.label)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => handleDownloadPitch(m)} disabled={!!pitchBusy}>
+                              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                              {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {pitchBusy && <Progress value={pitchDlPct} className="h-1.5" />}
             </CardContent>
           </Card>
         </TabsContent>
