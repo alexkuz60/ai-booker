@@ -99,6 +99,8 @@ export async function createVcSession(
   console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms`);
 
   sessionCache.set(modelId, session);
+  sessionSizes.set(modelId, buffer.byteLength);
+  logVramUsage("load", modelId);
   return session;
 }
 
