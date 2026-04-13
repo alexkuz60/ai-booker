@@ -21,6 +21,7 @@
 import * as ort from "onnxruntime-web";
 import { createVcSession } from "./vcInferenceSession";
 import { alignPitchToEmbeddings } from "./vcPipeline";
+import { applyFeatureRetrieval } from "./vcIndexSearch";
 import type { VcFeatures } from "./vcPipeline";
 
 // RVC v2 constants — mel-scale pitch quantization (matches Applio/RVC reference)
