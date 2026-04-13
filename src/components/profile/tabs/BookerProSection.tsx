@@ -19,7 +19,7 @@ import type { BookerProState } from "@/hooks/useBookerPro";
 import { useGpuDevices } from "@/hooks/useGpuDevices";
 import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import {
-  VC_MODEL_REGISTRY, downloadAllModels, getModelStatus,
+  VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, downloadAllModels, getModelStatus,
   getTotalModelSize, clearAllModels, VC_MODEL_CACHE_EVENT,
   type ModelDownloadProgress,
 } from "@/lib/vcModelCache";
