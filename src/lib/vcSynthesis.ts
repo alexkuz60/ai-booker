@@ -287,13 +287,25 @@ export async function synthesizeVoice(
 
   const rawAudio = new Float32Array(output.data as Float32Array);
 
+  // Derive effective output SR from input duration when available.
+  // This is critical: RVC models may internally use a non-standard SR or
+  // hop size, so guessing (32k/40k/48k) often gives wrong duration.
+  // The correct approach: effectiveSR = rawSamples / knownInputDuration.
+  let effectiveSR = outputSR;
+  if (options?.inputDurationSec && options.inputDurationSec > 0) {
+    effectiveSR = rawAudio.length / options.inputDurationSec;
+    console.info(
+      `[vcSynthesis] Derived effective SR: ${rawAudio.length} samples / ${options.inputDurationSec.toFixed(3)}s = ${Math.round(effectiveSR)}Hz`
+    );
+  }
+
   // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility
-  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
+  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, effectiveSR);
   const finalSR = PROJECT_OUTPUT_SR;
   const durationSec = finalAudio.length / finalSR;
 
   console.info(
-    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
+    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${Math.round(effectiveSR)}Hz → ` +
     `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
     `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
   );
