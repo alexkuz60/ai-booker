@@ -77,19 +77,21 @@ function decodePitch(probs: Float32Array): { frequency: number; confidence: numb
 }
 
 /**
- * Run CREPE-tiny on 16 kHz mono audio.
+ * Run CREPE on 16 kHz mono audio.
+ * Supports both "crepe-tiny" and "crepe-full" models.
  * Model must be pre-downloaded to OPFS via vcModelCache.
  */
 export async function extractPitch(
   samples: Float32Array,
   sampleRate = EXPECTED_SR,
   hopMs = DEFAULT_HOP_MS,
+  modelId: "crepe-tiny" | "crepe-full" = "crepe-tiny",
 ): Promise<CrepeResult> {
   if (sampleRate !== EXPECTED_SR) {
     throw new Error(`CREPE requires ${EXPECTED_SR}Hz input, got ${sampleRate}Hz`);
   }
 
-  const session = await createVcSession("crepe-tiny");
+  const session = await createVcSession(modelId);
   const hopSamples = Math.round((hopMs / 1000) * sampleRate);
 
   // Frame the audio

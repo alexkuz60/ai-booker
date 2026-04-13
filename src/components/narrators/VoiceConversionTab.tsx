@@ -12,12 +12,13 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, PITCH_ALGORITHM_LABELS, type PitchAlgorithm } from "@/lib/vcModelCache";
+import { hasModel, downloadModel } from "@/lib/vcModelCache";
 import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
@@ -47,7 +48,7 @@ const STAGE_LABELS: Record<VcStage, { ru: string; en: string }> = {
   tts: { ru: "Генерация TTS...", en: "Generating TTS..." },
   resample: { ru: "Ресемплинг 16kHz...", en: "Resampling 16kHz..." },
   contentvec: { ru: "ContentVec эмбеддинги...", en: "ContentVec embeddings..." },
-  crepe: { ru: "CREPE F0 pitch...", en: "CREPE F0 pitch..." },
+  crepe: { ru: "Извлечение F0 pitch...", en: "F0 pitch extraction..." },
   synthesis: { ru: "RVC v2 синтез...", en: "RVC v2 synthesis..." },
   done: { ru: "Готово", en: "Done" },
   error: { ru: "Ошибка", en: "Error" },
@@ -68,6 +69,7 @@ export function VoiceConversionTab({
   const indexRate = (voiceConfig.vc_index_rate as number) ?? 0.75;
   const vcIndexId = (voiceConfig.vc_index_id as string) || "";
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
+  const pitchAlgorithm = (voiceConfig.vc_pitch_algorithm as PitchAlgorithm) || "crepe-tiny";
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
@@ -102,11 +104,54 @@ export function VoiceConversionTab({
     );
   }, [isRu]);
 
+  // Pitch model download state
+  const [pitchModelDownloading, setPitchModelDownloading] = useState(false);
+  const [pitchDlProgress, setPitchDlProgress] = useState(0);
+
   // Available references & indexes (read-only lists from OPFS)
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
   const [localIndexes, setLocalIndexes] = useState<VcIndexEntry[]>([]);
 
   const isProcessing = stage !== "idle" && stage !== "done" && stage !== "error";
+
+  /** Handle pitch algorithm change — download model if needed */
+  const handlePitchAlgorithmChange = useCallback(async (val: string) => {
+    const algo = val as PitchAlgorithm;
+    onUpdateVcConfig({ vc_pitch_algorithm: algo });
+
+    // Check if the selected model is already downloaded
+    const modelId = algo; // model IDs match algorithm IDs
+    const cached = await hasModel(modelId);
+    if (cached) return;
+
+    // Need to download the model
+    const entry = VC_ALL_MODELS.find(m => m.id === modelId);
+    if (!entry) return;
+
+    const confirmed = window.confirm(
+      isRu
+        ? `Модель "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) не загружена. Скачать?`
+        : `Model "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) not cached. Download?`
+    );
+    if (!confirmed) {
+      // Revert to crepe-tiny which is always available
+      onUpdateVcConfig({ vc_pitch_algorithm: "crepe-tiny" });
+      return;
+    }
+
+    setPitchModelDownloading(true);
+    setPitchDlProgress(0);
+    try {
+      const ok = await downloadModel(entry, (p) => setPitchDlProgress(Math.round(p.fraction * 100)));
+      if (!ok) throw new Error("Download failed");
+      toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+    } catch (err: any) {
+      toast.error(isRu ? `Ошибка загрузки: ${err.message}` : `Download error: ${err.message}`);
+      onUpdateVcConfig({ vc_pitch_algorithm: "crepe-tiny" });
+    } finally {
+      setPitchModelDownloading(false);
+    }
+  }, [isRu, onUpdateVcConfig]);
 
   // Load available refs & indexes
   useEffect(() => {
@@ -158,6 +203,7 @@ export function VoiceConversionTab({
       }
 
       const pipelineOpts: VcPipelineOptions = {
+        pitchAlgorithm,
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
@@ -169,8 +215,9 @@ export function VoiceConversionTab({
       const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       const backendLabel = activeBackend === "wasm" ? " [CPU/WASM]" : " [GPU/WebGPU]";
+      const pitchLabel = result.features.pitchAlgorithm === "rmvpe" ? "RMVPE" : result.features.pitchAlgorithm === "crepe-full" ? "CREPE-Full" : "CREPE-Tiny";
       setTimingInfo(
-        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
+        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
@@ -185,7 +232,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -233,6 +280,44 @@ export function VoiceConversionTab({
           </p>
         </div>
         <Switch checked={vcEnabled} onCheckedChange={v => onUpdateVcConfig({ vc_enabled: v })} />
+      </div>
+
+      {/* ─── Pitch Algorithm ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Алгоритм питча (F0)" : "Pitch Algorithm (F0)"}
+          </label>
+          <Badge variant="outline" className="text-[10px]">
+            {PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.size ?? "~2 MB"}
+          </Badge>
+        </div>
+        <Select value={pitchAlgorithm} onValueChange={handlePitchAlgorithmChange} disabled={isProcessing || pitchModelDownloading}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PITCH_ALGORITHM_LABELS) as PitchAlgorithm[]).map(algo => (
+              <SelectItem key={algo} value={algo}>
+                {isRu ? PITCH_ALGORITHM_LABELS[algo].ru : PITCH_ALGORITHM_LABELS[algo].en}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {pitchModelDownloading && (
+          <div className="space-y-1">
+            <Progress value={pitchDlProgress} className="h-1.5" />
+            <p className="text-xs text-muted-foreground text-center">
+              <Download className="inline h-3 w-3 mr-1" />
+              {isRu ? `Загрузка модели: ${pitchDlProgress}%` : `Downloading model: ${pitchDlProgress}%`}
+            </p>
+          </div>
+        )}
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "Tiny = быстро | Full = чище переходы | RMVPE = золотой стандарт"
+            : "Tiny = fast | Full = cleaner transitions | RMVPE = gold standard"}
+        </p>
       </div>
 
       <Separator />
