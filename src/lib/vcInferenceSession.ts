@@ -30,6 +30,19 @@ export interface VcSessionOptions {
 /** Cached sessions keyed by modelId */
 const sessionCache = new Map<string, ort.InferenceSession>();
 
+/** Track model buffer sizes for VRAM estimation */
+const sessionSizes = new Map<string, number>();
+
+/** Log estimated VRAM usage across all loaded sessions */
+function logVramUsage(action: string, modelId: string): void {
+  let totalBytes = 0;
+  for (const sz of sessionSizes.values()) totalBytes += sz;
+  const models = Array.from(sessionSizes.keys()).join(", ");
+  console.info(
+    `[vcSession] 💾 VRAM after ${action} "${modelId}": ~${(totalBytes / 1e6).toFixed(1)} MB total | loaded: [${models}]`,
+  );
+}
+
 /** Detect if WebGPU execution provider is available (uses shared adapter) */
 async function isWebGpuAvailable(): Promise<boolean> {
   const adapter = await getSharedAdapter();
