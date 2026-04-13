@@ -2,7 +2,7 @@
 
 > This file is the **first line of defense** against AI-induced data loss.
 > Every AI model working with this codebase MUST read and follow these rules.
-> Last updated: 2026-04-09.
+> Last updated: 2026-04-13.
 
 ---
 
@@ -144,9 +144,25 @@ When restoring from server (`openSavedBook`):
 | Project storage API | `src/lib/projectStorage.ts` |
 | Path resolver | `src/lib/projectPaths.ts` |
 | Book map (precomputed paths) | `src/lib/bookMap.ts` |
+| Voice matching helpers | `src/lib/voiceMatching.ts` |
+| VC pipeline orchestrator | `src/lib/vcPipeline.ts` |
+| VC model OPFS cache | `src/lib/vcModelCache.ts` |
+| VC ONNX session manager | `src/lib/vcInferenceSession.ts` |
+| Reusable slider component | `src/components/ui/SliderField.tsx` |
 | Architecture docs | `ARCHITECTURE.md` |
 | Known problems | `PROBLEMS.md` |
 | Strategic plan | `STRATEGY.md` |
+
+---
+
+## 🎤 VC Pipeline Contracts
+
+- **Core models** (ContentVec, CREPE Tiny, RVC v2) are required for Booker Pro activation.
+- **Pitch models** (CREPE Full, SwiftF0, RMVPE) are optional, downloaded on demand.
+- RMVPE mel-spectrogram input tensor MUST be padded to a multiple of 32 frames (`PAD_MULTIPLE = 32`).
+- All ONNX sessions are cached; on backend switch call `releaseAllVcSessions()`.
+- Model cache lives in OPFS `vc-models/` directory, emits `VC_MODEL_CACHE_EVENT` on change.
+- UI components: `BookerProSection` (profile), `GpuStatusCard`, `ModelDownloadPanel`, `VoiceConversionTab` (narrators).
 
 ---
 
