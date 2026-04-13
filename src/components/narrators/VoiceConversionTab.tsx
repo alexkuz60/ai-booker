@@ -203,6 +203,7 @@ export function VoiceConversionTab({
       }
 
       const pipelineOpts: VcPipelineOptions = {
+        pitchAlgorithm,
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
@@ -214,8 +215,9 @@ export function VoiceConversionTab({
       const srLabel = result.synthesis.sampleRate === 44_100 ? "44.1" : `${(result.synthesis.sampleRate/1000).toFixed(0)}`;
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       const backendLabel = activeBackend === "wasm" ? " [CPU/WASM]" : " [GPU/WebGPU]";
+      const pitchLabel = result.features.pitchAlgorithm === "rmvpe" ? "RMVPE" : result.features.pitchAlgorithm === "crepe-full" ? "CREPE-Full" : "CREPE-Tiny";
       setTimingInfo(
-        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, CREPE ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
+        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
