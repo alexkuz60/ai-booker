@@ -52,11 +52,12 @@ export const VC_MODEL_REGISTRY: VcModelEntry[] = [
 ];
 
 /** Pitch algorithm options */
-export type PitchAlgorithm = "crepe-tiny" | "crepe-full" | "rmvpe";
+export type PitchAlgorithm = "crepe-tiny" | "crepe-full" | "swiftf0" | "rmvpe";
 
 export const PITCH_ALGORITHM_LABELS: Record<PitchAlgorithm, { ru: string; en: string; size: string }> = {
   "crepe-tiny": { ru: "CREPE Tiny (быстро)", en: "CREPE Tiny (fast)", size: "~2 MB" },
   "crepe-full": { ru: "CREPE Full (качество)", en: "CREPE Full (quality)", size: "~89 MB" },
+  "swiftf0": { ru: "SwiftF0 (сверхбыстро)", en: "SwiftF0 (ultra-fast)", size: "~400 KB" },
   "rmvpe": { ru: "RMVPE (золотой стандарт)", en: "RMVPE (gold standard)", size: "~362 MB" },
 };
 
@@ -70,6 +71,13 @@ export const VC_PITCH_MODELS: VcModelEntry[] = [
     url: "https://huggingface.co/AnhP/Vietnamese-RVC-Project/resolve/main/predictors/crepe_full.onnx",
     sizeBytes: 89_000_000,
     description: "Pitch (F0) extraction — high accuracy, slower",
+  },
+  {
+    id: "swiftf0",
+    label: "SwiftF0",
+    url: "https://raw.githubusercontent.com/lars76/swift-f0/main/swift_f0/model.onnx",
+    sizeBytes: 398_000,
+    description: "Ultra-fast pitch detector — 96K params, 42× faster than CREPE",
   },
   {
     id: "rmvpe",
@@ -90,6 +98,7 @@ const LEGACY_MODEL_FILE_NAMES: Partial<Record<string, string[]>> = {
   contentvec: ["hubert_base.onnx", "hubert-base.onnx"],
   "crepe-tiny": ["crepe_tiny.onnx"],
   "crepe-full": ["crepe_full.onnx"],
+  swiftf0: ["model.onnx", "swiftf0.onnx"],
   "rvc-v2": ["rvc_full.onnx", "rvc.onnx"],
   rmvpe: ["rmvpe.onnx"],
 };

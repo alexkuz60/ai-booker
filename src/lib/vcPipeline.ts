@@ -9,6 +9,7 @@ import { resampleTo16kMono } from "./vcResample";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
+import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
 import type { PitchAlgorithm } from "./vcModelCache";
 
@@ -57,6 +58,8 @@ async function extractPitchWithAlgorithm(
       return extractPitch(samples, 16_000, hopMs, "crepe-tiny");
     case "crepe-full":
       return extractPitch(samples, 16_000, hopMs, "crepe-full");
+    case "swiftf0":
+      return extractPitchSwiftF0(samples, 16_000);
     case "rmvpe":
       return extractPitchRmvpe(samples, 16_000);
     default:

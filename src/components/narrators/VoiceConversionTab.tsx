@@ -315,8 +315,8 @@ export function VoiceConversionTab({
         )}
         <p className="text-muted-foreground/60 text-xs text-center">
           {isRu
-            ? "Tiny = быстро | Full = чище переходы | RMVPE = золотой стандарт"
-            : "Tiny = fast | Full = cleaner transitions | RMVPE = gold standard"}
+            ? "SwiftF0 = молния | Tiny = быстро | Full = чище | RMVPE = золотой стандарт"
+            : "SwiftF0 = lightning | Tiny = fast | Full = cleaner | RMVPE = gold standard"}
         </p>
       </div>
 
