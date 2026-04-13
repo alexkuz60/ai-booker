@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getModelStatus, VC_MODEL_REGISTRY, downloadAllModels, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, downloadAllModels, downloadModel, deleteModel, hasModel, type ModelDownloadProgress } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
