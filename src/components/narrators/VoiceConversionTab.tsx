@@ -75,7 +75,8 @@ export function VoiceConversionTab({
   const [stage, setStage] = useState<VcStage>("idle");
   const [stageProgress, setStageProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [resultBlobUrl, setResultBlobUrl] = useState<string | null>(null);
   const [timingInfo, setTimingInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
