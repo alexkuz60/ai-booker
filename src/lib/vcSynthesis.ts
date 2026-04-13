@@ -85,7 +85,9 @@ function f0ToCoarsePitch(f0Hz: number): number {
  */
 function applyPitchShift(f0Hz: number, semitones: number): number {
   if (f0Hz <= 0 || semitones === 0) return f0Hz;
-  return f0Hz * Math.pow(2, semitones / 12);
+  const shifted = f0Hz * Math.pow(2, semitones / 12);
+  // Clamp to valid range so coarse bins stay in [1,255]
+  return Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, shifted));
 }
 
 /**
