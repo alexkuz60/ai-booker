@@ -23,17 +23,19 @@ import { createVcSession } from "./vcInferenceSession";
 import { alignPitchToEmbeddings } from "./vcPipeline";
 import type { VcFeatures } from "./vcPipeline";
 
-// RVC v2 constants
-const F0_BIN_SIZE = 256;      // Pitch bin count for coarse quantization
-const F0_MAX = 1100;          // Max F0 in Hz for bin mapping
-const F0_MIN = 50;            // Min F0 in Hz
+// RVC v2 constants — mel-scale pitch quantization (matches Applio/RVC reference)
+const F0_HZ_MIN = 50;            // Min F0 in Hz
+const F0_HZ_MAX = 1100;          // Max F0 in Hz
+// Precomputed mel-scale boundaries
+const F0_MEL_MIN = 1127.0 * Math.log(1 + F0_HZ_MIN / 700.0);   // ≈ 77.97
+const F0_MEL_MAX = 1127.0 * Math.log(1 + F0_HZ_MAX / 700.0);   // ≈ 908.87
 
 /** Supported RVC output sample rates */
 export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 44_100, 48_000] as const;
 export type RvcOutputSR = typeof RVC_OUTPUT_SR_OPTIONS[number];
 
-/** Default output sample rate — 44.1 kHz to match project standard */
-export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 44_100;
+/** Default output sample rate — 40 kHz (most common for RVC v2 models) */
+export const RVC_OUTPUT_SR_DEFAULT: RvcOutputSR = 40_000;
 
 /** Project-standard sample rate for Studio timeline compatibility */
 export const PROJECT_OUTPUT_SR = 44_100;
@@ -65,16 +67,17 @@ export interface VcSynthesisOptions {
 
 /**
  * Convert continuous F0 (Hz) to coarse pitch bin index.
- * Uses logarithmic mapping similar to MIDI note numbers.
+ * Uses **mel-scale** quantization to 255 bins [1..255], 0 = unvoiced.
+ * This matches the reference RVC v2 / Applio implementation:
+ *   f0_mel = 1127 * ln(1 + f0/700)
+ *   bin = clip((f0_mel - mel_min) * 254 / (mel_max - mel_min) + 1, 1, 255)
  */
 function f0ToCoarsePitch(f0Hz: number): number {
   if (f0Hz <= 0) return 0; // unvoiced
-  const clamped = Math.max(F0_MIN, Math.min(F0_MAX, f0Hz));
-  // Log-scale mapping to bins
-  const logF0 = Math.log2(clamped / F0_MIN);
-  const logRange = Math.log2(F0_MAX / F0_MIN);
-  const bin = Math.round((logF0 / logRange) * (F0_BIN_SIZE - 1));
-  return Math.max(0, Math.min(F0_BIN_SIZE - 1, bin));
+  const clamped = Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, f0Hz));
+  const mel = 1127.0 * Math.log(1 + clamped / 700.0);
+  const bin = (mel - F0_MEL_MIN) * 254 / (F0_MEL_MAX - F0_MEL_MIN) + 1;
+  return Math.max(1, Math.min(255, Math.round(bin)));
 }
 
 /**
