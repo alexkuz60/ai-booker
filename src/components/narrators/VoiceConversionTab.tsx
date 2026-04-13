@@ -17,7 +17,7 @@ import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache"
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
@@ -25,6 +25,10 @@ import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  type VcBackend, setForcedBackend, getForcedBackend,
+  releaseAllVcSessions, getAvailableBackend,
+} from "@/lib/vcInferenceSession";
 
 interface VoiceConversionTabProps {
   isRu: boolean;
