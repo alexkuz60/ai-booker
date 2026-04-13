@@ -238,6 +238,28 @@ export async function synthesizeVoice(
   // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
+  // ── Consonant Protection ─────────────────────────────────────────────
+  // Reference RVC implementation: if protect < 0.5, zero out F0 for frames
+  // with low voicing confidence to preserve unvoiced consonant texture.
+  // CREPE confidence <(1 - protect) → treat as unvoiced.
+  if (protect < 0.5) {
+    const confThreshold = 1 - protect; // e.g. protect=0.33 → threshold=0.67
+    // Interpolate CREPE confidence to match T frames (same as F0 alignment)
+    const srcConfLen = features.pitchFrames.length;
+    const ratio = srcConfLen / T;
+    for (let i = 0; i < T; i++) {
+      const srcIdx = i * ratio;
+      const lo = Math.floor(srcIdx);
+      const hi = Math.min(lo + 1, srcConfLen - 1);
+      const frac = srcIdx - lo;
+      const conf = features.pitchFrames[lo].confidence * (1 - frac)
+                 + features.pitchFrames[hi].confidence * frac;
+      if (conf < confThreshold) {
+        alignedF0[i] = 0; // mark as unvoiced → protects consonants
+      }
+    }
+  }
+
   // Build pitch tensors
   const pitchCoarse = new Float32Array(T);
   const pitchFine = new Float32Array(T);
