@@ -232,7 +232,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -280,6 +280,44 @@ export function VoiceConversionTab({
           </p>
         </div>
         <Switch checked={vcEnabled} onCheckedChange={v => onUpdateVcConfig({ vc_enabled: v })} />
+      </div>
+
+      {/* ─── Pitch Algorithm ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Алгоритм питча (F0)" : "Pitch Algorithm (F0)"}
+          </label>
+          <Badge variant="outline" className="text-[10px]">
+            {PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.size ?? "~2 MB"}
+          </Badge>
+        </div>
+        <Select value={pitchAlgorithm} onValueChange={handlePitchAlgorithmChange} disabled={isProcessing || pitchModelDownloading}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PITCH_ALGORITHM_LABELS) as PitchAlgorithm[]).map(algo => (
+              <SelectItem key={algo} value={algo}>
+                {isRu ? PITCH_ALGORITHM_LABELS[algo].ru : PITCH_ALGORITHM_LABELS[algo].en}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {pitchModelDownloading && (
+          <div className="space-y-1">
+            <Progress value={pitchDlProgress} className="h-1.5" />
+            <p className="text-xs text-muted-foreground text-center">
+              <Download className="inline h-3 w-3 mr-1" />
+              {isRu ? `Загрузка модели: ${pitchDlProgress}%` : `Downloading model: ${pitchDlProgress}%`}
+            </p>
+          </div>
+        )}
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "Tiny = быстро | Full = чище переходы | RMVPE = золотой стандарт"
+            : "Tiny = fast | Full = cleaner transitions | RMVPE = gold standard"}
+        </p>
       </div>
 
       <Separator />
