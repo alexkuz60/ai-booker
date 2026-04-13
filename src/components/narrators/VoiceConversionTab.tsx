@@ -66,6 +66,8 @@ export function VoiceConversionTab({
   const pitchShift = (voiceConfig.vc_pitch_shift as number) ?? 0;
   const vcOutputSR = (voiceConfig.vc_output_sr as RvcOutputSR) || RVC_OUTPUT_SR_DEFAULT;
   const vcReferenceId = (voiceConfig.vc_reference_id as string) || "";
+  const indexRate = (voiceConfig.vc_index_rate as number) ?? 0.75;
+  const protect = (voiceConfig.vc_protect as number) ?? 0.33;
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");

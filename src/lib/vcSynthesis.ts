@@ -73,6 +73,21 @@ export interface VcSynthesisOptions {
   modelId?: string;
   /** RVC model native sample rate (default 40kHz for most RVC v2 models) */
   outputSampleRate?: RvcOutputSR;
+  /**
+   * Feature Ratio (index_rate): 0.0–1.0 (default 0.75).
+   * Controls blend between raw ContentVec embeddings and FAISS-retrieved
+   * training data embeddings. Higher = more similar to training voice,
+   * lower = more faithful to source articulation.
+   * When no FAISS index is loaded, this is ignored.
+   */
+  indexRate?: number;
+  /**
+   * Consonant Protection: 0.0–0.5 (default 0.33).
+   * Protects unvoiced consonants (sibilants, plosives) from VC artifacts.
+   * Higher values preserve more of the original consonant texture.
+   * Applied by zeroing F0 for frames below a voicing confidence threshold.
+   */
+  protect?: number;
 }
 
 /**
