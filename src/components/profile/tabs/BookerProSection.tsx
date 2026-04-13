@@ -167,17 +167,17 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
           onToggleDetails={() => setShowDetails(v => !v)}
         />
 
-        {/* Browser warning */}
+        {/* Browser compatibility note */}
         {!pro.isChromium && (
-          <Alert className="border-amber-500/30 bg-amber-500/5">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <Alert className="border-blue-500/30 bg-blue-500/5">
+            <AlertTriangle className="h-4 w-4 text-blue-500" />
             <AlertTitle className="text-sm">
-              {isRu ? "Рекомендация" : "Recommendation"}
+              {isRu ? "Совместимость браузера" : "Browser Compatibility"}
             </AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground">
               {isRu
-                ? "Firefox и Safari имеют ограниченную поддержку WebGPU. Для стабильной работы Voice Conversion рекомендуется Google Chrome или Microsoft Edge."
-                : "Firefox and Safari have limited WebGPU support. For stable Voice Conversion, we recommend Google Chrome or Microsoft Edge."}
+                ? "WebGPU поддерживается в Firefox начиная с версии 141 и в Safari начиная с версии 26. Убедитесь, что ваш браузер обновлён до актуальной версии."
+                : "WebGPU is supported in Firefox starting from version 141 and in Safari starting from version 26. Make sure your browser is up to date."}
             </AlertDescription>
           </Alert>
         )}
