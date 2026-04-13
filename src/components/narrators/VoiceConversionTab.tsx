@@ -255,7 +255,7 @@ export function VoiceConversionTab({
       setStageProgress(100);
       const pipelineOpts: VcPipelineOptions = {
         onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
-        synthesis: { pitchShift, outputSampleRate: vcOutputSR },
+        synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
       const t = result.features.timing;
@@ -280,7 +280,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
