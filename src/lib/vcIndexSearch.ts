@@ -4,6 +4,7 @@
  * Replaces FAISS with brute-force L2 KNN search in the browser.
  * Supports loading training embeddings from:
  *   - .npy files (NumPy binary format — total_fea.npy from RVC training)
+ *   - .index files (FAISS IndexIVFFlat / IndexFlatL2 binary format)
  *   - Raw Float32Array
  *
  * Reference RVC algorithm (pipeline.py):
