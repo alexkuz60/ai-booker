@@ -9,6 +9,7 @@ import { resampleTo16kMono } from "./vcResample";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
+import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
 import type { PitchAlgorithm } from "./vcModelCache";
 

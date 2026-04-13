@@ -73,6 +73,13 @@ export const VC_PITCH_MODELS: VcModelEntry[] = [
     description: "Pitch (F0) extraction — high accuracy, slower",
   },
   {
+    id: "swiftf0",
+    label: "SwiftF0",
+    url: "https://raw.githubusercontent.com/lars76/swift-f0/main/swift_f0/model.onnx",
+    sizeBytes: 398_000,
+    description: "Ultra-fast pitch detector — 96K params, 42× faster than CREPE",
+  },
+  {
     id: "rmvpe",
     label: "RMVPE",
     url: "https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.onnx",
@@ -91,6 +98,7 @@ const LEGACY_MODEL_FILE_NAMES: Partial<Record<string, string[]>> = {
   contentvec: ["hubert_base.onnx", "hubert-base.onnx"],
   "crepe-tiny": ["crepe_tiny.onnx"],
   "crepe-full": ["crepe_full.onnx"],
+  swiftf0: ["model.onnx", "swiftf0.onnx"],
   "rvc-v2": ["rvc_full.onnx", "rvc.onnx"],
   rmvpe: ["rmvpe.onnx"],
 };
