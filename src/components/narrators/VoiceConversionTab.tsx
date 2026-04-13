@@ -19,7 +19,7 @@ import {
   type VcReferenceEntry,
 } from "@/lib/vcReferenceCache";
 import {
-  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseNpy,
+  listVcIndexes, saveVcIndex, deleteVcIndex, loadVcIndex, parseIndexFile, buildNpyBlob,
   type VcIndexEntry,
 } from "@/lib/vcIndexSearch";
 import {
@@ -223,20 +223,24 @@ export function VoiceConversionTab({
     setUploadingIndex(true);
     try {
       const arrayBuf = await file.arrayBuffer();
-      const { rows, cols } = parseNpy(arrayBuf);
+      const { rows, cols } = parseIndexFile(arrayBuf, file.name);
       if (cols !== 768 && cols !== 256) {
         throw new Error(isRu
           ? `Неподдерживаемая размерность: ${cols}. Ожидается 768 (ContentVec) или 256 (HuBERT v1).`
           : `Unsupported dimension: ${cols}. Expected 768 (ContentVec) or 256 (HuBERT v1).`);
       }
+      // Convert to .npy for storage (always save as parsed float32)
       const id = crypto.randomUUID();
       const name = file.name.replace(/\.[^.]+$/, "");
+      const parsed = parseIndexFile(arrayBuf, file.name);
+      // Build a minimal .npy header + data blob for storage
+      const npyBlob = buildNpyBlob(parsed.data, parsed.rows, parsed.cols);
       const entry: VcIndexEntry = {
         id, name, vectorCount: rows, dim: cols,
-        sizeBytes: file.size,
+        sizeBytes: npyBlob.size,
         addedAt: new Date().toISOString(),
       };
-      await saveVcIndex(id, new Blob([arrayBuf]), entry);
+      await saveVcIndex(id, npyBlob, entry);
       setLocalIndexes(await listVcIndexes());
       onUpdateVcConfig({ vc_index_id: id });
       toast.success(isRu
@@ -553,17 +557,17 @@ export function VoiceConversionTab({
         ) : (
           <p className="text-xs text-muted-foreground italic">
             {isRu
-              ? "Индекс не загружен. Загрузите .npy файл (total_fea.npy из RVC-обучения) для активации Feature Ratio."
-              : "No index loaded. Upload a .npy file (total_fea.npy from RVC training) to activate Feature Ratio."}
+              ? "Индекс не загружен. Загрузите .npy (total_fea.npy) или .index файл из RVC-обучения для активации Feature Ratio."
+              : "No index loaded. Upload a .npy (total_fea.npy) or .index file from RVC training to activate Feature Ratio."}
           </p>
         )}
 
         {/* Upload button */}
         <div className="flex gap-2">
-          <input ref={indexInputRef} type="file" accept=".npy" className="hidden" onChange={handleIndexUpload} />
+          <input ref={indexInputRef} type="file" accept=".npy,.index,.bin" className="hidden" onChange={handleIndexUpload} />
           <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => indexInputRef.current?.click()} disabled={uploadingIndex}>
             {uploadingIndex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            {isRu ? "Загрузить .npy" : "Upload .npy"}
+            {isRu ? "Загрузить .npy / .index" : "Upload .npy / .index"}
           </Button>
         </div>
 
