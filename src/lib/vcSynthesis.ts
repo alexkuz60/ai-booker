@@ -199,9 +199,30 @@ export async function synthesizeVoice(
     }
   }
 
-  const T = features.numFrames;
+  // ── Critical: 2x upsample ContentVec embeddings ──────────────────────
+  // Reference RVC pipeline does: F.interpolate(feats, scale_factor=2)
+  // ContentVec produces ~50 fps (hop=320 @ 16kHz), but RVC v2 decoder
+  // expects ~100 fps. Decoder upsample product ≈ 400, so:
+  //   100 fps × 400 = 40,000 samples/sec (correct for 40kHz model)
+  //   50 fps × 400 = 20,000 samples/sec (2x slower — the bug we had)
+  const srcT = features.numFrames;
+  const T = srcT * 2; // 2x temporal upsample
+  const upEmb = new Float32Array(T * features.embeddingDim);
+  for (let i = 0; i < T; i++) {
+    const srcIdx = i / 2;
+    const lo = Math.floor(srcIdx);
+    const hi = Math.min(lo + 1, srcT - 1);
+    const frac = srcIdx - lo;
+    const offLo = lo * features.embeddingDim;
+    const offHi = hi * features.embeddingDim;
+    const offOut = i * features.embeddingDim;
+    for (let d = 0; d < features.embeddingDim; d++) {
+      upEmb[offOut + d] = features.embeddings[offLo + d] * (1 - frac)
+                        + features.embeddings[offHi + d] * frac;
+    }
+  }
 
-  // Align F0 pitch to ContentVec frame count
+  // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
   // Build pitch tensors
@@ -215,8 +236,8 @@ export async function synthesizeVoice(
   }
 
   // Prepare ONNX tensors
-  // feats: [1, T, 768]
-  const featsTensor = new ort.Tensor("float32", features.embeddings, [1, T, features.embeddingDim]);
+  // feats: [1, T, 768] — using 2x upsampled embeddings
+  const featsTensor = new ort.Tensor("float32", upEmb, [1, T, features.embeddingDim]);
   // p_len: [1] — int64
   const pLenData = BigInt64Array.from([BigInt(T)]);
   const pLenTensor = new ort.Tensor("int64", pLenData, [1]);
@@ -287,20 +308,9 @@ export async function synthesizeVoice(
 
   const rawAudio = new Float32Array(output.data as Float32Array);
 
-  // Derive effective output SR from input duration when available.
-  // This is critical: RVC models may internally use a non-standard SR or
-  // hop size, so guessing (32k/40k/48k) often gives wrong duration.
-  // The correct approach: effectiveSR = rawSamples / knownInputDuration.
-  let effectiveSR = outputSR;
-  if (options?.inputDurationSec && options.inputDurationSec > 0) {
-    effectiveSR = rawAudio.length / options.inputDurationSec;
-    console.info(
-      `[vcSynthesis] Derived effective SR: ${rawAudio.length} samples / ${options.inputDurationSec.toFixed(3)}s = ${Math.round(effectiveSR)}Hz`
-    );
-  }
-
-  // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility
-  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, effectiveSR);
+  // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility.
+  // Output SR is the model's native rate (e.g. 40kHz) — NOT derived dynamically.
+  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
   const finalSR = PROJECT_OUTPUT_SR;
   const durationSec = finalAudio.length / finalSR;
 
