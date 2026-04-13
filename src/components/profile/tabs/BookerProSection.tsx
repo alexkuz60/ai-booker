@@ -19,7 +19,7 @@ import type { BookerProState } from "@/hooks/useBookerPro";
 import { useGpuDevices } from "@/hooks/useGpuDevices";
 import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import {
-  VC_MODEL_REGISTRY, downloadAllModels, getModelStatus,
+  VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, downloadAllModels, getModelStatus,
   getTotalModelSize, clearAllModels, VC_MODEL_CACHE_EVENT,
   type ModelDownloadProgress,
 } from "@/lib/vcModelCache";
@@ -165,7 +165,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
     pro.setEnabled(checked);
   };
 
-  const cachedCount = Object.values(modelStatuses).filter(Boolean).length;
+  const cachedCount = VC_ALL_MODELS.filter(m => modelStatuses[m.id]).length;
 
   return (
     <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
@@ -240,7 +240,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
               <Cpu className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">{isRu ? "ONNX модели" : "ONNX Models"}</span>
               <span className="text-xs text-muted-foreground">
-                ({cachedCount}/{VC_MODEL_REGISTRY.length})
+                ({cachedCount}/{VC_ALL_MODELS.length})
               </span>
             </div>
             {pro.modelsReady ? (
@@ -268,6 +268,21 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
           {/* Per-model status list */}
           <div className="space-y-1">
             {VC_MODEL_REGISTRY.map(m => (
+              <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-muted/20">
+                <span className="text-muted-foreground font-mono">{m.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{formatBytes(m.sizeBytes)}</span>
+                  {modelStatuses[m.id]
+                    ? <CheckCircle2 className="h-3 w-3 text-primary" />
+                    : <XCircle className="h-3 w-3 text-muted-foreground/50" />
+                  }
+                </div>
+              </div>
+            ))}
+            <p className="text-[11px] text-muted-foreground pt-1 px-2">
+              {isRu ? "Алгоритмы определения тона (F0)" : "Pitch Detection (F0)"}
+            </p>
+            {VC_PITCH_MODELS.map(m => (
               <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-muted/20">
                 <span className="text-muted-foreground font-mono">{m.label}</span>
                 <div className="flex items-center gap-2">
