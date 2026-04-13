@@ -181,15 +181,20 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
                   : "WebGPU is supported in Firefox (141+) and Safari (26+). For best performance, we recommend Google Chrome or Microsoft Edge."}
               </p>
               <p className="font-medium">
-                {isRu ? "Firefox — about:config:" : "Firefox — about:config:"}
+                {isRu ? "Firefox — about:config (обязательные):" : "Firefox — about:config (required):"}
               </p>
               <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
-                <li>dom.webgpu.enabled → true</li>
-                <li>gfx.webgpu.ignore-blocklist → true</li>
-                <li>dom.webgpu.testing.assert-hardware-adapter → true</li>
-                <li>javascript.options.wasm_simd → true</li>
-                <li>javascript.options.wasm_memory64 → true</li>
-                <li>gfx.webrender.all → true</li>
+                <li>dom.webgpu.enabled → true <span className="font-sans opacity-60">— {isRu ? "WebGPU для ONNX-инференса" : "WebGPU for ONNX inference"}</span></li>
+                <li>gfx.webgpu.ignore-blocklist → true <span className="font-sans opacity-60">— {isRu ? "разблокировка GPU" : "unblock GPU"}</span></li>
+                <li>javascript.options.wasm_simd → true <span className="font-sans opacity-60">— {isRu ? "SIMD-ускорение WASM (×2-3)" : "SIMD acceleration (×2-3)"}</span></li>
+                <li>javascript.options.wasm_memory64 → true <span className="font-sans opacity-60">— {isRu ? "память >4 ГБ для моделей" : "memory >4 GB for models"}</span></li>
+                <li>javascript.options.wasm_threads → true <span className="font-sans opacity-60">— {isRu ? "многопоточность ONNX Runtime" : "ONNX Runtime multi-threading"}</span></li>
+              </ul>
+              <p className="font-medium mt-1">
+                {isRu ? "Опционально:" : "Optional:"}
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
+                <li>gfx.webrender.all → true <span className="font-sans opacity-60">— {isRu ? "плавность UI при нагрузке" : "smoother UI under load"}</span></li>
               </ul>
               <p className="text-[11px] opacity-70">
                 {isRu
