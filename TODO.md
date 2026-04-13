@@ -1,7 +1,19 @@
 # TODO — AI-Booker
 
 > Список задач, собранных по ходу обсуждения архитектуры и аудита кода.
-> Актуальная дата: 2026-03-31.
+> Актуальная дата: 2026-04-13.
+
+---
+
+## Рефакторинг — Снижение сложности
+
+- [x] **BookerProSection** (515→140 строк) — извлечены `GpuStatusCard.tsx`, `ModelDownloadPanel.tsx`
+- [x] **Narrators.tsx** (1026→720 строк) — извлечены `SliderField` → `src/components/ui/`, `voiceMatching.ts` → `src/lib/`
+- [ ] **VoiceConversionTab** (587 строк) — кандидат на дробление при росте (VcPipelineTest, VcConfigForm)
+- [ ] **StudioWorkspace** — оценить и разбить по панелям
+- [ ] **Feature-модуль VC** — `src/features/voice-conversion/` с barrel exports
+- [ ] **Unit-тесты VC** — vcModelCache, vcRmvpe padding, vcPipeline flow
+- [ ] **VC_ARCHITECTURE.md** — граф зависимостей моделей, порядок инициализации
 
 ---
 
