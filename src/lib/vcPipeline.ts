@@ -129,6 +129,21 @@ export function alignPitchToEmbeddings(
 
 // ── Full end-to-end Voice Conversion ──────────────────────────────────────
 
+export interface VcResampleInfo {
+  /** Input sample count (from RVC model) */
+  inputSamples: number;
+  /** Output sample count (after resample) */
+  outputSamples: number;
+  /** RVC model native sample rate */
+  inputSR: number;
+  /** Project output sample rate */
+  outputSR: number;
+  /** Duration in seconds (should be same before/after) */
+  durationSec: number;
+  /** Resample time in ms */
+  resampleMs: number;
+}
+
 export interface VcFullResult {
   /** Converted audio as WAV Blob */
   wav: Blob;
@@ -136,6 +151,8 @@ export interface VcFullResult {
   features: VcFeatures;
   /** Synthesis result (raw audio, timing) */
   synthesis: VcSynthesisResult;
+  /** Output resampling metrics */
+  resample: VcResampleInfo;
   /** Total wall-clock time in ms */
   totalMs: number;
 }
