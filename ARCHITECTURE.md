@@ -2,7 +2,7 @@
 
 > Единый справочник кодовой архитектуры проекта.  
 > Цель: дать ИИ-ассистенту (и разработчику) однозначное понимание, где хранятся данные, как они перемещаются и какие файлы за что отвечают — без необходимости искать истину по разным документам.  
-> Актуальная дата: 2026-04-02.
+> Актуальная дата: 2026-04-13.
 
 ---
 
@@ -189,6 +189,8 @@
 | `src/lib/localProjectResolver.ts` | **Резолвер проектов** — `resolveLocalStorageForBook()` для поиска OPFS-проекта по bookId |
 | `src/lib/projectCleanup.ts` | **Очистка browser state** — `wipeProjectBrowserState()` (по bookId) и `wipeAllBrowserState()` |
 | `src/hooks/useProjectStorage.ts` | React-хук: create / open / close / import / export проекта |
+| `src/lib/voiceMatching.ts` | Хелперы маппинга голосов: `matchVoice()`, `matchRole()`, `getVoiceDisplayName()`, `PROVIDER_LABELS` |
+| `src/components/ui/SliderField.tsx` | Переиспользуемый слайдер с лейблом, значением и кнопкой сброса |
 
 ### 1.6a OPFS-инициализация: три функции вместо `openOrCreate`
 
@@ -890,6 +892,70 @@ Web Audio API в браузере значительно сложнее для r
 - `src/hooks/useMixerPersistence.ts` — сохранение/восстановление микшерных настроек
 - `src/hooks/usePluginsPersistence.ts` — канальные плагины (EQ/Comp/Limiter) в localStorage
 - `src/hooks/useClipPluginConfigs.ts` — per-clip плагины (EQ/Comp/Limiter/Panner3D/Convolver) в Supabase
+
+---
+
+## 1.21 Voice Conversion Pipeline (Booker Pro)
+
+### Архитектура
+
+Booker Pro — клиентский Voice Conversion пайплайн на базе WebGPU + ONNX Runtime.
+Цепочка: TTS Audio → Resample 16kHz → ContentVec Embeddings → F0 Pitch Extraction → RVC v2 Synthesis → WAV Output.
+
+### Алгоритмы определения тона (F0)
+
+| Алгоритм | Модель | Размер | Скорость | Точность |
+|----------|--------|--------|----------|----------|
+| CREPE Tiny | `crepe-tiny` | ~2 MB | Быстро | Хорошая |
+| CREPE Full | `crepe-full` | ~83 MB | Средне | Высокая |
+| SwiftF0 | `swiftf0` | ~0.4 MB | Молниеносно (×42) | 91.8% |
+| RMVPE | `rmvpe` | ~55 MB | Средне | Золотой стандарт |
+
+### Хранение моделей
+
+Модели кэшируются в OPFS (`vc-models/`). Глобальное событие `VC_MODEL_CACHE_EVENT` уведомляет UI об изменениях кэша.
+
+### Бэкенды инференса
+
+| Бэкенд | Скорость | Стабильность |
+|--------|----------|--------------|
+| WebGPU | ×3-5 быстрее | Возможны ошибки валидации |
+| WASM (CPU) | Медленнее | Стабильно |
+
+Автоматический fallback: WebGPU → WASM. Пользователь может форсировать бэкенд.
+
+### Ключевые файлы
+
+| Файл | Назначение |
+|------|------------|
+| `src/lib/vcPipeline.ts` | Оркестратор: `extractVcFeatures()`, `convertVoiceFull()` |
+| `src/lib/vcModelCache.ts` | OPFS-кэш моделей: реестр, скачивание, статусы |
+| `src/lib/vcInferenceSession.ts` | Обёртка ONNX Runtime: WebGPU→WASM fallback, кэш сессий |
+| `src/lib/vcContentVec.ts` | Извлечение ContentVec эмбеддингов |
+| `src/lib/vcCrepe.ts` | CREPE Tiny/Full pitch extraction |
+| `src/lib/vcSwiftF0.ts` | SwiftF0 — сверхкомпактный F0 (96K параметров) |
+| `src/lib/vcRmvpe.ts` | RMVPE — U-Net pitch extraction (pad до ×32) |
+| `src/lib/vcSynthesis.ts` | RVC v2 синтез + WAV-кодирование |
+| `src/lib/vcResample.ts` | Ресемплинг аудио до 16kHz mono |
+| `src/lib/vcReferenceCache.ts` | OPFS-кэш референсных голосов |
+| `src/lib/vcIndexSearch.ts` | KNN-поиск по обучающим индексам |
+
+### UI-компоненты
+
+| Компонент | Расположение | Назначение |
+|-----------|-------------|------------|
+| `BookerProSection` | `src/components/profile/tabs/BookerProSection.tsx` | Активация Booker Pro в Профиле |
+| `GpuStatusCard` | `src/components/profile/tabs/GpuStatusCard.tsx` | GPU-статус, спецификации, бенчмарк |
+| `ModelDownloadPanel` | `src/components/profile/tabs/ModelDownloadPanel.tsx` | Список моделей, скачивание, прогресс |
+| `VoiceConversionTab` | `src/components/narrators/VoiceConversionTab.tsx` | Per-character VC настройки + тест пайплайна |
+| `IndexStatsPanel` | `src/components/voicelab/IndexStatsPanel.tsx` | Voice Lab: модели, референсы, индексы |
+
+### Контракты
+
+- Модели ядра (ContentVec, CREPE Tiny, RVC v2) — обязательны для активации Booker Pro.
+- Pitch-модели (CREPE Full, SwiftF0, RMVPE) — опциональны, скачиваются по требованию.
+- RMVPE: входной тензор mel-спектрограммы **должен** быть кратен 32 по оси фреймов (`PAD_MULTIPLE = 32`).
+- Все сессии кэшируются; при смене бэкенда — `releaseAllVcSessions()`.
 
 ---
 
