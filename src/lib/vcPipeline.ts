@@ -173,9 +173,13 @@ export async function convertVoiceFull(
   // Extract features (resample + ContentVec + CREPE)
   const features = await extractVcFeatures(audio, options);
 
-  // Synthesize with RVC
+  // Synthesize with RVC — pass input duration so synthesizer can derive correct output SR
   options?.onProgress?.("synthesis", 0);
-  const synthesis = await synthesizeVoice(features, options?.synthesis);
+  const synthOptions: VcSynthesisOptions = {
+    ...options?.synthesis,
+    inputDurationSec: features.durationSec,
+  };
+  const synthesis = await synthesizeVoice(features, synthOptions);
   options?.onProgress?.("synthesis", 1);
 
   // Encode to WAV
