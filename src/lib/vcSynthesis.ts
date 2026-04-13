@@ -325,6 +325,7 @@ export async function synthesizeVoice(
   console.info(
     `[vcSynthesis] Running RVC "${modelId}": ${T} frames, ` +
     `pitchShift=${pitchShift}st, speaker=${speakerId}, ` +
+    `indexRate=${indexRate}, protect=${protect}, ` +
     `inputs=[${inputNames.join(", ")}]`
   );
 
