@@ -308,7 +308,9 @@ export function VoiceConversionTab({
         <div>
           <p className="text-sm font-medium">{isRu ? "Применять Voice Conversion" : "Apply Voice Conversion"}</p>
           <p className="text-xs text-muted-foreground">
-            {isRu ? "TTS → ContentVec → CREPE → RVC v2 → уникальный тембр" : "TTS → ContentVec → CREPE → RVC v2 → unique timbre"}
+            {isRu
+              ? `TTS → ${vcEncoder === "wavlm" ? "WavLM" : "ContentVec"} → ${PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.en?.split(" ")[0] ?? "CREPE"} → RVC v2 → уникальный тембр`
+              : `TTS → ${vcEncoder === "wavlm" ? "WavLM" : "ContentVec"} → ${PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.en?.split(" ")[0] ?? "CREPE"} → RVC v2 → unique timbre`}
           </p>
         </div>
         <Switch checked={vcEnabled} onCheckedChange={v => onUpdateVcConfig({ vc_enabled: v })} />
