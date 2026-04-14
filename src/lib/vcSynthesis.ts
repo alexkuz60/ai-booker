@@ -217,17 +217,9 @@ export async function synthesizeVoice(
   if (!options?.outputSampleRate) {
     const detectedSR = detectOutputSRFromModel(session);
     if (detectedSR) {
-      // Sanity check: detected SR should produce duration within 10% of input
-      const detectedDuration = 203200 / detectedSR; // rough check with typical output size
-      const inputDuration = features.durationSec;
-      const durationRatio = detectedDuration / inputDuration;
-      if (durationRatio > 0.9 && durationRatio < 1.1) {
-        outputSR = detectedSR;
-        srAutoDetected = true;
-        console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
-      } else {
-        console.warn(`[vcSynthesis] Rejected auto-detected SR ${detectedSR}Hz (would give ${detectedDuration.toFixed(2)}s vs ${inputDuration.toFixed(2)}s input). Using default ${outputSR}Hz`);
-      }
+      outputSR = detectedSR;
+      srAutoDetected = true;
+      console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
     }
   }
 
