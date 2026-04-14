@@ -90,6 +90,7 @@ export function VoiceConversionTab({
   const [refBlob, setRefBlob] = useState<Blob | null>(null);
   const [ttsF0, setTtsF0] = useState<PitchFrame[] | undefined>();
   const [refF0, setRefF0] = useState<PitchFrame[] | undefined>();
+  const [rvcF0, setRvcF0] = useState<PitchFrame[] | undefined>();
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
@@ -267,6 +268,10 @@ export function VoiceConversionTab({
       setStage("done");
       setRvcBlob(result.wav);
       setTtsF0(result.features.pitchFrames);
+      // Extract F0 from RVC output for spectrogram overlay
+      extractVcFeatures(result.wav, { pitchAlgorithm, encoder: vcEncoder })
+        .then(f => setRvcF0(f.pitchFrames))
+        .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e));
       // Extract F0 from reference for spectrogram overlay
       if (vcReferenceId) {
         readVcReferenceBlob(vcReferenceId).then(async (b) => {
@@ -749,7 +754,7 @@ export function VoiceConversionTab({
           slots={[
             { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(255, 60, 60, 0.9)" },
             { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 255, 100, 0.85)" },
-            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
+            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(255, 200, 0, 0.9)" },
           ]}
           onClose={() => setShowSpectrograms(false)}
         />
