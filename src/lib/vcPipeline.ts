@@ -85,20 +85,29 @@ export async function extractVcFeatures(
   const startTotal = performance.now();
   const onProgress = options?.onProgress;
   const pitchAlgorithm = options?.pitchAlgorithm ?? "crepe-tiny";
+  const encoder = options?.encoder ?? "contentvec";
 
   // Stage 1: Resample to 16kHz mono
   onProgress?.("resample", 0);
   const t0 = performance.now();
-  const { samples, durationSec } = await resampleTo16kMono(audio);
+  const { samples: rawSamples, durationSec } = await resampleTo16kMono(audio);
   const resampleMs = Math.round(performance.now() - t0);
   onProgress?.("resample", 1);
 
-  // Stage 2: ContentVec embeddings
+  // Stage 2: RMS normalization
+  onProgress?.("normalize", 0);
+  const normResult = normalizeRms(rawSamples);
+  const samples = normResult.samples;
+  onProgress?.("normalize", 1);
+
+  // Stage 3: Speech encoder (ContentVec or WavLM)
   onProgress?.("contentvec", 0);
-  const cvResult: ContentVecResult = await extractContentVec(samples);
+  const cvResult: ContentVecResult = encoder === "wavlm"
+    ? await extractWavLM(samples)
+    : await extractContentVec(samples);
   onProgress?.("contentvec", 1);
 
-  // Stage 3: Pitch extraction (algorithm-dependent)
+  // Stage 4: Pitch extraction (algorithm-dependent)
   onProgress?.("crepe", 0);
   const pitchResult: CrepeResult = await extractPitchWithAlgorithm(
     samples,
@@ -109,11 +118,12 @@ export async function extractVcFeatures(
 
   const totalMs = Math.round(performance.now() - startTotal);
 
-  const algoLabel = pitchAlgorithm === "rmvpe" ? "RMVPE" : pitchAlgorithm === "crepe-full" ? "CREPE-Full" : "CREPE-Tiny";
+  const algoLabel = pitchAlgorithm === "rmvpe" ? "RMVPE" : pitchAlgorithm === "crepe-full" ? "CREPE-Full" : pitchAlgorithm === "swiftf0" ? "SwiftF0" : "CREPE-Tiny";
+  const encLabel = encoder === "wavlm" ? "WavLM" : "ContentVec";
   console.info(
-    `[vcPipeline] Complete (${algoLabel}): ${durationSec.toFixed(2)}s audio → ` +
+    `[vcPipeline] Complete (${encLabel}+${algoLabel}): ${durationSec.toFixed(2)}s audio → ` +
     `${cvResult.numFrames} embeddings + ${pitchResult.frames.length} pitch frames, ` +
-    `${totalMs}ms total (resample ${resampleMs}ms, CV ${cvResult.inferenceMs}ms, pitch ${pitchResult.inferenceMs}ms)`
+    `${totalMs}ms total (resample ${resampleMs}ms, norm ${normResult.normalizeMs}ms, enc ${cvResult.inferenceMs}ms, pitch ${pitchResult.inferenceMs}ms)`
   );
 
   return {
@@ -125,10 +135,12 @@ export async function extractVcFeatures(
     totalMs,
     timing: {
       resampleMs,
-      contentvecMs: cvResult.inferenceMs,
+      normalizeMs: normResult.normalizeMs,
+      encoderMs: cvResult.inferenceMs,
       crepeMs: pitchResult.inferenceMs,
     },
     pitchAlgorithm,
+    encoder,
   };
 }
 
