@@ -61,6 +61,30 @@ export const PITCH_ALGORITHM_LABELS: Record<PitchAlgorithm, { ru: string; en: st
   "rmvpe": { ru: "RMVPE (золотой стандарт)", en: "RMVPE (gold standard)", size: "~362 MB" },
 };
 
+/** Speech encoder type */
+export type SpeechEncoder = "contentvec" | "wavlm";
+
+export const SPEECH_ENCODER_LABELS: Record<SpeechEncoder, { ru: string; en: string; size: string; description: { ru: string; en: string } }> = {
+  contentvec: {
+    ru: "ContentVec (HuBERT)",
+    en: "ContentVec (HuBERT)",
+    size: "~378 MB",
+    description: {
+      ru: "Классический энкодер — стабильный, но может «роботизировать» живой TTS",
+      en: "Classic encoder — stable but may flatten expressive TTS",
+    },
+  },
+  wavlm: {
+    ru: "WavLM (рекомендуемый)",
+    en: "WavLM (recommended)",
+    size: "~95 MB",
+    description: {
+      ru: "Лучше сохраняет интонации и эмоциональную окраску живого TTS",
+      en: "Better preserves intonation and emotional quality of live TTS",
+    },
+  },
+};
+
 /**
  * Optional pitch models — downloaded on demand when user selects algorithm.
  */
@@ -88,8 +112,21 @@ export const VC_PITCH_MODELS: VcModelEntry[] = [
   },
 ];
 
-/** All models combined (core + optional pitch) */
-export const VC_ALL_MODELS: VcModelEntry[] = [...VC_MODEL_REGISTRY, ...VC_PITCH_MODELS];
+/**
+ * Optional encoder models — alternatives to the default ContentVec.
+ */
+export const VC_ENCODER_MODELS: VcModelEntry[] = [
+  {
+    id: "wavlm",
+    label: "WavLM-Base-Plus (INT8)",
+    url: "https://huggingface.co/Xenova/wavlm-base-plus/resolve/main/onnx/model_quantized.onnx",
+    sizeBytes: 95_400_000,
+    description: "Speech encoder — better prosody preservation than ContentVec",
+  },
+];
+
+/** All models combined (core + optional pitch + optional encoders) */
+export const VC_ALL_MODELS: VcModelEntry[] = [...VC_MODEL_REGISTRY, ...VC_PITCH_MODELS, ...VC_ENCODER_MODELS];
 
 const VC_CACHE_DIR = "vc-models";
 export const VC_MODEL_CACHE_EVENT = "booker-pro:vc-model-cache-changed";
