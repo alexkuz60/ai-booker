@@ -210,16 +210,24 @@ export async function synthesizeVoice(
 
   const session = await createVcSession(modelId);
 
-  // Try to auto-detect output SR from model metadata
+  // Determine output SR: user override > auto-detect > default (40kHz)
   let srAutoDetected = false;
   let outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR_DEFAULT;
 
   if (!options?.outputSampleRate) {
     const detectedSR = detectOutputSRFromModel(session);
     if (detectedSR) {
-      outputSR = detectedSR;
-      srAutoDetected = true;
-      console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
+      // Sanity check: detected SR should produce duration within 10% of input
+      const detectedDuration = 203200 / detectedSR; // rough check with typical output size
+      const inputDuration = features.durationSec;
+      const durationRatio = detectedDuration / inputDuration;
+      if (durationRatio > 0.9 && durationRatio < 1.1) {
+        outputSR = detectedSR;
+        srAutoDetected = true;
+        console.info(`[vcSynthesis] Auto-detected output SR: ${detectedSR}Hz`);
+      } else {
+        console.warn(`[vcSynthesis] Rejected auto-detected SR ${detectedSR}Hz (would give ${detectedDuration.toFixed(2)}s vs ${inputDuration.toFixed(2)}s input). Using default ${outputSR}Hz`);
+      }
     }
   }
 
