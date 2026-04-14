@@ -354,6 +354,70 @@ export function VoiceConversionTab({
         </p>
       </div>
 
+      {/* ─── Speech Encoder ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Энкодер речи" : "Speech Encoder"}
+          </label>
+          <Badge variant="outline" className="text-[10px]">
+            {SPEECH_ENCODER_LABELS[vcEncoder]?.size ?? "~378 MB"}
+          </Badge>
+        </div>
+        <Select
+          value={vcEncoder}
+          onValueChange={async (val: string) => {
+            const enc = val as SpeechEncoder;
+            onUpdateVcConfig({ vc_encoder: enc });
+            if (enc === "wavlm") {
+              const cached = await hasModel("wavlm");
+              if (!cached) {
+                const entry = VC_ENCODER_MODELS.find(m => m.id === "wavlm");
+                if (!entry) return;
+                const confirmed = window.confirm(
+                  isRu
+                    ? `Модель "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) не загружена. Скачать?`
+                    : `Model "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) not cached. Download?`
+                );
+                if (!confirmed) {
+                  onUpdateVcConfig({ vc_encoder: "contentvec" });
+                  return;
+                }
+                setPitchModelDownloading(true);
+                setPitchDlProgress(0);
+                try {
+                  const ok = await downloadModel(entry, (p) => setPitchDlProgress(Math.round(p.fraction * 100)));
+                  if (!ok) throw new Error("Download failed");
+                  toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+                } catch (err: any) {
+                  toast.error(isRu ? `Ошибка загрузки: ${err.message}` : `Download error: ${err.message}`);
+                  onUpdateVcConfig({ vc_encoder: "contentvec" });
+                } finally {
+                  setPitchModelDownloading(false);
+                }
+              }
+            }
+          }}
+          disabled={isProcessing || pitchModelDownloading}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(SPEECH_ENCODER_LABELS) as SpeechEncoder[]).map(enc => (
+              <SelectItem key={enc} value={enc}>
+                {isRu ? SPEECH_ENCODER_LABELS[enc].ru : SPEECH_ENCODER_LABELS[enc].en}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? SPEECH_ENCODER_LABELS[vcEncoder]?.description.ru
+            : SPEECH_ENCODER_LABELS[vcEncoder]?.description.en}
+        </p>
+      </div>
+
       <Separator />
 
       {/* ─── Reference Voice Select ─── */}
