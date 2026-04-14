@@ -58,7 +58,7 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
       height: RENDER_HEIGHT,
       fftSize: BASE_FFT,
       hop: BASE_HOP,
-      minDb: -96,
+      minDb: -80,
       maxDb: -5,
       palette: "magma",
     };
