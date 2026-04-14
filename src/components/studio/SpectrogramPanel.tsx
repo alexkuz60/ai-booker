@@ -2,16 +2,22 @@
  * SpectrogramPanel — Shows side-by-side spectrograms for VC diagnostics.
  * Displays: Input TTS, Reference voice, RVC Output.
  * Canvas auto-resizes to fill container width.
+ * Supports optional F0 pitch contour overlay per slot.
  */
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { renderSpectrogramFromBlob, type SpectrogramOptions } from "@/lib/vcSpectrogram";
+import type { PitchFrame } from "@/lib/vcCrepe";
 import { X, BarChart3 } from "lucide-react";
 
-interface SpectrogramSlot {
+export interface SpectrogramSlot {
   label: string;
   blob: Blob | null;
+  /** Optional F0 pitch contour to overlay on the spectrogram */
+  f0Frames?: PitchFrame[];
+  /** Color for F0 line (default cyan for input, lime for reference) */
+  f0Color?: string;
 }
 
 interface SpectrogramPanelProps {
@@ -70,6 +76,8 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
         await renderSpectrogramFromBlob(canvas, slot.blob, {
           ...opts,
           label: slot.label,
+          f0Frames: slot.f0Frames,
+          f0Color: slot.f0Color,
         });
       }
     } catch (err) {
@@ -89,7 +97,7 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {isRu ? "Спектрограммы" : "Spectrograms"}
+            {isRu ? "Спектрограммы (мел-шкала)" : "Spectrograms (mel scale)"}
           </span>
           {rendering && (
             <Badge variant="outline" className="text-[10px] animate-pulse">
@@ -132,8 +140,8 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
 
       <p className="text-[10px] text-muted-foreground/60 text-center">
         {isRu
-          ? "Ось Y: частота (снизу → вверх) | Ось X: время | Цвет: амплитуда (dB)"
-          : "Y-axis: frequency (bottom → up) | X-axis: time | Color: magnitude (dB)"}
+          ? "Ось Y: частота, мел-шкала (снизу → вверх) | Ось X: время | Цвет: амплитуда (dB) | Линия: F0 pitch"
+          : "Y-axis: frequency, mel scale (bottom → up) | X-axis: time | Color: magnitude (dB) | Line: F0 pitch"}
       </p>
     </div>
   );
