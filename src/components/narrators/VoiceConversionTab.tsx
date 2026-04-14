@@ -3,7 +3,7 @@
  * Voice selection (references/indexes) + synthesis params + test pipeline.
  * Full management (upload, models) lives on the Voice Lab page.
  */
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
