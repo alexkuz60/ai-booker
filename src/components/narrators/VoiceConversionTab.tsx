@@ -88,6 +88,8 @@ export function VoiceConversionTab({
   const [ttsBlob, setTtsBlob] = useState<Blob | null>(null);
   const [rvcBlob, setRvcBlob] = useState<Blob | null>(null);
   const [refBlob, setRefBlob] = useState<Blob | null>(null);
+  const [ttsF0, setTtsF0] = useState<PitchFrame[] | undefined>();
+  const [refF0, setRefF0] = useState<PitchFrame[] | undefined>();
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
