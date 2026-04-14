@@ -1,28 +1,17 @@
 /**
- * vcNormalize.ts — RMS loudness normalization for Voice Conversion pipeline.
+ * vcNormalize.ts — Peak normalization for Voice Conversion pipeline.
  *
- * Normalizes input audio to a consistent RMS level before feeding into
- * speech encoders (ContentVec/WavLM), eliminating amplitude variance
- * across different TTS providers (Yandex, ElevenLabs, SaluteSpeech, etc.)
+ * Peak-normalizes input audio to [-1.0, 1.0] before feeding into
+ * speech encoders (ContentVec/WavLM), matching librosa.load() behavior
+ * which is the standard input normalization for RVC models.
  */
-
-/** Target RMS in dBFS — EBU R128 speech level */
-const DEFAULT_TARGET_DB = -23;
-
-/** Ceiling in dBFS — prevents hard clipping */
-const CEILING_DB = -1;
-
-/** Convert dBFS to linear amplitude */
-function dbToLinear(db: number): number {
-  return Math.pow(10, db / 20);
-}
 
 /** Convert linear amplitude to dBFS */
 function linearToDb(linear: number): number {
   return 20 * Math.log10(Math.max(linear, 1e-10));
 }
 
-/** Compute RMS of audio buffer */
+/** Compute RMS of audio buffer (for diagnostics only) */
 function computeRms(samples: Float32Array): number {
   let sum = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -46,74 +35,60 @@ export interface NormalizeResult {
   samples: Float32Array;
   /** Applied gain in dB */
   gainDb: number;
-  /** Input RMS in dBFS */
+  /** Input RMS in dBFS (diagnostic) */
   inputRmsDb: number;
-  /** Output RMS in dBFS */
+  /** Output RMS in dBFS (diagnostic) */
   outputRmsDb: number;
-  /** Whether ceiling limiter was applied */
+  /** Input peak in dBFS */
+  inputPeakDb: number;
+  /** Always false for peak-normalize (no limiter needed) */
   limited: boolean;
   /** Processing time in ms */
   normalizeMs: number;
 }
 
 /**
- * Normalize audio RMS to target level with soft ceiling limiter.
+ * Peak-normalize audio to [-1.0, 1.0].
+ *
+ * Matches librosa.load() behavior — the standard input normalization
+ * for RVC/ContentVec/WavLM models. Simple linear scaling by 1/peak.
  *
  * @param samples - Input audio samples (mono, any sample rate)
- * @param targetDb - Target RMS in dBFS (default -23)
+ * @param _targetDb - Ignored (kept for API compatibility)
  * @returns Normalized audio with metadata
  */
 export function normalizeRms(
   samples: Float32Array,
-  targetDb = DEFAULT_TARGET_DB,
+  _targetDb?: number,
 ): NormalizeResult {
   const t0 = performance.now();
 
+  const inputPeak = computePeak(samples);
+  const inputPeakDb = linearToDb(inputPeak);
   const inputRms = computeRms(samples);
   const inputRmsDb = linearToDb(inputRms);
 
   // Skip normalization for silence
-  if (inputRms < 1e-8) {
+  if (inputPeak < 1e-8) {
     console.info(`[vcNormalize] Input is silence, skipping`);
     return {
       samples,
       gainDb: 0,
       inputRmsDb: -Infinity,
       outputRmsDb: -Infinity,
+      inputPeakDb: -Infinity,
       limited: false,
       normalizeMs: Math.round(performance.now() - t0),
     };
   }
 
-  // Calculate required gain
-  const targetRms = dbToLinear(targetDb);
-  const gain = targetRms / inputRms;
+  // Peak-normalize: scale so max(abs) = 1.0
+  const gain = 1.0 / inputPeak;
   const gainDb = linearToDb(gain);
 
-  // Apply gain
   const output = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) {
     output[i] = samples[i] * gain;
-  }
-
-  // Check for clipping and apply soft ceiling limiter
-  const ceiling = dbToLinear(CEILING_DB);
-  const peak = computePeak(output);
-  let limited = false;
-
-  if (peak > ceiling) {
-    // Soft limiter: tanh-based saturation
-    const scale = ceiling / peak;
-    for (let i = 0; i < output.length; i++) {
-      const scaled = output[i] * scale;
-      // Gentle tanh compression in the top 3 dB
-      if (Math.abs(scaled) > ceiling * 0.9) {
-        output[i] = Math.tanh(scaled / ceiling) * ceiling;
-      } else {
-        output[i] = scaled;
-      }
-    }
-    limited = true;
   }
 
   const outputRms = computeRms(output);
@@ -121,9 +96,10 @@ export function normalizeRms(
   const normalizeMs = Math.round(performance.now() - t0);
 
   console.info(
-    `[vcNormalize] ${inputRmsDb.toFixed(1)} dBFS → ${outputRmsDb.toFixed(1)} dBFS ` +
-    `(gain ${gainDb > 0 ? "+" : ""}${gainDb.toFixed(1)} dB${limited ? ", limited" : ""}), ${normalizeMs}ms`
+    `[vcNormalize] Peak-norm: peak ${inputPeakDb.toFixed(1)} dBFS → 0.0 dBFS ` +
+    `(gain ${gainDb > 0 ? "+" : ""}${gainDb.toFixed(1)} dB), ` +
+    `RMS ${inputRmsDb.toFixed(1)} → ${outputRmsDb.toFixed(1)} dBFS, ${normalizeMs}ms`
   );
 
-  return { samples: output, gainDb, inputRmsDb, outputRmsDb, limited, normalizeMs };
+  return { samples: output, gainDb, inputRmsDb, outputRmsDb, inputPeakDb, limited: false, normalizeMs };
 }
