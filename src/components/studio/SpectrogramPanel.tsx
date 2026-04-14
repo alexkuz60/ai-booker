@@ -30,20 +30,24 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
   const [rendering, setRendering] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(0);
 
-  // Track the inner canvas wrapper width (excludes outer padding)
+  // Track the inner canvas wrapper width with debounce
   useEffect(() => {
     const el = canvasWrapRef.current;
     if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
         const w = Math.floor(entry.contentRect.width);
-        if (w > 0) setCanvasWidth(w);
+        if (w > 0) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => setCanvasWidth(w), 300);
+        }
       }
     });
     ro.observe(el);
     const w = Math.floor(el.clientWidth);
     if (w > 0) setCanvasWidth(w);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (timer) clearTimeout(timer); };
   }, []);
 
   const renderAll = useCallback(async () => {
