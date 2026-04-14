@@ -261,6 +261,10 @@ export function VoiceConversionTab({
       );
       setStage("done");
       setRvcBlob(result.wav);
+      // Reload reference blob for spectrogram comparison
+      if (showSpectrograms && vcReferenceId) {
+        readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
+      }
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
