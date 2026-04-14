@@ -700,7 +700,14 @@ export function VoiceConversionTab({
             variant="outline"
             size="sm"
             className="gap-2 w-full"
-            onClick={() => setShowSpectrograms(prev => !prev)}
+            onClick={async () => {
+              const next = !showSpectrograms;
+              setShowSpectrograms(next);
+              if (next && !refBlob && vcReferenceId) {
+                const blob = await readVcReferenceBlob(vcReferenceId);
+                if (blob) setRefBlob(blob);
+              }
+            }}
           >
             <BarChart3 className="h-3.5 w-3.5" />
             {showSpectrograms
