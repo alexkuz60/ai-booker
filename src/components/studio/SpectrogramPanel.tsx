@@ -47,10 +47,10 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
   }, []);
 
   const renderAll = useCallback(async () => {
-    if (containerWidth < 100) return;
+    if (canvasWidth < 100) return;
     setRendering(true);
     const opts: SpectrogramOptions = {
-      width: containerWidth,
+      width: canvasWidth,
       height: RENDER_HEIGHT,
       fftSize: BASE_FFT,
       hop: BASE_HOP,
@@ -73,14 +73,14 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
     } finally {
       setRendering(false);
     }
-  }, [slots, containerWidth]);
+  }, [slots, canvasWidth]);
 
   useEffect(() => {
     renderAll();
   }, [renderAll]);
 
   return (
-    <div ref={containerRef} className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3">
+    <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3 overflow-hidden">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-primary" />
@@ -100,13 +100,13 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div ref={canvasWrapRef} className="flex flex-col gap-2">
         {slots.map((slot, idx) => (
           <div key={idx} className="relative w-full">
             {slot.blob ? (
               <canvas
                 ref={(el) => { canvasRefs.current[idx] = el; }}
-                width={containerWidth || 480}
+                width={canvasWidth || 480}
                 height={RENDER_HEIGHT}
                 className="w-full rounded border border-border/30"
                 style={{ imageRendering: "pixelated", height: RENDER_HEIGHT }}
