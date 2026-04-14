@@ -356,10 +356,13 @@ const Narrators = () => {
     try {
       const currentChar = characters.find(c => c.id === selectedId);
       const isExtra = currentChar?.voice_config?.is_extra as boolean | undefined;
+      // Collect all vc_* fields from current voice_config
       const vcFields: Record<string, unknown> = {};
-      if (currentChar?.voice_config?.vc_enabled != null) vcFields.vc_enabled = currentChar.voice_config.vc_enabled;
-      if (currentChar?.voice_config?.vc_pitch_shift != null) vcFields.vc_pitch_shift = currentChar.voice_config.vc_pitch_shift;
-      if (currentChar?.voice_config?.vc_speaker_id != null) vcFields.vc_speaker_id = currentChar.voice_config.vc_speaker_id;
+      if (currentChar?.voice_config) {
+        for (const [k, v] of Object.entries(currentChar.voice_config)) {
+          if (k.startsWith("vc_")) vcFields[k] = v;
+        }
+      }
 
       const voiceConfig = {
         ...(voiceProvider === "salutespeech"
