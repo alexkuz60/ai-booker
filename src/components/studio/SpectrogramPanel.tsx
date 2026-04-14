@@ -100,16 +100,17 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
         )}
       </div>
 
-      <div ref={canvasWrapRef} className="flex flex-col gap-2">
+      <div ref={canvasWrapRef} className="flex flex-col gap-2 min-w-0">
         {slots.map((slot, idx) => (
-          <div key={idx} className="relative w-full">
+          <div key={idx} className="relative w-full min-w-0">
             {slot.blob ? (
               <canvas
+                key={`canvas-${idx}-${canvasWidth}`}
                 ref={(el) => { canvasRefs.current[idx] = el; }}
                 width={canvasWidth || 480}
                 height={RENDER_HEIGHT}
-                className="w-full rounded border border-border/30"
-                style={{ imageRendering: "pixelated", height: RENDER_HEIGHT }}
+                className="block w-full rounded border border-border/30"
+                style={{ imageRendering: "pixelated" }}
               />
             ) : (
               <div
