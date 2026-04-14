@@ -267,6 +267,8 @@ export async function synthesizeVoice(
     console.info(`[vcSynthesis] No index loaded — protect disabled, F0 kept unchanged`);
   }
 
+  const effectiveIndexRate = retrievalApplied ? indexRate : 0;
+
   // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
@@ -389,7 +391,7 @@ export async function synthesizeVoice(
   console.info(
     `[vcSynthesis] Running RVC "${modelId}": ${T} frames, ` +
     `pitchShift=${pitchShift}st, speaker=${speakerId}, ` +
-    `indexRate=${indexRate}, protect=${protect}, ` +
+    `indexRate=${effectiveIndexRate}, protect=${protect}, ` +
     `inputs=[${inputNames.join(", ")}]`
   );
 
