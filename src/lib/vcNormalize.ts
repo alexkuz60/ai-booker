@@ -1,10 +1,17 @@
 /**
- * vcNormalize.ts — Peak normalization for Voice Conversion pipeline.
+ * vcNormalize.ts — RMS normalization for Voice Conversion pipeline.
  *
- * Peak-normalizes input audio to [-1.0, 1.0] before feeding into
- * speech encoders (ContentVec/WavLM), matching librosa.load() behavior
- * which is the standard input normalization for RVC models.
+ * RMS-normalizes input audio to a target loudness level (-20 dBFS)
+ * with a soft ceiling limiter at -1 dBFS to prevent clipping.
+ * This provides consistent loudness matching the RVC training data,
+ * which is more stable than simple peak normalization.
  */
+
+/** Default target RMS in dBFS — typical for RVC training data */
+const DEFAULT_TARGET_RMS_DB = -20;
+
+/** Ceiling in linear — soft limiter threshold to prevent clipping */
+const CEILING_LINEAR = 0.891; // ≈ -1 dBFS
 
 /** Convert linear amplitude to dBFS */
 function linearToDb(linear: number): number {
@@ -41,25 +48,27 @@ export interface NormalizeResult {
   outputRmsDb: number;
   /** Input peak in dBFS */
   inputPeakDb: number;
-  /** Always false for peak-normalize (no limiter needed) */
+  /** Whether soft limiter was applied */
   limited: boolean;
   /** Processing time in ms */
   normalizeMs: number;
 }
 
 /**
- * Peak-normalize audio to [-1.0, 1.0].
+ * RMS-normalize audio to a target loudness level.
  *
- * Matches librosa.load() behavior — the standard input normalization
- * for RVC/ContentVec/WavLM models. Simple linear scaling by 1/peak.
+ * Scales audio so its RMS matches the target (default -20 dBFS),
+ * then applies a soft tanh limiter to prevent clipping above -1 dBFS.
+ * This provides consistent loudness across different TTS providers
+ * and matches typical RVC training data normalization.
  *
  * @param samples - Input audio samples (mono, any sample rate)
- * @param _targetDb - Ignored (kept for API compatibility)
+ * @param targetRmsDb - Target RMS level in dBFS (default -20)
  * @returns Normalized audio with metadata
  */
 export function normalizeRms(
   samples: Float32Array,
-  _targetDb?: number,
+  targetRmsDb = DEFAULT_TARGET_RMS_DB,
 ): NormalizeResult {
   const t0 = performance.now();
 
@@ -82,24 +91,37 @@ export function normalizeRms(
     };
   }
 
-  // Peak-normalize: scale so max(abs) = 1.0
-  const gain = 1.0 / inputPeak;
+  // RMS-normalize: scale so RMS matches target
+  const targetRmsLinear = Math.pow(10, targetRmsDb / 20);
+  const gain = inputRms > 1e-10 ? targetRmsLinear / inputRms : 1;
   const gainDb = linearToDb(gain);
 
   const output = new Float32Array(samples.length);
+  let limited = false;
+
   for (let i = 0; i < samples.length; i++) {
-    output[i] = samples[i] * gain;
+    let s = samples[i] * gain;
+    // Soft tanh limiter above ceiling
+    if (Math.abs(s) > CEILING_LINEAR) {
+      limited = true;
+      s = Math.sign(s) * (CEILING_LINEAR + (1 - CEILING_LINEAR) * Math.tanh((Math.abs(s) - CEILING_LINEAR) / (1 - CEILING_LINEAR)));
+    }
+    output[i] = s;
   }
 
   const outputRms = computeRms(output);
   const outputRmsDb = linearToDb(outputRms);
+  const outputPeak = computePeak(output);
+  const outputPeakDb = linearToDb(outputPeak);
   const normalizeMs = Math.round(performance.now() - t0);
 
   console.info(
-    `[vcNormalize] Peak-norm: peak ${inputPeakDb.toFixed(1)} dBFS → 0.0 dBFS ` +
+    `[vcNormalize] RMS-norm: target ${targetRmsDb} dBFS, ` +
     `(gain ${gainDb > 0 ? "+" : ""}${gainDb.toFixed(1)} dB), ` +
-    `RMS ${inputRmsDb.toFixed(1)} → ${outputRmsDb.toFixed(1)} dBFS, ${normalizeMs}ms`
+    `RMS ${inputRmsDb.toFixed(1)} → ${outputRmsDb.toFixed(1)} dBFS, ` +
+    `peak ${inputPeakDb.toFixed(1)} → ${outputPeakDb.toFixed(1)} dBFS` +
+    `${limited ? " [LIMITED]" : ""}, ${normalizeMs}ms`
   );
 
-  return { samples: output, gainDb, inputRmsDb, outputRmsDb, inputPeakDb, limited: false, normalizeMs };
+  return { samples: output, gainDb, inputRmsDb, outputRmsDb, inputPeakDb, limited, normalizeMs };
 }
