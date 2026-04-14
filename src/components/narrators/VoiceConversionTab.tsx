@@ -26,6 +26,7 @@ import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SpectrogramPanel } from "@/components/studio/SpectrogramPanel";
 import {
   type VcBackend, setForcedBackend, getForcedBackend,
   releaseAllVcSessions, getAvailableBackend,
