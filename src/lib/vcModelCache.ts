@@ -157,6 +157,20 @@ async function resolveModelFile(modelId: string): Promise<ResolvedModelFile | nu
 
 // ---------- OPFS directory helpers ----------
 
+let persistenceRequested = false;
+
+/** Request persistent storage so the browser won't evict large ONNX models */
+async function requestPersistence(): Promise<void> {
+  if (persistenceRequested) return;
+  persistenceRequested = true;
+  try {
+    if (navigator.storage?.persist) {
+      const granted = await navigator.storage.persist();
+      console.info(`[vcModelCache] Persistent storage ${granted ? "granted" : "denied"}`);
+    }
+  } catch { /* ignore */ }
+}
+
 async function getVcCacheDir(): Promise<FileSystemDirectoryHandle | null> {
   try {
     const root = await navigator.storage.getDirectory();
@@ -201,6 +215,7 @@ export async function downloadModel(
   onProgress?: ProgressCallback,
   signal?: AbortSignal,
 ): Promise<boolean> {
+  await requestPersistence();
   const dir = await getVcCacheDir();
   if (!dir) {
     onProgress?.({

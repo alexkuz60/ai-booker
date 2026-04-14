@@ -31,6 +31,19 @@ export interface VcReferenceEntry {
 
 const VC_REF_DIR = "vc-references";
 
+let persistenceRequested = false;
+
+async function requestPersistence(): Promise<void> {
+  if (persistenceRequested) return;
+  persistenceRequested = true;
+  try {
+    if (navigator.storage?.persist) {
+      const granted = await navigator.storage.persist();
+      console.info(`[vcRefCache] Persistent storage ${granted ? "granted" : "denied"}`);
+    }
+  } catch { /* ignore */ }
+}
+
 async function getRefDir(): Promise<FileSystemDirectoryHandle | null> {
   try {
     const root = await navigator.storage.getDirectory();
@@ -101,6 +114,7 @@ export async function saveVcReference(
   audioBlob: Blob,
   meta: VcReferenceEntry,
 ): Promise<boolean> {
+  await requestPersistence();
   const dir = await getRefDir();
   if (!dir) return false;
   try {

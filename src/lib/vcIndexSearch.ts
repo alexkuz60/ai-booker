@@ -644,6 +644,19 @@ export interface VcIndexEntry {
   addedAt: string;
 }
 
+let indexPersistenceRequested = false;
+
+async function requestIndexPersistence(): Promise<void> {
+  if (indexPersistenceRequested) return;
+  indexPersistenceRequested = true;
+  try {
+    if (navigator.storage?.persist) {
+      const granted = await navigator.storage.persist();
+      console.info(`[vcIndex] Persistent storage ${granted ? "granted" : "denied"}`);
+    }
+  } catch { /* ignore */ }
+}
+
 async function getIndexDir(): Promise<FileSystemDirectoryHandle | null> {
   try {
     const root = await navigator.storage.getDirectory();
@@ -688,6 +701,7 @@ export async function saveVcIndex(
   npyBlob: Blob,
   meta: VcIndexEntry,
 ): Promise<boolean> {
+  await requestIndexPersistence();
   const dir = await getIndexDir();
   if (!dir) return false;
   try {
