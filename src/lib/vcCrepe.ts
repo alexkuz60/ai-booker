@@ -142,7 +142,7 @@ export async function extractPitch(
       const { frequency, confidence } = decodePitch(probs);
       pitchFrames.push({
         timeSec: (frameIdx * hopSamples) / sampleRate,
-        frequencyHz: confidence > 0.3 ? frequency : 0, // threshold for voiced
+        frequencyHz: confidence > 0.15 ? frequency : 0, // lowered threshold for TTS input
         confidence,
       });
     }

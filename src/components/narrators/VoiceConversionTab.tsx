@@ -201,7 +201,10 @@ export function VoiceConversionTab({
     setErrorMsg("");
     setTtsBlob(null);
     setRvcBlob(null);
-    setRefBlob(null);
+    // Reload reference blob if spectrograms are visible and reference is set
+    if (showSpectrograms && vcReferenceId && !refBlob) {
+      readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
+    }
     try {
       const status = await getModelStatus();
       const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
@@ -258,6 +261,10 @@ export function VoiceConversionTab({
       );
       setStage("done");
       setRvcBlob(result.wav);
+      // Reload reference blob for spectrogram comparison
+      if (showSpectrograms && vcReferenceId) {
+        readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
+      }
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
