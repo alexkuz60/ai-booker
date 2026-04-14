@@ -45,8 +45,10 @@ export interface VcPipelineOptions {
   crepeHopMs?: number;
   /** Pitch extraction algorithm (default "crepe-tiny") */
   pitchAlgorithm?: PitchAlgorithm;
+  /** Speech encoder (default "contentvec") */
+  encoder?: SpeechEncoder;
   /** Callback for progress updates */
-  onProgress?: (stage: "resample" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
+  onProgress?: (stage: "resample" | "normalize" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
   /** Synthesis options (pitch shift, speaker ID, model) */
   synthesis?: VcSynthesisOptions;
 }
