@@ -71,6 +71,7 @@ export function VoiceConversionTab({
   const vcIndexId = (voiceConfig.vc_index_id as string) || "";
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
   const pitchAlgorithm = (voiceConfig.vc_pitch_algorithm as PitchAlgorithm) || "crepe-tiny";
+  const vcEncoder = (voiceConfig.vc_encoder as SpeechEncoder) || "contentvec";
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
