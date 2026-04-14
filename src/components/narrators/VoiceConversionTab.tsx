@@ -41,13 +41,14 @@ interface VoiceConversionTabProps {
   buildTtsRequest: () => { url: string; body: Record<string, unknown> } | null;
 }
 
-type VcStage = "idle" | "tts" | "resample" | "contentvec" | "crepe" | "synthesis" | "done" | "error";
+type VcStage = "idle" | "tts" | "resample" | "normalize" | "contentvec" | "crepe" | "synthesis" | "done" | "error";
 
 const STAGE_LABELS: Record<VcStage, { ru: string; en: string }> = {
   idle: { ru: "Ожидание", en: "Idle" },
   tts: { ru: "Генерация TTS...", en: "Generating TTS..." },
   resample: { ru: "Ресемплинг 16kHz...", en: "Resampling 16kHz..." },
-  contentvec: { ru: "ContentVec эмбеддинги...", en: "ContentVec embeddings..." },
+  normalize: { ru: "Нормализация громкости...", en: "Loudness normalization..." },
+  contentvec: { ru: "Извлечение эмбеддингов...", en: "Extracting embeddings..." },
   crepe: { ru: "Извлечение F0 pitch...", en: "F0 pitch extraction..." },
   synthesis: { ru: "RVC v2 синтез...", en: "RVC v2 synthesis..." },
   done: { ru: "Готово", en: "Done" },
