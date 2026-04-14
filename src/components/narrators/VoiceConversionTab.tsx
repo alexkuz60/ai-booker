@@ -4,6 +4,7 @@
  * Full management (upload, models) lives on the Voice Lab page.
  */
 import { useState, useCallback, useEffect, useRef } from "react";
+import type { PitchFrame } from "@/lib/vcCrepe";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
