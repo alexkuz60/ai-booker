@@ -558,7 +558,9 @@ export function VoiceConversionTab({
           </Button>
         </div>
         <p className="text-muted-foreground/60 text-xs text-center">
-          {isRu ? "0 = без защиты | 0.5 = макс. сохранение шипящих/взрывных" : "0 = no protection | 0.5 = max sibilant preservation"}
+          {isRu
+            ? "Работает только с индексом: меньше = сильнее возврат к исходной артикуляции на глухих участках"
+            : "Works only with an index: lower = stronger fallback to source articulation on unvoiced frames"}
         </p>
       </div>
 
