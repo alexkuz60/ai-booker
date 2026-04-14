@@ -204,6 +204,8 @@ export function VoiceConversionTab({
     setErrorMsg("");
     setTtsBlob(null);
     setRvcBlob(null);
+    setTtsF0(undefined);
+    setRefF0(undefined);
     // Reload reference blob if spectrograms are visible and reference is set
     if (showSpectrograms && vcReferenceId && !refBlob) {
       readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
