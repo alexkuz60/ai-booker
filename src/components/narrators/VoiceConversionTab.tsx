@@ -18,7 +18,7 @@ import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache"
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download, BarChart3,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
@@ -26,6 +26,7 @@ import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SpectrogramPanel } from "@/components/studio/SpectrogramPanel";
 import {
   type VcBackend, setForcedBackend, getForcedBackend,
   releaseAllVcSessions, getAvailableBackend,
@@ -82,6 +83,9 @@ export function VoiceConversionTab({
   const [resultBlobUrl, setResultBlobUrl] = useState<string | null>(null);
   const [timingInfo, setTimingInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [showSpectrograms, setShowSpectrograms] = useState(false);
+  const [ttsBlob, setTtsBlob] = useState<Blob | null>(null);
+  const [rvcBlob, setRvcBlob] = useState<Blob | null>(null);
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
@@ -194,6 +198,8 @@ export function VoiceConversionTab({
     setStageProgress(0);
     setTimingInfo("");
     setErrorMsg("");
+    setTtsBlob(null);
+    setRvcBlob(null);
     try {
       const status = await getModelStatus();
       const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
@@ -214,6 +220,7 @@ export function VoiceConversionTab({
       });
       if (!ttsResp.ok) { const txt = await ttsResp.text().catch(() => ""); throw new Error(`TTS: ${ttsResp.status} ${txt.slice(0, 100)}`); }
       const ttsBlob = await ttsResp.blob();
+      setTtsBlob(ttsBlob);
       setStageProgress(100);
 
       // Load index data if configured
@@ -248,6 +255,7 @@ export function VoiceConversionTab({
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
+      setRvcBlob(result.wav);
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
@@ -683,7 +691,34 @@ export function VoiceConversionTab({
             <span className="break-all">{errorMsg}</span>
           </div>
         )}
+
+        {/* Spectrogram toggle */}
+        {stage === "done" && (ttsBlob || rvcBlob) && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 w-full"
+            onClick={() => setShowSpectrograms(prev => !prev)}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            {showSpectrograms
+              ? (isRu ? "Скрыть спектрограммы" : "Hide spectrograms")
+              : (isRu ? "Показать спектрограммы" : "Show spectrograms")}
+          </Button>
+        )}
       </div>
+
+      {/* Spectrogram comparison panel */}
+      {showSpectrograms && (ttsBlob || rvcBlob) && (
+        <SpectrogramPanel
+          isRu={isRu}
+          slots={[
+            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob },
+            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
+          ]}
+          onClose={() => setShowSpectrograms(false)}
+        />
+      )}
     </div>
   );
 }
