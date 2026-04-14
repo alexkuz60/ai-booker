@@ -198,6 +198,8 @@ export function VoiceConversionTab({
     setStageProgress(0);
     setTimingInfo("");
     setErrorMsg("");
+    setTtsBlob(null);
+    setRvcBlob(null);
     try {
       const status = await getModelStatus();
       const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
