@@ -72,6 +72,7 @@ export function VoiceConversionTab({
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
   const pitchAlgorithm = (voiceConfig.vc_pitch_algorithm as PitchAlgorithm) || "crepe-tiny";
   const vcEncoder = (voiceConfig.vc_encoder as SpeechEncoder) || "contentvec";
+  const dryWet = (voiceConfig.vc_dry_wet as number) ?? 1.0;
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
@@ -228,6 +229,7 @@ export function VoiceConversionTab({
       const pipelineOpts: VcPipelineOptions = {
         pitchAlgorithm,
         encoder: vcEncoder,
+        dryWet,
         onProgress: (s, p) => { setStage(s as VcStage); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
@@ -264,7 +266,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder, dryWet]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
