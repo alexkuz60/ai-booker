@@ -1,17 +1,20 @@
 /**
  * vcPipeline.ts — Unified Voice Conversion pipeline.
  *
- * Orchestrates: resample → ContentVec embeddings → Pitch (F0) → RVC synthesis
- * Supports pitch algorithms: CREPE Tiny, CREPE Full, RMVPE
+ * Orchestrates: resample → normalize → encoder (ContentVec/WavLM) → Pitch (F0) → RVC synthesis
+ * Supports pitch algorithms: CREPE Tiny, CREPE Full, SwiftF0, RMVPE
+ * Supports speech encoders: ContentVec (HuBERT), WavLM-Base-Plus
  */
 
 import { resampleTo16kMono } from "./vcResample";
+import { normalizeRms } from "./vcNormalize";
 import { extractContentVec, type ContentVecResult } from "./vcContentVec";
+import { extractWavLM } from "./vcWavLM";
 import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
 import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
-import type { PitchAlgorithm } from "./vcModelCache";
+import type { PitchAlgorithm, SpeechEncoder } from "./vcModelCache";
 
 export interface VcFeatures {
   /** Speaker-independent phonetic embeddings [T, 768] */
@@ -27,11 +30,14 @@ export interface VcFeatures {
   /** Per-stage timing */
   timing: {
     resampleMs: number;
-    contentvecMs: number;
+    normalizeMs: number;
+    encoderMs: number;
     crepeMs: number;
   };
   /** Which pitch algorithm was used */
   pitchAlgorithm: PitchAlgorithm;
+  /** Which speech encoder was used */
+  encoder: SpeechEncoder;
 }
 
 export interface VcPipelineOptions {
