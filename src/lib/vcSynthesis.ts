@@ -340,9 +340,42 @@ export async function synthesizeVoice(
     }
   }
 
-  // Log actual feed shapes for debugging
+  // Log actual feed shapes + statistics for debugging
   for (const [k, v] of Object.entries(feeds)) {
-    console.info(`[vcSynthesis] feed "${k}": shape=[${v.dims}], type=${v.type}`);
+    const dims = `[${v.dims}]`;
+    if (v.type === "float32") {
+      const d = v.data as Float32Array;
+      let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+      for (let i = 0; i < d.length; i++) {
+        const val = d[i];
+        if (val < min) min = val;
+        if (val > max) max = val;
+        sum += val;
+        sumSq += val * val;
+      }
+      const mean = sum / d.length;
+      const std = Math.sqrt(sumSq / d.length - mean * mean);
+      const zeros = d.reduce((c, v) => c + (v === 0 ? 1 : 0), 0);
+      console.info(
+        `[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}, ` +
+        `min=${min.toFixed(4)}, max=${max.toFixed(4)}, mean=${mean.toFixed(4)}, ` +
+        `std=${std.toFixed(4)}, zeros=${zeros}/${d.length}`
+      );
+    } else if (v.type === "int64") {
+      const d = v.data as BigInt64Array;
+      let min = d[0], max = d[0];
+      for (let i = 1; i < d.length; i++) {
+        if (d[i] < min) min = d[i];
+        if (d[i] > max) max = d[i];
+      }
+      const zeros = Array.from(d).filter(v => v === 0n).length;
+      console.info(
+        `[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}, ` +
+        `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
+      );
+    } else {
+      console.info(`[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}`);
+    }
   }
 
   console.info(
