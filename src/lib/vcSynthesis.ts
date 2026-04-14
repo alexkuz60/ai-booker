@@ -85,8 +85,9 @@ export interface VcSynthesisOptions {
   /**
    * Consonant Protection: 0.0–0.5 (default 0.33).
    * Protects unvoiced consonants (sibilants, plosives) from VC artifacts.
-   * Higher values preserve more of the original consonant texture.
-   * Applied by zeroing F0 for frames below a voicing confidence threshold.
+   * Applied only when feature retrieval (index) is enabled by blending
+   * retrieved embeddings back toward the original encoder embeddings on
+   * unvoiced frames. Ignored when no index is loaded.
    */
   protect?: number;
   /**
@@ -249,38 +250,45 @@ export async function synthesizeVoice(
   // ── Feature Retrieval (index_rate) ───────────────────────────────────
   // If training data index is loaded, blend source embeddings with
   // KNN-retrieved training embeddings. Modifies upEmb in-place.
+  let protectSourceEmbeddings: Float32Array | null = null;
+  let retrievalApplied = false;
   if (indexRate > 0 && options?.indexData) {
     const { data: trainData, rows: trainN, cols: trainDim } = options.indexData;
     if (trainDim === features.embeddingDim) {
+      if (protect < 0.5) {
+        protectSourceEmbeddings = upEmb.slice();
+      }
       await applyFeatureRetrieval(upEmb, T, features.embeddingDim, trainData, trainN, indexRate);
+      retrievalApplied = true;
     } else {
       console.warn(`[vcSynthesis] Index dim mismatch: ${trainDim} vs ${features.embeddingDim}, skipping retrieval`);
     }
+  } else if (protect < 0.5 && indexRate > 0) {
+    console.info(`[vcSynthesis] No index loaded — protect disabled, F0 kept unchanged`);
   }
 
   // Align F0 pitch to upsampled frame count (2T)
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
   // ── Consonant Protection ─────────────────────────────────────────────
-  // Reference RVC implementation: if protect < 0.5, zero out F0 for frames
-  // with low voicing confidence to preserve unvoiced consonant texture.
-  // CREPE confidence <(1 - protect) → treat as unvoiced.
-  if (protect < 0.5) {
-    const confThreshold = 1 - protect; // e.g. protect=0.33 → threshold=0.67
-    // Interpolate CREPE confidence to match T frames (same as F0 alignment)
-    const srcConfLen = features.pitchFrames.length;
-    const ratio = srcConfLen / T;
+  // Reference RVC implementation blends retrieved embeddings back toward the
+  // original encoder features on unvoiced frames. It does NOT zero out F0.
+  if (protect < 0.5 && retrievalApplied && protectSourceEmbeddings) {
+    let protectedFrames = 0;
     for (let i = 0; i < T; i++) {
-      const srcIdx = i * ratio;
-      const lo = Math.floor(srcIdx);
-      const hi = Math.min(lo + 1, srcConfLen - 1);
-      const frac = srcIdx - lo;
-      const conf = features.pitchFrames[lo].confidence * (1 - frac)
-                 + features.pitchFrames[hi].confidence * frac;
-      if (conf < confThreshold) {
-        alignedF0[i] = 0; // mark as unvoiced → protects consonants
+      if (alignedF0[i] < 1) {
+        protectedFrames += 1;
+        const off = i * features.embeddingDim;
+        for (let d = 0; d < features.embeddingDim; d++) {
+          upEmb[off + d] = upEmb[off + d] * protect
+                         + protectSourceEmbeddings[off + d] * (1 - protect);
+        }
       }
     }
+
+    console.info(
+      `[vcSynthesis] Protect blend: ${protectedFrames}/${T} unvoiced frames, factor=${protect}`
+    );
   }
 
   // Build pitch tensors
