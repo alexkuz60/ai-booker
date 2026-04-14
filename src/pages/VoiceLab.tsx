@@ -80,7 +80,10 @@ export default function VoiceLab() {
     const pitchEntries = await Promise.all(
       VC_PITCH_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
     );
-    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries) });
+    const encoderEntries = await Promise.all(
+      VC_ENCODER_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
+    );
+    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries), ...Object.fromEntries(encoderEntries) });
   }, []);
 
   useEffect(() => {
