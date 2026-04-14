@@ -227,7 +227,8 @@ export function VoiceConversionTab({
 
       const pipelineOpts: VcPipelineOptions = {
         pitchAlgorithm,
-        onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
+        encoder: vcEncoder,
+        onProgress: (s, p) => { setStage(s as VcStage); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
@@ -239,8 +240,9 @@ export function VoiceConversionTab({
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       const backendLabel = activeBackend === "wasm" ? " [CPU/WASM]" : " [GPU/WebGPU]";
       const pitchLabel = result.features.pitchAlgorithm === "rmvpe" ? "RMVPE" : result.features.pitchAlgorithm === "crepe-full" ? "CREPE-Full" : result.features.pitchAlgorithm === "swiftf0" ? "SwiftF0" : "CREPE-Tiny";
+      const encLabel = result.features.encoder === "wavlm" ? "WavLM" : "ContentVec";
       setTimingInfo(
-        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
+        `${result.features.durationSec.toFixed(1)}s → ${encLabel} ${t.encoderMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, norm ${t.normalizeMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
@@ -255,7 +257,6 @@ export function VoiceConversionTab({
       setPlaying(true);
       audio.play().catch(() => {
         setPlaying(false);
-        // Autoplay blocked — user can click replay
         console.warn("[VcTest] Autoplay blocked, user can click Play to replay");
       });
     } catch (err: any) {
@@ -263,7 +264,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
