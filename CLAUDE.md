@@ -148,6 +148,9 @@ When restoring from server (`openSavedBook`):
 | VC pipeline orchestrator | `src/lib/vcPipeline.ts` |
 | VC model OPFS cache | `src/lib/vcModelCache.ts` |
 | VC ONNX session manager | `src/lib/vcInferenceSession.ts` |
+| VC RMS normalization | `src/lib/vcNormalize.ts` |
+| VC WavLM encoder | `src/lib/vcWavLM.ts` |
+| VC ContentVec encoder | `src/lib/vcContentVec.ts` |
 | Reusable slider component | `src/components/ui/SliderField.tsx` |
 | Architecture docs | `ARCHITECTURE.md` |
 | Known problems | `PROBLEMS.md` |
@@ -159,6 +162,11 @@ When restoring from server (`openSavedBook`):
 
 - **Core models** (ContentVec, CREPE Tiny, RVC v2) are required for Booker Pro activation.
 - **Pitch models** (CREPE Full, SwiftF0, RMVPE) are optional, downloaded on demand.
+- **Encoder models** (WavLM-Base-Plus INT8) are optional, recommended for expressive TTS.
+- Pipeline stages: resample → **RMS normalize** → encoder (ContentVec|WavLM) → pitch (F0) → RVC v2 → WAV.
+- RMS normalization targets -23 dBFS with soft ceiling limiter at -1 dBFS.
+- `SpeechEncoder` type: `"contentvec" | "wavlm"` — stored in `voice_config.vc_encoder`.
+- WavLM-Base-Plus outputs 768-dim embeddings — drop-in compatible with RVC v2 decoder.
 - RMVPE mel-spectrogram input tensor MUST be padded to a multiple of 32 frames (`PAD_MULTIPLE = 32`).
 - All ONNX sessions are cached; on backend switch call `releaseAllVcSessions()`.
 - Model cache lives in OPFS `vc-models/` directory, emits `VC_MODEL_CACHE_EVENT` on change.

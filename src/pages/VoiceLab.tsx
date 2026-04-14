@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, downloadAllModels, downloadModel, deleteModel, hasModel, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, hasModel, type ModelDownloadProgress } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
@@ -80,7 +80,10 @@ export default function VoiceLab() {
     const pitchEntries = await Promise.all(
       VC_PITCH_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
     );
-    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries) });
+    const encoderEntries = await Promise.all(
+      VC_ENCODER_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
+    );
+    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries), ...Object.fromEntries(encoderEntries) });
   }, []);
 
   useEffect(() => {
@@ -430,6 +433,70 @@ export default function VoiceLab() {
                 </TableBody>
               </Table>
               {pitchBusy && <Progress value={pitchDlPct} className="h-1.5" />}
+            </CardContent>
+          </Card>
+
+          {/* ── Encoder Models (optional) ── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-primary" />
+                {isRu ? "Альтернативные энкодеры речи" : "Alternative Speech Encoders"}
+                <Badge variant="outline" className="text-[10px] ml-auto border-primary/50 text-primary">
+                  {isRu ? "рекомендуемый" : "recommended"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                {isRu
+                  ? "WavLM лучше сохраняет интонации и эмоциональную окраску живого TTS. Используется вместо ContentVec для более естественного результата."
+                  : "WavLM better preserves intonation and emotional quality of live TTS. Used instead of ContentVec for more natural results."}
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
+                    <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
+                    <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                    <TableHead className="text-xs w-20"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {VC_ENCODER_MODELS.map(m => {
+                    const cached = !!modelStatus[m.id];
+                    const busy = pitchBusy === m.id;
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="py-2">
+                          <p className="text-sm font-medium">{m.label}</p>
+                          <p className="text-xs text-muted-foreground">{m.description}</p>
+                        </TableCell>
+                        <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                          {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {cached
+                            ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
+                            : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {cached ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeletePitch(m.id, m.label)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => handleDownloadPitch(m)} disabled={!!pitchBusy}>
+                              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                              {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>

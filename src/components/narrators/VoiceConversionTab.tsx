@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, PITCH_ALGORITHM_LABELS, type PitchAlgorithm } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, VC_ENCODER_MODELS, PITCH_ALGORITHM_LABELS, SPEECH_ENCODER_LABELS, type PitchAlgorithm, type SpeechEncoder } from "@/lib/vcModelCache";
 import { hasModel, downloadModel } from "@/lib/vcModelCache";
 import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
@@ -41,13 +41,14 @@ interface VoiceConversionTabProps {
   buildTtsRequest: () => { url: string; body: Record<string, unknown> } | null;
 }
 
-type VcStage = "idle" | "tts" | "resample" | "contentvec" | "crepe" | "synthesis" | "done" | "error";
+type VcStage = "idle" | "tts" | "resample" | "normalize" | "contentvec" | "crepe" | "synthesis" | "done" | "error";
 
 const STAGE_LABELS: Record<VcStage, { ru: string; en: string }> = {
   idle: { ru: "Ожидание", en: "Idle" },
   tts: { ru: "Генерация TTS...", en: "Generating TTS..." },
   resample: { ru: "Ресемплинг 16kHz...", en: "Resampling 16kHz..." },
-  contentvec: { ru: "ContentVec эмбеддинги...", en: "ContentVec embeddings..." },
+  normalize: { ru: "Нормализация громкости...", en: "Loudness normalization..." },
+  contentvec: { ru: "Извлечение эмбеддингов...", en: "Extracting embeddings..." },
   crepe: { ru: "Извлечение F0 pitch...", en: "F0 pitch extraction..." },
   synthesis: { ru: "RVC v2 синтез...", en: "RVC v2 synthesis..." },
   done: { ru: "Готово", en: "Done" },
@@ -70,6 +71,7 @@ export function VoiceConversionTab({
   const vcIndexId = (voiceConfig.vc_index_id as string) || "";
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
   const pitchAlgorithm = (voiceConfig.vc_pitch_algorithm as PitchAlgorithm) || "crepe-tiny";
+  const vcEncoder = (voiceConfig.vc_encoder as SpeechEncoder) || "contentvec";
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
@@ -225,7 +227,8 @@ export function VoiceConversionTab({
 
       const pipelineOpts: VcPipelineOptions = {
         pitchAlgorithm,
-        onProgress: (s, p) => { setStage(s); setStageProgress(Math.round(p * 100)); },
+        encoder: vcEncoder,
+        onProgress: (s, p) => { setStage(s as VcStage); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
       const result = await convertVoiceFull(ttsBlob, pipelineOpts);
@@ -237,8 +240,9 @@ export function VoiceConversionTab({
       const srNote = result.synthesis.srAutoDetected ? " (auto)" : "";
       const backendLabel = activeBackend === "wasm" ? " [CPU/WASM]" : " [GPU/WebGPU]";
       const pitchLabel = result.features.pitchAlgorithm === "rmvpe" ? "RMVPE" : result.features.pitchAlgorithm === "crepe-full" ? "CREPE-Full" : result.features.pitchAlgorithm === "swiftf0" ? "SwiftF0" : "CREPE-Tiny";
+      const encLabel = result.features.encoder === "wavlm" ? "WavLM" : "ContentVec";
       setTimingInfo(
-        `${result.features.durationSec.toFixed(1)}s → CV ${t.contentvecMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
+        `${result.features.durationSec.toFixed(1)}s → ${encLabel} ${t.encoderMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, norm ${t.normalizeMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
@@ -253,7 +257,6 @@ export function VoiceConversionTab({
       setPlaying(true);
       audio.play().catch(() => {
         setPlaying(false);
-        // Autoplay blocked — user can click replay
         console.warn("[VcTest] Autoplay blocked, user can click Play to replay");
       });
     } catch (err: any) {
@@ -261,7 +264,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -305,7 +308,9 @@ export function VoiceConversionTab({
         <div>
           <p className="text-sm font-medium">{isRu ? "Применять Voice Conversion" : "Apply Voice Conversion"}</p>
           <p className="text-xs text-muted-foreground">
-            {isRu ? "TTS → ContentVec → CREPE → RVC v2 → уникальный тембр" : "TTS → ContentVec → CREPE → RVC v2 → unique timbre"}
+            {isRu
+              ? `TTS → ${vcEncoder === "wavlm" ? "WavLM" : "ContentVec"} → ${PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.en?.split(" ")[0] ?? "CREPE"} → RVC v2 → уникальный тембр`
+              : `TTS → ${vcEncoder === "wavlm" ? "WavLM" : "ContentVec"} → ${PITCH_ALGORITHM_LABELS[pitchAlgorithm]?.en?.split(" ")[0] ?? "CREPE"} → RVC v2 → unique timbre`}
           </p>
         </div>
         <Switch checked={vcEnabled} onCheckedChange={v => onUpdateVcConfig({ vc_enabled: v })} />
@@ -346,6 +351,70 @@ export function VoiceConversionTab({
           {isRu
             ? "SwiftF0 = молния | Tiny = быстро | Full = чище | RMVPE = золотой стандарт"
             : "SwiftF0 = lightning | Tiny = fast | Full = cleaner | RMVPE = gold standard"}
+        </p>
+      </div>
+
+      {/* ─── Speech Encoder ─── */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Энкодер речи" : "Speech Encoder"}
+          </label>
+          <Badge variant="outline" className="text-[10px]">
+            {SPEECH_ENCODER_LABELS[vcEncoder]?.size ?? "~378 MB"}
+          </Badge>
+        </div>
+        <Select
+          value={vcEncoder}
+          onValueChange={async (val: string) => {
+            const enc = val as SpeechEncoder;
+            onUpdateVcConfig({ vc_encoder: enc });
+            if (enc === "wavlm") {
+              const cached = await hasModel("wavlm");
+              if (!cached) {
+                const entry = VC_ENCODER_MODELS.find(m => m.id === "wavlm");
+                if (!entry) return;
+                const confirmed = window.confirm(
+                  isRu
+                    ? `Модель "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) не загружена. Скачать?`
+                    : `Model "${entry.label}" (${(entry.sizeBytes / 1e6).toFixed(0)} MB) not cached. Download?`
+                );
+                if (!confirmed) {
+                  onUpdateVcConfig({ vc_encoder: "contentvec" });
+                  return;
+                }
+                setPitchModelDownloading(true);
+                setPitchDlProgress(0);
+                try {
+                  const ok = await downloadModel(entry, (p) => setPitchDlProgress(Math.round(p.fraction * 100)));
+                  if (!ok) throw new Error("Download failed");
+                  toast.success(isRu ? `${entry.label} загружена` : `${entry.label} downloaded`);
+                } catch (err: any) {
+                  toast.error(isRu ? `Ошибка загрузки: ${err.message}` : `Download error: ${err.message}`);
+                  onUpdateVcConfig({ vc_encoder: "contentvec" });
+                } finally {
+                  setPitchModelDownloading(false);
+                }
+              }
+            }
+          }}
+          disabled={isProcessing || pitchModelDownloading}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(SPEECH_ENCODER_LABELS) as SpeechEncoder[]).map(enc => (
+              <SelectItem key={enc} value={enc}>
+                {isRu ? SPEECH_ENCODER_LABELS[enc].ru : SPEECH_ENCODER_LABELS[enc].en}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? SPEECH_ENCODER_LABELS[vcEncoder]?.description.ru
+            : SPEECH_ENCODER_LABELS[vcEncoder]?.description.en}
         </p>
       </div>
 
