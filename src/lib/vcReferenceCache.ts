@@ -31,6 +31,19 @@ export interface VcReferenceEntry {
 
 const VC_REF_DIR = "vc-references";
 
+let persistenceRequested = false;
+
+async function requestPersistence(): Promise<void> {
+  if (persistenceRequested) return;
+  persistenceRequested = true;
+  try {
+    if (navigator.storage?.persist) {
+      const granted = await navigator.storage.persist();
+      console.info(`[vcRefCache] Persistent storage ${granted ? "granted" : "denied"}`);
+    }
+  } catch { /* ignore */ }
+}
+
 async function getRefDir(): Promise<FileSystemDirectoryHandle | null> {
   try {
     const root = await navigator.storage.getDirectory();
