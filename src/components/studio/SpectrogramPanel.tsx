@@ -1,6 +1,7 @@
 /**
  * SpectrogramPanel — Shows side-by-side spectrograms for VC diagnostics.
  * Displays: Input TTS, Reference voice, RVC Output.
+ * Canvas auto-resizes to fill container width.
  */
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,32 +20,52 @@ interface SpectrogramPanelProps {
   onClose?: () => void;
 }
 
-const CANVAS_WIDTH = 480;
-const CANVAS_HEIGHT = 160;
-
-const baseOpts: SpectrogramOptions = {
-  width: CANVAS_WIDTH,
-  height: CANVAS_HEIGHT,
-  fftSize: 2048,
-  hop: 256,
-  minDb: -80,
-  maxDb: -5,
-  palette: "magma",
-};
+const RENDER_HEIGHT = 160;
+const BASE_FFT = 2048;
+const BASE_HOP = 256;
 
 export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [rendering, setRendering] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Track container width via ResizeObserver
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const w = Math.floor(entry.contentRect.width);
+        if (w > 0) setContainerWidth(w);
+      }
+    });
+    ro.observe(el);
+    // Initial measurement
+    const w = Math.floor(el.clientWidth);
+    if (w > 0) setContainerWidth(w);
+    return () => ro.disconnect();
+  }, []);
 
   const renderAll = useCallback(async () => {
+    if (containerWidth < 100) return;
     setRendering(true);
+    const opts: SpectrogramOptions = {
+      width: containerWidth,
+      height: RENDER_HEIGHT,
+      fftSize: BASE_FFT,
+      hop: BASE_HOP,
+      minDb: -80,
+      maxDb: -5,
+      palette: "magma",
+    };
     try {
       for (let i = 0; i < slots.length; i++) {
         const canvas = canvasRefs.current[i];
         const slot = slots[i];
         if (!canvas || !slot.blob) continue;
         await renderSpectrogramFromBlob(canvas, slot.blob, {
-          ...baseOpts,
+          ...opts,
           label: slot.label,
         });
       }
@@ -53,14 +74,14 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
     } finally {
       setRendering(false);
     }
-  }, [slots]);
+  }, [slots, containerWidth]);
 
   useEffect(() => {
     renderAll();
   }, [renderAll]);
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3">
+    <div ref={containerRef} className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-primary" />
@@ -82,19 +103,19 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
 
       <div className="flex flex-col gap-2">
         {slots.map((slot, idx) => (
-          <div key={idx} className="relative">
+          <div key={idx} className="relative w-full">
             {slot.blob ? (
               <canvas
                 ref={(el) => { canvasRefs.current[idx] = el; }}
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
+                width={containerWidth || 480}
+                height={RENDER_HEIGHT}
                 className="w-full rounded border border-border/30"
-                style={{ imageRendering: "pixelated", height: CANVAS_HEIGHT }}
+                style={{ imageRendering: "pixelated", height: RENDER_HEIGHT }}
               />
             ) : (
               <div
                 className="flex items-center justify-center rounded border border-dashed border-border/30 bg-muted/40"
-                style={{ height: CANVAS_HEIGHT }}
+                style={{ height: RENDER_HEIGHT }}
               >
                 <span className="text-xs text-muted-foreground italic">
                   {slot.label}: {isRu ? "нет данных" : "no data"}
