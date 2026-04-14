@@ -51,6 +51,8 @@ export interface VcPipelineOptions {
   onProgress?: (stage: "resample" | "normalize" | "contentvec" | "crepe" | "synthesis", progress: number) => void;
   /** Synthesis options (pitch shift, speaker ID, model) */
   synthesis?: VcSynthesisOptions;
+  /** Dry/Wet mix ratio: 0.0 = pure TTS (dry), 1.0 = pure RVC (wet). Default 1.0 */
+  dryWet?: number;
 }
 
 /**
@@ -216,6 +218,7 @@ export async function convertVoiceFull(
   options?: VcPipelineOptions,
 ): Promise<VcFullResult> {
   const t0 = performance.now();
+  const dryWet = Math.max(0, Math.min(1, options?.dryWet ?? 1.0));
 
   // Extract features (resample + ContentVec + CREPE)
   const features = await extractVcFeatures(audio, options);
@@ -225,8 +228,22 @@ export async function convertVoiceFull(
   const synthesis = await synthesizeVoice(features, options?.synthesis);
   options?.onProgress?.("synthesis", 1);
 
+  // ── Dry/Wet mixing ──
+  // If dryWet < 1.0, blend original TTS (resampled to output SR) with RVC output
+  let finalAudio = synthesis.audio;
+  if (dryWet < 0.999) {
+    const dryResampled = await resampleForMix(audio, synthesis.sampleRate);
+    const minLen = Math.min(dryResampled.length, synthesis.audio.length);
+    const mixed = new Float32Array(minLen);
+    for (let i = 0; i < minLen; i++) {
+      mixed[i] = dryResampled[i] * (1 - dryWet) + synthesis.audio[i] * dryWet;
+    }
+    finalAudio = mixed;
+    console.info(`[vcPipeline] Dry/Wet mix: ${((1 - dryWet) * 100).toFixed(0)}% TTS + ${(dryWet * 100).toFixed(0)}% RVC`);
+  }
+
   // Encode to WAV
-  const wav = vcAudioToWav(synthesis.audio, synthesis.sampleRate);
+  const wav = vcAudioToWav(finalAudio, synthesis.sampleRate);
   const totalMs = Math.round(performance.now() - t0);
 
   const resample: VcResampleInfo = {
@@ -244,4 +261,24 @@ export async function convertVoiceFull(
   );
 
   return { wav, features, synthesis, resample, totalMs };
+}
+
+/**
+ * Resample input audio to target sample rate for dry/wet mixing.
+ */
+async function resampleForMix(audio: ArrayBuffer | Blob, targetSR: number): Promise<Float32Array> {
+  const buf = audio instanceof Blob ? await audio.arrayBuffer() : audio;
+  const ctx = new AudioContext();
+  try {
+    const decoded = await ctx.decodeAudioData(buf.slice(0));
+    const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetSR), targetSR);
+    const source = offline.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offline.destination);
+    source.start(0);
+    const rendered = await offline.startRendering();
+    return rendered.getChannelData(0);
+  } finally {
+    await ctx.close();
+  }
 }

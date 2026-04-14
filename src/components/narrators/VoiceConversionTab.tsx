@@ -72,6 +72,7 @@ export function VoiceConversionTab({
   const protect = (voiceConfig.vc_protect as number) ?? 0.33;
   const pitchAlgorithm = (voiceConfig.vc_pitch_algorithm as PitchAlgorithm) || "crepe-tiny";
   const vcEncoder = (voiceConfig.vc_encoder as SpeechEncoder) || "contentvec";
+  const dryWet = (voiceConfig.vc_dry_wet as number) ?? 1.0;
 
   // Test pipeline state
   const [stage, setStage] = useState<VcStage>("idle");
@@ -228,6 +229,7 @@ export function VoiceConversionTab({
       const pipelineOpts: VcPipelineOptions = {
         pitchAlgorithm,
         encoder: vcEncoder,
+        dryWet,
         onProgress: (s, p) => { setStage(s as VcStage); setStageProgress(Math.round(p * 100)); },
         synthesis: { pitchShift, outputSampleRate: vcOutputSR, indexRate, protect, indexData },
       };
@@ -264,7 +266,7 @@ export function VoiceConversionTab({
       setErrorMsg(err.message || String(err));
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder, dryWet]);
 
   // ─── Not activated ───
   if (!pro.enabled || !pro.modelsReady) {
@@ -540,6 +542,37 @@ export function VoiceConversionTab({
         </div>
         <p className="text-muted-foreground/60 text-xs text-center">
           {isRu ? "0 = без защиты | 0.5 = макс. сохранение шипящих/взрывных" : "0 = no protection | 0.5 = max sibilant preservation"}
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Dry/Wet Mix */}
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {isRu ? "Микс TTS / RVC" : "TTS / RVC Mix"}
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {dryWet >= 0.999
+              ? (isRu ? "100% RVC" : "100% RVC")
+              : dryWet <= 0.001
+                ? (isRu ? "100% TTS" : "100% TTS")
+                : `${((1 - dryWet) * 100).toFixed(0)}% TTS / ${(dryWet * 100).toFixed(0)}% RVC`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground shrink-0">TTS</span>
+          <Slider min={0} max={1} step={0.05} value={[dryWet]} onValueChange={([v]) => onUpdateVcConfig({ vc_dry_wet: v })} className="flex-1" />
+          <span className="text-[10px] text-muted-foreground shrink-0">RVC</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onUpdateVcConfig({ vc_dry_wet: 1.0 })} disabled={dryWet === 1.0}>
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground/60 text-xs text-center">
+          {isRu
+            ? "Смешивание оригинального TTS с конвертированным голосом для сохранения просодии"
+            : "Blend original TTS with converted voice to preserve prosody"}
         </p>
       </div>
 
