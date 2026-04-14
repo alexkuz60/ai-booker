@@ -264,9 +264,20 @@ export function VoiceConversionTab({
       );
       setStage("done");
       setRvcBlob(result.wav);
-      // Reload reference blob for spectrogram comparison
-      if (showSpectrograms && vcReferenceId) {
-        readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
+      setTtsF0(result.features.pitchFrames);
+      // Extract F0 from reference for spectrogram overlay
+      if (vcReferenceId) {
+        readVcReferenceBlob(vcReferenceId).then(async (b) => {
+          if (b) {
+            setRefBlob(b);
+            try {
+              const refFeatures = await extractVcFeatures(b, { pitchAlgorithm, encoder: vcEncoder });
+              setRefF0(refFeatures.pitchFrames);
+            } catch (e) {
+              console.warn("[VcTest] Failed to extract F0 from reference:", e);
+            }
+          }
+        });
       }
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
