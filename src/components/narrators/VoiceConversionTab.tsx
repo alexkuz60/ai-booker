@@ -18,7 +18,7 @@ import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache"
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
-  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download,
+  CheckCircle2, Wand2, ArrowRight, FlaskConical, Cpu, Monitor, Download, BarChart3,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
