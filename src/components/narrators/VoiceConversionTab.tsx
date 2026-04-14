@@ -103,6 +103,38 @@ export function VoiceConversionTab({
     getAvailableBackend().then(setActiveBackend);
   }, [backendChoice]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!showSpectrograms || !vcReferenceId) {
+      return;
+    }
+
+    const loadReferenceDiagnostics = async () => {
+      const blob = refBlob ?? await readVcReferenceBlob(vcReferenceId);
+      if (!blob || cancelled) return;
+
+      if (!refBlob) {
+        setRefBlob(blob);
+      }
+
+      try {
+        const refFeatures = await extractVcFeatures(blob, { pitchAlgorithm, encoder: vcEncoder });
+        if (!cancelled) {
+          setRefF0(refFeatures.pitchFrames);
+        }
+      } catch (e) {
+        console.warn("[VcTest] Failed to extract F0 from reference:", e);
+      }
+    };
+
+    void loadReferenceDiagnostics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSpectrograms, vcReferenceId, refBlob, pitchAlgorithm, vcEncoder]);
+
   // Handle backend switch — release existing sessions first
   const handleBackendChange = useCallback(async (val: string) => {
     const choice = val as "auto" | VcBackend;
@@ -753,13 +785,8 @@ export function VoiceConversionTab({
             variant="outline"
             size="sm"
             className="gap-2 w-full"
-            onClick={async () => {
-              const next = !showSpectrograms;
-              setShowSpectrograms(next);
-              if (next && !refBlob && vcReferenceId) {
-                const blob = await readVcReferenceBlob(vcReferenceId);
-                if (blob) setRefBlob(blob);
-              }
+            onClick={() => {
+              setShowSpectrograms((prev) => !prev);
             }}
           >
             <BarChart3 className="h-3.5 w-3.5" />
