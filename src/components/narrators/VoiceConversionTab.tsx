@@ -255,6 +255,7 @@ export function VoiceConversionTab({
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
       setStage("done");
+      setRvcBlob(result.wav);
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
