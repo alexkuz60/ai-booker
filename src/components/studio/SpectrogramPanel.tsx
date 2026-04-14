@@ -113,7 +113,7 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
                 ref={(el) => { canvasRefs.current[idx] = el; }}
                 width={canvasWidth || 480}
                 height={RENDER_HEIGHT}
-                className="block w-full rounded border border-border/30"
+                className="block w-full rounded border border-border/30 bg-black"
                 style={{ imageRendering: "pixelated" }}
               />
             ) : (
