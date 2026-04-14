@@ -4,6 +4,7 @@
  * Full management (upload, models) lives on the Voice Lab page.
  */
 import { useState, useCallback, useEffect, useRef } from "react";
+import type { PitchFrame } from "@/lib/vcCrepe";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
-import { convertVoiceFull, type VcPipelineOptions } from "@/lib/vcPipeline";
+import { convertVoiceFull, extractVcFeatures, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -87,6 +88,8 @@ export function VoiceConversionTab({
   const [ttsBlob, setTtsBlob] = useState<Blob | null>(null);
   const [rvcBlob, setRvcBlob] = useState<Blob | null>(null);
   const [refBlob, setRefBlob] = useState<Blob | null>(null);
+  const [ttsF0, setTtsF0] = useState<PitchFrame[] | undefined>();
+  const [refF0, setRefF0] = useState<PitchFrame[] | undefined>();
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
@@ -201,6 +204,8 @@ export function VoiceConversionTab({
     setErrorMsg("");
     setTtsBlob(null);
     setRvcBlob(null);
+    setTtsF0(undefined);
+    setRefF0(undefined);
     // Reload reference blob if spectrograms are visible and reference is set
     if (showSpectrograms && vcReferenceId && !refBlob) {
       readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
@@ -261,9 +266,20 @@ export function VoiceConversionTab({
       );
       setStage("done");
       setRvcBlob(result.wav);
-      // Reload reference blob for spectrogram comparison
-      if (showSpectrograms && vcReferenceId) {
-        readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
+      setTtsF0(result.features.pitchFrames);
+      // Extract F0 from reference for spectrogram overlay
+      if (vcReferenceId) {
+        readVcReferenceBlob(vcReferenceId).then(async (b) => {
+          if (b) {
+            setRefBlob(b);
+            try {
+              const refFeatures = await extractVcFeatures(b, { pitchAlgorithm, encoder: vcEncoder });
+              setRefF0(refFeatures.pitchFrames);
+            } catch (e) {
+              console.warn("[VcTest] Failed to extract F0 from reference:", e);
+            }
+          }
+        });
       }
       // Clean up previous blob URL
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
@@ -731,8 +747,8 @@ export function VoiceConversionTab({
         <SpectrogramPanel
           isRu={isRu}
           slots={[
-            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob },
-            { label: isRu ? "Референс" : "Reference", blob: refBlob },
+            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(0, 255, 255, 0.85)" },
+            { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 255, 100, 0.85)" },
             { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
           ]}
           onClose={() => setShowSpectrograms(false)}
