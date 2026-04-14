@@ -40,8 +40,8 @@ export async function extractContentVec(
 
   const session = await createVcSession("contentvec");
 
-  // HuBERT ONNX exports typically use [batch, sequence] = [1, T]
-  const inputTensor = new ort.Tensor("float32", samples, [1, samples.length]);
+  // ContentVec768 (vec-768-layer-12) expects [batch, channels, sequence] = [1, 1, T]
+  const inputTensor = new ort.Tensor("float32", samples, [1, 1, samples.length]);
 
   const startMs = performance.now();
   const feeds: Record<string, ort.Tensor> = {};
