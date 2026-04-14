@@ -701,6 +701,7 @@ export async function saveVcIndex(
   npyBlob: Blob,
   meta: VcIndexEntry,
 ): Promise<boolean> {
+  await requestIndexPersistence();
   const dir = await getIndexDir();
   if (!dir) return false;
   try {
