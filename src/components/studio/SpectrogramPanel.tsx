@@ -25,25 +25,24 @@ const BASE_FFT = 2048;
 const BASE_HOP = 256;
 
 export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [rendering, setRendering] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [canvasWidth, setCanvasWidth] = useState(0);
 
-  // Track container width via ResizeObserver
+  // Track the inner canvas wrapper width (excludes outer padding)
   useEffect(() => {
-    const el = containerRef.current;
+    const el = canvasWrapRef.current;
     if (!el) return;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
         const w = Math.floor(entry.contentRect.width);
-        if (w > 0) setContainerWidth(w);
+        if (w > 0) setCanvasWidth(w);
       }
     });
     ro.observe(el);
-    // Initial measurement
     const w = Math.floor(el.clientWidth);
-    if (w > 0) setContainerWidth(w);
+    if (w > 0) setCanvasWidth(w);
     return () => ro.disconnect();
   }, []);
 
