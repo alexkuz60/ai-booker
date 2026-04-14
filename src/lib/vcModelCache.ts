@@ -30,10 +30,10 @@ export interface VcModelEntry {
 export const VC_MODEL_REGISTRY: VcModelEntry[] = [
   {
     id: "contentvec",
-    label: "ContentVec (HuBERT)",
-    url: "https://huggingface.co/MidFord327/Hubert-Base-ONNX/resolve/main/hubert_base.onnx",
+    label: "ContentVec 768-L12",
+    url: "https://huggingface.co/DogManTC/test-rvc-onnx/resolve/main/vec-768-layer-12.onnx",
     sizeBytes: 378_000_000,
-    description: "Phonetic feature extractor (768-dim, 12 layers)",
+    description: "ContentVec768 phonetic feature extractor (speaker-disentangled, layer 12)",
   },
   {
     id: "crepe-tiny",
