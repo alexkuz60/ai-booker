@@ -691,7 +691,34 @@ export function VoiceConversionTab({
             <span className="break-all">{errorMsg}</span>
           </div>
         )}
+
+        {/* Spectrogram toggle */}
+        {stage === "done" && (ttsBlob || rvcBlob) && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 w-full"
+            onClick={() => setShowSpectrograms(prev => !prev)}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            {showSpectrograms
+              ? (isRu ? "Скрыть спектрограммы" : "Hide spectrograms")
+              : (isRu ? "Показать спектрограммы" : "Show spectrograms")}
+          </Button>
+        )}
       </div>
+
+      {/* Spectrogram comparison panel */}
+      {showSpectrograms && (ttsBlob || rvcBlob) && (
+        <SpectrogramPanel
+          isRu={isRu}
+          slots={[
+            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob },
+            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
+          ]}
+          onClose={() => setShowSpectrograms(false)}
+        />
+      )}
     </div>
   );
 }
