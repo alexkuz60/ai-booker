@@ -335,25 +335,36 @@ export default function VoiceLab() {
                     <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
                     <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
                     <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                    <TableHead className="text-xs w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {VC_MODEL_REGISTRY.map(m => (
-                    <TableRow key={m.id}>
-                      <TableCell className="py-2">
-                        <p className="text-sm font-medium">{m.label}</p>
-                        <p className="text-xs text-muted-foreground">{m.description}</p>
-                      </TableCell>
-                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
-                        {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {modelStatus[m.id]
-                          ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
-                          : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {VC_MODEL_REGISTRY.map(m => {
+                    const cached = !!modelStatus[m.id];
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="py-2">
+                          <p className="text-sm font-medium">{m.label}</p>
+                          <p className="text-xs text-muted-foreground">{m.description}</p>
+                        </TableCell>
+                        <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                          {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {cached
+                            ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
+                            : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {cached && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeletePitch(m.id, m.label)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
 
