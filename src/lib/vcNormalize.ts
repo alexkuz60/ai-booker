@@ -7,7 +7,7 @@
  */
 
 /** Target RMS in dBFS — EBU R128 speech level */
-const DEFAULT_TARGET_DB = -12;
+const DEFAULT_TARGET_DB = -23;
 
 /** Ceiling in dBFS — prevents hard clipping */
 const CEILING_DB = -1;
