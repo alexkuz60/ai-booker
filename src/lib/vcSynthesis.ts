@@ -298,7 +298,13 @@ export async function synthesizeVoice(
   const pitchFine = new Float32Array(T);
 
   for (let i = 0; i < T; i++) {
-    const f0 = applyPitchShift(alignedF0[i], pitchShift);
+    let f0 = applyPitchShift(alignedF0[i], pitchShift);
+    // Clamp F0 to valid range — prevents coarse/fine mismatch artifacts
+    // (coarse is mel-quantized to [1,255] within [F0_HZ_MIN, F0_HZ_MAX],
+    //  fine must stay in the same range for the decoder to work correctly)
+    if (f0 > 0) {
+      f0 = Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, f0));
+    }
     pitchCoarse[i] = f0ToCoarsePitch(f0);
     pitchFine[i] = f0;
   }
