@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, VC_ENCODER_MODELS, PITCH_ALGORITHM_LABELS, SPEECH_ENCODER_LABELS, type PitchAlgorithm, type SpeechEncoder } from "@/lib/vcModelCache";
 import { hasModel, downloadModel } from "@/lib/vcModelCache";
-import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
+import { listVcReferences, readVcReferenceBlob, type VcReferenceEntry } from "@/lib/vcReferenceCache";
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
@@ -86,6 +86,7 @@ export function VoiceConversionTab({
   const [showSpectrograms, setShowSpectrograms] = useState(false);
   const [ttsBlob, setTtsBlob] = useState<Blob | null>(null);
   const [rvcBlob, setRvcBlob] = useState<Blob | null>(null);
+  const [refBlob, setRefBlob] = useState<Blob | null>(null);
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
@@ -200,6 +201,7 @@ export function VoiceConversionTab({
     setErrorMsg("");
     setTtsBlob(null);
     setRvcBlob(null);
+    setRefBlob(null);
     try {
       const status = await getModelStatus();
       const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
@@ -698,7 +700,14 @@ export function VoiceConversionTab({
             variant="outline"
             size="sm"
             className="gap-2 w-full"
-            onClick={() => setShowSpectrograms(prev => !prev)}
+            onClick={async () => {
+              const next = !showSpectrograms;
+              setShowSpectrograms(next);
+              if (next && !refBlob && vcReferenceId) {
+                const blob = await readVcReferenceBlob(vcReferenceId);
+                if (blob) setRefBlob(blob);
+              }
+            }}
           >
             <BarChart3 className="h-3.5 w-3.5" />
             {showSpectrograms
@@ -714,6 +723,7 @@ export function VoiceConversionTab({
           isRu={isRu}
           slots={[
             { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob },
+            { label: isRu ? "Референс" : "Reference", blob: refBlob },
             { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
           ]}
           onClose={() => setShowSpectrograms(false)}
