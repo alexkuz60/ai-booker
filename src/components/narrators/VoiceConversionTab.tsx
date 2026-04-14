@@ -776,7 +776,7 @@ export function VoiceConversionTab({
           isRu={isRu}
           slots={[
             { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(255, 60, 60, 0.9)" },
-            { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 255, 100, 0.85)" },
+            { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 255, 80, 0.95)" },
             { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(40, 40, 80, 0.95)" },
           ]}
           onClose={() => setShowSpectrograms(false)}
