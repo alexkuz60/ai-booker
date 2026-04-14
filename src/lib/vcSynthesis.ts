@@ -400,6 +400,28 @@ export async function synthesizeVoice(
 
   const rawAudio = new Float32Array(output.data as Float32Array);
 
+  // Diagnostic: output tensor statistics
+  {
+    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+    for (let i = 0; i < rawAudio.length; i++) {
+      const v = rawAudio[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      sumSq += v * v;
+    }
+    const mean = sum / rawAudio.length;
+    const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
+    const nanCount = rawAudio.reduce((c, v) => c + (Number.isNaN(v) ? 1 : 0), 0);
+    const infCount = rawAudio.reduce((c, v) => c + (!Number.isFinite(v) && !Number.isNaN(v) ? 1 : 0), 0);
+    console.info(
+      `[vcSynthesis] OUTPUT "${outputName}": shape=[${output.dims}], ` +
+      `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
+      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}, NaN=${nanCount}, Inf=${infCount}`
+    );
+  }
+
+
   // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility.
   // Output SR is the model's native rate (e.g. 40kHz) — NOT derived dynamically.
   const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
