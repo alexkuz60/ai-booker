@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS, VC_ENCODER_MODELS, PITCH_ALGORITHM_LABELS, SPEECH_ENCODER_LABELS, type PitchAlgorithm, type SpeechEncoder } from "@/lib/vcModelCache";
 import { hasModel, downloadModel } from "@/lib/vcModelCache";
-import { listVcReferences, type VcReferenceEntry } from "@/lib/vcReferenceCache";
+import { listVcReferences, readVcReferenceBlob, type VcReferenceEntry } from "@/lib/vcReferenceCache";
 import { listVcIndexes, loadVcIndex, type VcIndexEntry } from "@/lib/vcIndexSearch";
 import {
   Zap, Play, Square, Loader2, RotateCcw, AlertTriangle,
