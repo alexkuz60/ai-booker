@@ -538,6 +538,29 @@ export function VoiceConversionTab({
             <RotateCcw className="h-3 w-3" />
           </Button>
         </div>
+        {ttsF0 && refF0 && (() => {
+          const ttsVoiced = ttsF0.filter(f => f.frequencyHz > 0);
+          const refVoiced = refF0.filter(f => f.frequencyHz > 0);
+          if (ttsVoiced.length > 10 && refVoiced.length > 10) {
+            const median = (arr: number[]) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+            const medTts = median(ttsVoiced.map(f => f.frequencyHz));
+            const medRef = median(refVoiced.map(f => f.frequencyHz));
+            const suggestedSt = Math.round(12 * Math.log2(medRef / medTts));
+            if (suggestedSt !== 0) {
+              return (
+                <button
+                  className="text-xs text-primary hover:underline cursor-pointer text-center w-full"
+                  onClick={() => onUpdateVcConfig({ vc_pitch_shift: Math.max(-12, Math.min(12, suggestedSt)) })}
+                >
+                  {isRu
+                    ? `💡 Рекомендация: ${suggestedSt > 0 ? "+" : ""}${suggestedSt} пт (вход ${Math.round(medTts)}Гц → реф ${Math.round(medRef)}Гц) — нажми для применения`
+                    : `💡 Suggested: ${suggestedSt > 0 ? "+" : ""}${suggestedSt} st (input ${Math.round(medTts)}Hz → ref ${Math.round(medRef)}Hz) — click to apply`}
+                </button>
+              );
+            }
+          }
+          return null;
+        })()}
         <p className="text-muted-foreground/60 text-xs text-center">
           {isRu ? "♀→♂: −4…−6 | ♂→♀: +4…+6 | Тонкая коррекция: ±1…2" : "♀→♂: −4…−6 | ♂→♀: +4…+6 | Fine-tune: ±1…2"}
         </p>
@@ -754,7 +777,7 @@ export function VoiceConversionTab({
           slots={[
             { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(255, 60, 60, 0.9)" },
             { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 255, 100, 0.85)" },
-            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(255, 200, 0, 0.9)" },
+            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(40, 40, 80, 0.95)" },
           ]}
           onClose={() => setShowSpectrograms(false)}
         />
