@@ -2,7 +2,7 @@
  * useBookerPro — manages Booker Pro mode state.
  * Persists via useCloudSettings, exposes activation status and model download state.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { useWebGPU } from "@/hooks/useWebGPU";
 import type { GpuAdapterDetails } from "@/hooks/useWebGPU";
@@ -27,6 +27,10 @@ export function useBookerPro(): BookerProState {
   const { value: modelsReady, update: setModelsReady } = useCloudSettings("booker-pro-models-ready", false);
   const { status: gpuStatus, adapterInfo, isChromium, details, benchmarkResult, benchmarking, runBenchmark } = useWebGPU();
 
+  // Use ref to avoid re-running effect when modelsReady changes
+  const modelsReadyRef = useRef(modelsReady);
+  modelsReadyRef.current = modelsReady;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -36,7 +40,7 @@ export function useBookerPro(): BookerProState {
         if (cancelled) return;
 
         const allReady = VC_MODEL_REGISTRY.every(model => status[model.id]);
-        if (allReady !== modelsReady) {
+        if (allReady !== modelsReadyRef.current) {
           setModelsReady(allReady);
         }
       } catch (error) {
@@ -65,7 +69,7 @@ export function useBookerPro(): BookerProState {
       window.removeEventListener("focus", handleCacheChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [modelsReady, setModelsReady]);
+  }, [setModelsReady]);
 
   return {
     enabled,

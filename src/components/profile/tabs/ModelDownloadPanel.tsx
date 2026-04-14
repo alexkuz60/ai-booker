@@ -2,7 +2,7 @@
  * ModelDownloadPanel — ONNX model list with download/clear controls.
  * Extracted from BookerProSection for maintainability.
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -40,6 +40,11 @@ export function ModelDownloadPanel({
   const totalSize = getTotalModelSize();
 
   // Check cached model status on mount and when cache changes
+  // NOTE: modelsReady intentionally NOT in deps to avoid race conditions
+  // where refreshStatuses toggles modelsReady, causing re-runs.
+  const modelsReadyRef = useRef(modelsReady);
+  modelsReadyRef.current = modelsReady;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -48,7 +53,7 @@ export function ModelDownloadPanel({
       if (cancelled) return;
       setModelStatuses(status);
       const allReady = VC_MODEL_REGISTRY.every(m => status[m.id]);
-      if (allReady !== modelsReady) {
+      if (allReady !== modelsReadyRef.current) {
         setModelsReady(allReady);
       }
     };
@@ -69,7 +74,7 @@ export function ModelDownloadPanel({
       window.removeEventListener("focus", handleCacheChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [modelsReady, setModelsReady]);
+  }, [setModelsReady]);
 
   const handleDownloadModels = useCallback(async () => {
     const ac = new AbortController();
