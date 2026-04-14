@@ -220,6 +220,7 @@ export function VoiceConversionTab({
       });
       if (!ttsResp.ok) { const txt = await ttsResp.text().catch(() => ""); throw new Error(`TTS: ${ttsResp.status} ${txt.slice(0, 100)}`); }
       const ttsBlob = await ttsResp.blob();
+      setTtsBlob(ttsBlob);
       setStageProgress(100);
 
       // Load index data if configured
