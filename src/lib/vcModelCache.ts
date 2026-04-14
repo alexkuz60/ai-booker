@@ -215,6 +215,7 @@ export async function downloadModel(
   onProgress?: ProgressCallback,
   signal?: AbortSignal,
 ): Promise<boolean> {
+  await requestPersistence();
   const dir = await getVcCacheDir();
   if (!dir) {
     onProgress?.({

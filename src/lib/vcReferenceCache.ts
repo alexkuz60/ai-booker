@@ -114,6 +114,7 @@ export async function saveVcReference(
   audioBlob: Blob,
   meta: VcReferenceEntry,
 ): Promise<boolean> {
+  await requestPersistence();
   const dir = await getRefDir();
   if (!dir) return false;
   try {
