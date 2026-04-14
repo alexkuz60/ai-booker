@@ -201,6 +201,7 @@ export function VoiceConversionTab({
     setErrorMsg("");
     setTtsBlob(null);
     setRvcBlob(null);
+    setRefBlob(null);
     try {
       const status = await getModelStatus();
       const missing = VC_MODEL_REGISTRY.filter(m => !status[m.id]);
@@ -715,6 +716,7 @@ export function VoiceConversionTab({
           isRu={isRu}
           slots={[
             { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob },
+            { label: isRu ? "Референс" : "Reference", blob: refBlob },
             { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob },
           ]}
           onClose={() => setShowSpectrograms(false)}
