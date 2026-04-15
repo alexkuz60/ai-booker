@@ -12,7 +12,7 @@
 import * as ort from "onnxruntime-web";
 
 // Configure ORT WASM paths (CDN — Vite does not serve node_modules assets)
-const ORT_VERSION = "1.24.3";
+const ORT_VERSION = "1.25.0-dev.20260327-722743c0e2";
 ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 ort.env.wasm.numThreads = navigator.hardwareConcurrency
   ? Math.min(navigator.hardwareConcurrency, 4)
