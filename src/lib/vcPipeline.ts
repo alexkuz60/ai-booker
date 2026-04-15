@@ -262,6 +262,15 @@ async function _convertVoiceFullImpl(
     // Extract features (resample + ContentVec + CREPE)
     const features = await extractVcFeatures(audio, options);
 
+    // Release encoder & pitch sessions BEFORE synthesis to free GPU memory.
+    // RMVPE + ContentVec + RVC simultaneously can exceed GPU capacity,
+    // causing corrupted (all-zero) RVC output.
+    const encoderModelId = options?.encoder ?? "contentvec";
+    const pitchModelId = options?.pitchAlgorithm ?? "crepe-tiny";
+    await releaseVcSession(encoderModelId).catch(() => {});
+    await releaseVcSession(pitchModelId).catch(() => {});
+    console.info(`[vcPipeline] Released pre-synthesis sessions: [${encoderModelId}, ${pitchModelId}]`);
+
     // Synthesize with RVC
     options?.onProgress?.("synthesis", 0);
     const synthesis = await synthesizeVoice(features, options?.synthesis);
