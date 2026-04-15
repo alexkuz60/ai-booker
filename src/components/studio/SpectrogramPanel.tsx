@@ -30,7 +30,7 @@ interface SpectrogramPanelProps {
   recalcingSlots?: Set<number>;
 }
 
-const RENDER_HEIGHT = 160;
+const RENDER_HEIGHT = 240;
 const BASE_FFT = 2048;
 const BASE_HOP = 256;
 
