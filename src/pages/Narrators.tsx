@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp, Zap } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp } from "lucide-react";
 import { TheaterMasks } from "@/components/icons/TheaterMasks";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,7 +24,6 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
 import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import type { CharacterIndex } from "@/pages/parser/types";
