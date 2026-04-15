@@ -14,6 +14,7 @@ import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
 import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
+import { WebGPUCorruptError, forceWasmFallback, getSessionBackend } from "./vcInferenceSession";
 import type { PitchAlgorithm, SpeechEncoder } from "./vcModelCache";
 
 export interface VcFeatures {
