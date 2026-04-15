@@ -57,8 +57,9 @@ export interface VcPipelineOptions {
 
 /**
  * Extract pitch using the selected algorithm.
+ * Exported so callers can get F0 without running the full encoder pipeline.
  */
-async function extractPitchWithAlgorithm(
+export async function extractPitchWithAlgorithm(
   samples: Float32Array,
   algorithm: PitchAlgorithm,
   hopMs: number,
@@ -145,6 +146,23 @@ export async function extractVcFeatures(
     encoder,
   };
 }
+
+/**
+ * Lightweight F0-only extraction: resample → normalize → pitch.
+ * Skips the encoder (ContentVec/WavLM) entirely — much faster and
+ * avoids model compatibility issues when only pitch contour is needed.
+ */
+export async function extractF0Only(
+  audio: ArrayBuffer | Blob,
+  pitchAlgorithm: PitchAlgorithm = "crepe-tiny",
+  hopMs = 10,
+): Promise<PitchFrame[]> {
+  const { samples: rawSamples } = await resampleTo16kMono(audio);
+  const { samples } = normalizeRms(rawSamples);
+  const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
+  return result.frames;
+}
+
 
 /**
  * Interpolate F0 to match ContentVec frame count.

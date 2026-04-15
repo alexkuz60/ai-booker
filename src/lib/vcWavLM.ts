@@ -40,10 +40,16 @@ export async function extractWavLM(
   const feeds: Record<string, ort.Tensor> = {};
 
   const inputNames = session.inputNames;
-  // Map known inputs
+  console.info(`[WavLM] Model inputs: [${inputNames.join(", ")}], outputs: [${session.outputNames.join(", ")}]`);
+
+  // WavLM (Xenova/Transformers.js) uses "input_values" [1, T] — rank 2
+  // Do NOT match "source" — that's ContentVec's input name with rank 3
   for (const name of inputNames) {
     const key = name.toLowerCase();
-    if (key === "input_values" || key === "input" || key === "source" || key === "audio") {
+    if (key === "input_values" || key === "input" || key === "audio") {
+      feeds[name] = inputTensor;
+    } else if (key === "source") {
+      // Some WavLM exports may use "source" but expect rank 2
       feeds[name] = inputTensor;
     } else if (key === "attention_mask" || key === "padding_mask") {
       // Attention mask: all 1s (all tokens are valid)
