@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
+import { F5TtsLabPanel } from "@/components/voicelab/F5TtsLabPanel";
 import { buildTtsRequestFromConfig } from "@/lib/buildTtsRequestFromConfig";
 import { PROVIDER_LABELS, getVoiceDisplayName } from "@/lib/voiceMatching";
 import type { CharacterIndex } from "@/pages/parser/types";
