@@ -191,6 +191,11 @@ export function VcTestPipeline({
     setStage("tts"); setStageProgress(0); setTimingInfo(""); setErrorMsg("");
     setTtsBlob(null); setRvcBlob(null); setTtsF0(undefined); setRvcF0(undefined);
 
+    // Release ALL cached GPU sessions before each test run to prevent
+    // WebGPU buffer conflicts between models (e.g. lingering RMVPE session
+    // corrupting ContentVec output). Sessions are re-created lazily by the pipeline.
+    await releaseAllVcSessions().catch(() => {});
+
     if (showSpectrograms && vcReferenceId && !refBlob) {
       readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
     }
