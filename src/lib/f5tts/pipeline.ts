@@ -100,7 +100,7 @@ export async function synthesizeF5(
       dims: [1, tokens.length],
       dtype: "int32",
     },
-    duration: {
+    max_duration: {
       data: durationI32,
       dims: [1],
       dtype: "int32_as_int64",
