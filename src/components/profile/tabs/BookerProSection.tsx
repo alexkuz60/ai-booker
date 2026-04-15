@@ -102,14 +102,7 @@ export function BookerProSection({ pro, isRu }: BookerProSectionProps) {
           </Alert>
         )}
 
-        {/* Models status */}
-        <ModelDownloadPanel
-          isRu={isRu}
-          modelsReady={pro.modelsReady}
-          setModelsReady={pro.setModelsReady}
-          setEnabled={pro.setEnabled}
-          gpuChecking={gpuChecking}
-        />
+        {/* Models — managed in Voice Lab */}
 
         {/* Activation toggle */}
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
