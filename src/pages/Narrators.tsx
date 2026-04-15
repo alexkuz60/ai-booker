@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp, Zap } from "lucide-react";
+import { Volume2, Loader2, Play, Square, Save, RotateCcw, Brain, CircleHelp } from "lucide-react";
 import { TheaterMasks } from "@/components/icons/TheaterMasks";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,7 +24,6 @@ import { SaveBookButton } from "@/components/SaveBookButton";
 import { CharacterProfileColumn, type CharacterProfileData } from "@/components/narrators/CharacterProfileColumn";
 import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
-import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { readSceneIndex } from "@/lib/sceneIndex";
 import type { CharacterIndex } from "@/pages/parser/types";
@@ -316,7 +315,7 @@ const Narrators = () => {
     const provider = (vc.provider as string) || "yandex";
     const resolvedProvider = provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex";
     setVoiceProvider(resolvedProvider);
-    if (voiceTab !== "vc") setVoiceTab(resolvedProvider);
+    setVoiceTab(resolvedProvider);
 
     if (provider === "salutespeech") {
       setSsVoice((vc.voice_id as string) || "Nec_24000");
@@ -477,39 +476,8 @@ const Narrators = () => {
     if (voiceProvider === "elevenlabs" && !elCredits && !elCreditsLoading) loadElCredits();
   }, [voiceProvider]);
 
-  // Build TTS request for VC test pipeline
-  const buildTtsRequest = useCallback((): { url: string; body: Record<string, unknown> } | null => {
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const testText = isRu
-      ? "Здравствуйте. Это предварительное прослушивание голоса для вашего персонажа."
-      : "Hello. This is a voice preview for your character.";
-    if (voiceProvider === "salutespeech") {
-      return { url: `${base}/functions/v1/salutespeech-tts`, body: { text: testText, voice: ssVoice, lang: isRu ? "ru" : "en" } };
-    }
-    if (voiceProvider === "proxyapi") {
-      const body: Record<string, unknown> = { text: testText, model: paModel, voice: paVoice, speed: paSpeed, lang: isRu ? "ru" : "en" };
-      if (paInstructions && paModel === "gpt-4o-mini-tts") body.instructions = paInstructions;
-      return { url: `${base}/functions/v1/proxyapi-tts`, body };
-    }
-    if (voiceProvider === "elevenlabs") {
-      return { url: `${base}/functions/v1/elevenlabs-tts`, body: { text: testText, voiceId: elVoice, lang: isRu ? "ru" : "en" } };
-    }
-    const selectedV = YANDEX_VOICES.find(v => v.id === voice);
-    return {
-      url: `${base}/functions/v1/yandex-tts`,
-      body: { text: testText, voice, lang: selectedV?.lang === "en" ? "en" : "ru", speed, role: role !== "neutral" ? role : undefined, pitchShift: pitch !== 0 ? pitch : undefined, volume: volume !== 0 ? volume : undefined },
-    };
-  }, [isRu, voiceProvider, ssVoice, paModel, paVoice, paSpeed, paInstructions, elVoice, voice, speed, role, pitch, volume]);
 
-  // Update VC fields in voice_config (local state + mark dirty)
-  const handleUpdateVcConfig = useCallback((patch: Record<string, unknown>) => {
-    if (!selectedId) return;
-    setCharacters(prev => prev.map(c => {
-      if (c.id !== selectedId) return c;
-      return { ...c, voice_config: { ...c.voice_config, ...patch } };
-    }));
-    markDirty();
-  }, [selectedId]);
+
 
   const handleVoiceChange = (v: string) => {
     setVoice(v); markDirty();
@@ -695,16 +663,14 @@ const Narrators = () => {
 
                   <Tabs value={voiceTab} onValueChange={v => {
                     setVoiceTab(v);
-                    if (v !== "vc") { setVoiceProvider(v as typeof voiceProvider); markDirty(); }
+                    setVoiceProvider(v as typeof voiceProvider);
+                    markDirty();
                   }}>
                     <TabsList className="w-full">
                       <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
                       <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
                       <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
                       <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
-                      <TabsTrigger value="vc" className="flex-1 text-xs gap-1">
-                        <Zap className="h-3 w-3" />VC
-                      </TabsTrigger>
                     </TabsList>
 
                     {/* ─── Yandex ─── */}
@@ -875,18 +841,6 @@ const Narrators = () => {
                       </div>
                     </TabsContent>
 
-                    {/* ─── Voice Conversion (Booker Pro) ─── */}
-                    <TabsContent value="vc">
-                      <VoiceConversionTab
-                        isRu={isRu}
-                        characterName={selectedChar.name}
-                        characterId={selectedChar.id}
-                        voiceConfig={selectedChar.voice_config}
-                        onUpdateVcConfig={handleUpdateVcConfig}
-                        ttsProvider={voiceProvider}
-                        buildTtsRequest={buildTtsRequest}
-                      />
-                    </TabsContent>
                   </Tabs>
 
                   <Separator />
