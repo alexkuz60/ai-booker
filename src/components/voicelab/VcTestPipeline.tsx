@@ -150,6 +150,18 @@ export function VcTestPipeline({
     audio.play().catch(() => { setPlaying(false); });
   }, [resultBlobUrl, handleStop, isRu]);
 
+  const handleReplayTts = useCallback(() => {
+    if (!ttsBlob) return;
+    handleStop();
+    const url = URL.createObjectURL(ttsBlob);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
+    audio.onerror = () => { setPlaying(false); URL.revokeObjectURL(url); };
+    setPlaying(true);
+    audio.play().catch(() => { setPlaying(false); });
+  }, [ttsBlob, handleStop]);
+
   const handleTestVc = useCallback(async () => {
     if (playing) { handleStop(); return; }
     setStage("tts"); setStageProgress(0); setTimingInfo(""); setErrorMsg("");
@@ -281,9 +293,14 @@ export function VcTestPipeline({
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Square className="h-4 w-4" /> : <FlaskConical className="h-4 w-4" />}
             {isProcessing ? (isRu ? STAGE_LABELS[stage].ru : STAGE_LABELS[stage].en) : playing ? (isRu ? "Стоп" : "Stop") : (isRu ? `Тест: ${ttsProvider} → VC` : `Test: ${ttsProvider} → VC`)}
           </Button>
+          {stage === "done" && !playing && !isProcessing && ttsBlob && (
+            <Button onClick={handleReplayTts} variant="outline" className="gap-2 shrink-0">
+              <Play className="h-4 w-4" />TTS
+            </Button>
+          )}
           {stage === "done" && resultBlobUrl && !playing && !isProcessing && (
             <Button onClick={handleReplay} variant="outline" className="gap-2 shrink-0">
-              <Play className="h-4 w-4" />{isRu ? "Повторить" : "Replay"}
+              <Play className="h-4 w-4" />RVC
             </Button>
           )}
         </div>
