@@ -43,10 +43,14 @@ export async function extractWavLM(
     return await _runWavLM(samples);
   } catch (err) {
     if (err instanceof WebGPUCorruptError && getSessionBackend("wavlm") === "webgpu") {
-      console.warn(`[WavLM] WebGPU corruption detected — falling back to WASM`);
+      console.warn(`[WavLM] WebGPU output corrupted — releasing session & retrying on GPU`);
       await releaseVcSession("wavlm");
-      setForcedBackend("wasm");
-      return await _runWavLM(samples);
+      try {
+        return await _runWavLM(samples);
+      } catch (retryErr) {
+        console.error(`[WavLM] GPU retry failed. VRAM may be exhausted. User should free GPU memory or switch backend manually.`);
+        throw retryErr;
+      }
     }
     throw err;
   }

@@ -50,10 +50,16 @@ export async function extractContentVec(
     return await _runContentVec(samples);
   } catch (err) {
     if (err instanceof WebGPUCorruptError && getSessionBackend("contentvec") === "webgpu") {
-      console.warn(`[ContentVec] WebGPU corruption detected — falling back to WASM`);
+      // GPU corruption likely caused by VRAM pressure — release session and retry on GPU
+      console.warn(`[ContentVec] WebGPU output corrupted — releasing session & retrying on GPU`);
       await releaseVcSession("contentvec");
-      setForcedBackend("wasm");
-      return await _runContentVec(samples);
+      try {
+        return await _runContentVec(samples);
+      } catch (retryErr) {
+        // Second GPU failure — throw with diagnostic, do NOT silently switch to WASM
+        console.error(`[ContentVec] GPU retry failed. VRAM may be exhausted. User should free GPU memory or switch backend manually.`);
+        throw retryErr;
+      }
     }
     throw err;
   }
