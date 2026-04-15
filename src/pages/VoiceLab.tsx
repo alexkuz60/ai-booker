@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, hasModel, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, type ModelDownloadProgress } from "@/lib/vcModelCache";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
@@ -76,20 +76,30 @@ export default function VoiceLab() {
 
   // Load data on mount
   const refreshModelStatus = useCallback(async () => {
-    const core = await getModelStatus();
-    const pitchEntries = await Promise.all(
-      VC_PITCH_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
-    );
-    const encoderEntries = await Promise.all(
-      VC_ENCODER_MODELS.map(async m => [m.id, await hasModel(m.id)] as const),
-    );
-    setModelStatus({ ...core, ...Object.fromEntries(pitchEntries), ...Object.fromEntries(encoderEntries) });
+    const status = await getModelStatus();
+    setModelStatus(status);
   }, []);
 
   useEffect(() => {
-    refreshModelStatus();
+    const handleCacheChange = () => { void refreshModelStatus(); };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshModelStatus();
+      }
+    };
+
+    void refreshModelStatus();
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
+    window.addEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
+    window.addEventListener("focus", handleCacheChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
+      window.removeEventListener("focus", handleCacheChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [refreshModelStatus]);
 
   // ── Model download ──
@@ -278,16 +288,18 @@ export default function VoiceLab() {
     setLocalIndexes(await listVcIndexes());
   }, []);
 
+  const coreModelsReady = VC_MODEL_REGISTRY.every(m => modelStatus[m.id]);
+
   // ── Not activated ──
-  if (!pro.enabled || !pro.modelsReady) {
+  if (!pro.enabled) {
     return (
       <div className="max-w-3xl mx-auto p-6 space-y-4">
         <Alert className="border-primary/30 bg-primary/5">
           <Zap className="h-4 w-4 text-primary" />
           <AlertDescription className="text-sm">
             {isRu
-              ? "Voice Lab требует активации Booker Pro в Профиле. Необходимы WebGPU и загруженные ONNX модели (~491 MB)."
-              : "Voice Lab requires Booker Pro activation in Profile. WebGPU and downloaded ONNX models (~491 MB) are needed."}
+              ? "Voice Lab требует активации Booker Pro в Профиле. После активации модели можно докачать прямо здесь."
+              : "Voice Lab requires Booker Pro activation in Profile. After activation, you can download missing models here."}
           </AlertDescription>
         </Alert>
         <Button variant="outline" className="gap-2" onClick={() => navigate("/profile")}>
@@ -298,11 +310,20 @@ export default function VoiceLab() {
     );
   }
 
-  const allModelsReady = VC_MODEL_REGISTRY.every(m => modelStatus[m.id]);
-
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-      <Tabs defaultValue="references" className="w-full">
+      {!coreModelsReady && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <AlertTriangle className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-sm">
+            {isRu
+              ? "Не все базовые VC-модели найдены в OPFS. Зайдите во вкладку «Модели» и докачайте недостающий ContentVec / RVC / CREPE Tiny."
+              : "Some core VC models were not found in OPFS. Open the Models tab and download the missing ContentVec / RVC / CREPE Tiny files."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Tabs defaultValue={coreModelsReady ? "references" : "models"} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="models" className="gap-1.5">
             <HardDrive className="h-3.5 w-3.5" />
@@ -325,7 +346,7 @@ export default function VoiceLab() {
               <CardTitle className="text-sm flex items-center gap-2">
                 <HardDrive className="h-4 w-4 text-primary" />
                 {isRu ? "ONNX модели для Voice Conversion" : "ONNX Models for Voice Conversion"}
-                {allModelsReady && <Badge variant="outline" className="text-[10px] text-primary border-primary/50 ml-auto">Ready</Badge>}
+                {coreModelsReady && <Badge variant="outline" className="text-[10px] text-primary border-primary/50 ml-auto">Ready</Badge>}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -368,7 +389,7 @@ export default function VoiceLab() {
                 </TableBody>
               </Table>
 
-              {!allModelsReady && (
+              {!coreModelsReady && (
                 <Button onClick={handleDownloadModels} disabled={downloading} className="w-full gap-2">
                   {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   {downloading && dlProgress

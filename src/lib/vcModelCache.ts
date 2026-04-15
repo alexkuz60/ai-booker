@@ -349,7 +349,7 @@ export async function downloadAllModels(
 /** Check which models are already cached */
 export async function getModelStatus(): Promise<Record<string, boolean>> {
   const entries = await Promise.all(
-    VC_MODEL_REGISTRY.map(async (entry) => [entry.id, await hasModel(entry.id)] as const),
+    VC_ALL_MODELS.map(async (entry) => [entry.id, await hasModel(entry.id)] as const),
   );
 
   return Object.fromEntries(entries);
