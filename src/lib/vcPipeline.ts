@@ -288,6 +288,18 @@ async function _convertVoiceFullImpl(
     `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
   );
 
+  // ── Release ONNX sessions to free VRAM ──
+  const shouldRelease = options?.releaseSessions !== false; // default true
+  if (shouldRelease) {
+    const encoder = options?.encoder ?? "contentvec";
+    const pitchAlgo = options?.pitchAlgorithm ?? "crepe-tiny";
+    const modelsToRelease = [encoder, pitchAlgo, options?.synthesis?.modelId ?? "rvc-v2"];
+    for (const modelId of modelsToRelease) {
+      await releaseVcSession(modelId).catch(() => {});
+    }
+    console.info(`[vcPipeline] Released sessions: [${modelsToRelease.join(", ")}]`);
+  }
+
   return { wav, features, synthesis, resample, totalMs };
 }
 
