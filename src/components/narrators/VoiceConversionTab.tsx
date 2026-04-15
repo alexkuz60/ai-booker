@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
-import { convertVoiceFull, extractVcFeatures, type VcPipelineOptions } from "@/lib/vcPipeline";
+import { convertVoiceFull, extractVcFeatures, extractF0Only, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -300,9 +300,9 @@ export function VoiceConversionTab({
       setStage("done");
       setRvcBlob(result.wav);
       setTtsF0(result.features.pitchFrames);
-      // Extract F0 from RVC output for spectrogram overlay
-      extractVcFeatures(result.wav, { pitchAlgorithm, encoder: vcEncoder })
-        .then(f => setRvcF0(f.pitchFrames))
+      // Extract F0 from RVC output for spectrogram overlay (pitch-only, no encoder needed)
+      extractF0Only(result.wav, pitchAlgorithm)
+        .then(frames => setRvcF0(frames))
         .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e));
       // Extract F0 from reference for spectrogram overlay
       if (vcReferenceId) {
@@ -310,8 +310,8 @@ export function VoiceConversionTab({
           if (b) {
             setRefBlob(b);
             try {
-              const refFeatures = await extractVcFeatures(b, { pitchAlgorithm, encoder: vcEncoder });
-              setRefF0(refFeatures.pitchFrames);
+              const refFrames = await extractF0Only(b, pitchAlgorithm);
+              setRefF0(refFrames);
             } catch (e) {
               console.warn("[VcTest] Failed to extract F0 from reference:", e);
             }
