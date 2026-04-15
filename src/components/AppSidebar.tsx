@@ -33,12 +33,15 @@ const mainNav = [
   { title: "Студия", titleEn: "Studio", url: "/studio", icon: AudioWaveform },
   { title: "Монтаж", titleEn: "Montage", url: "/montage", icon: Film },
   { title: "Дикторы", titleEn: "Narrators", url: "/narrators", icon: Mic2 },
-  { title: "Голос. лаб.", titleEn: "Voice Lab", url: "/voice-lab", icon: FlaskConical },
   { title: "Звуки", titleEn: "Soundscape", url: "/soundscape", icon: Waves },
 ];
 
 const extraNav = [
   { title: "Арт-перевод", titleEn: "Translation", url: "/translation", icon: Languages },
+];
+
+const labNav = [
+  { title: "Голос. лаб.", titleEn: "Voice Lab", url: "/voice-lab", icon: FlaskConical },
 ];
 
 export function AppSidebar() {
