@@ -7,54 +7,40 @@
  * CREPE operates on 1024-sample frames (64ms at 16kHz) with configurable hop.
  */
 
-import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
-import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
+import {
+  ensureVcSession,
+  runVcInference,
+  type TensorDesc,
+} from "./vcInferenceSession";
 import { frameAudio } from "./vcResample";
 
 const EXPECTED_SR = 16_000;
 const CREPE_FRAME_SIZE = 1024;
-const DEFAULT_HOP_MS = 10; // 10ms hop → 100 Hz frame rate
-
-/** Number of CREPE pitch bins (360 bins covering 32–1975 Hz in cents scale) */
+const DEFAULT_HOP_MS = 10;
 const CREPE_BINS = 360;
 const CENTS_PER_BIN = 20;
-const FMIN_CENTS = 2051.1488; // 1200 * log2(32.70 / 10)
+const FMIN_CENTS = 2051.1488;
 const F0_MIN = 50;
 const F0_MAX = 1100;
 
 export interface PitchFrame {
-  /** Time in seconds from start */
   timeSec: number;
-  /** Estimated frequency in Hz (0 if unvoiced) */
   frequencyHz: number;
-  /** Confidence 0..1 */
   confidence: number;
 }
 
 export interface CrepeResult {
-  /** Per-frame pitch estimates */
   frames: PitchFrame[];
-  /** Inference time in ms */
   inferenceMs: number;
-  /** Mean confidence across frames */
   meanConfidence: number;
 }
 
-/**
- * Convert CREPE bin index to frequency in Hz.
- */
 function binToFrequency(bin: number): number {
   const cents = FMIN_CENTS + bin * CENTS_PER_BIN;
   return 10 * Math.pow(2, cents / 1200);
 }
 
-/**
- * Find weighted average bin from CREPE output probabilities.
- * Uses parabolic interpolation around the peak for sub-bin accuracy.
- */
 function decodePitch(probs: Float32Array): { frequency: number; confidence: number } {
-  // Find peak bin
   let maxIdx = 0;
   let maxVal = probs[0];
   for (let i = 1; i < probs.length; i++) {
@@ -63,10 +49,7 @@ function decodePitch(probs: Float32Array): { frequency: number; confidence: numb
       maxIdx = i;
     }
   }
-
   const confidence = maxVal;
-
-  // Weighted average around peak for sub-bin precision (±2 bins)
   let weightedSum = 0;
   let weightTotal = 0;
   const radius = 2;
@@ -75,7 +58,6 @@ function decodePitch(probs: Float32Array): { frequency: number; confidence: numb
     weightTotal += probs[i];
   }
   const refinedBin = weightTotal > 0 ? weightedSum / weightTotal : maxIdx;
-
   const frequency = binToFrequency(refinedBin);
   return {
     frequency: frequency >= F0_MIN && frequency <= F0_MAX ? frequency : 0,
@@ -83,11 +65,6 @@ function decodePitch(probs: Float32Array): { frequency: number; confidence: numb
   };
 }
 
-/**
- * Run CREPE on 16 kHz mono audio.
- * Supports both "crepe-tiny" and "crepe-full" models.
- * Model must be pre-downloaded to OPFS via vcModelCache.
- */
 export async function extractPitch(
   samples: Float32Array,
   sampleRate = EXPECTED_SR,
@@ -98,30 +75,24 @@ export async function extractPitch(
     throw new Error(`CREPE requires ${EXPECTED_SR}Hz input, got ${sampleRate}Hz`);
   }
 
-  const session = await createVcSession(modelId);
+  const info = await ensureVcSession(modelId);
   const hopSamples = Math.round((hopMs / 1000) * sampleRate);
-
-  // Frame the audio
   const audioFrames = frameAudio(samples, CREPE_FRAME_SIZE, hopSamples);
   if (audioFrames.length === 0) {
     return { frames: [], inferenceMs: 0, meanConfidence: 0 };
   }
 
-  const inputName = session.inputNames[0] ?? "input";
-
+  const inputName = info.inputNames[0] ?? "input";
   const startMs = performance.now();
   const pitchFrames: PitchFrame[] = [];
 
-  // Process frames in batches — smaller batches for large models to avoid browser hangs
   const BATCH_SIZE = modelId === "crepe-full" ? 16 : 64;
   for (let batchStart = 0; batchStart < audioFrames.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, audioFrames.length);
     const batchLen = batchEnd - batchStart;
 
-    // Stack frames into batch tensor [batchLen, 1024]
     const batchData = new Float32Array(batchLen * CREPE_FRAME_SIZE);
     for (let i = 0; i < batchLen; i++) {
-      // Normalize each frame to [-1, 1]
       const frame = audioFrames[batchStart + i];
       let maxAbs = 0;
       for (let j = 0; j < frame.length; j++) {
@@ -134,30 +105,25 @@ export async function extractPitch(
       }
     }
 
-    const tensor = new ort.Tensor("float32", batchData, [batchLen, CREPE_FRAME_SIZE]);
-    let results: Record<string, ort.Tensor> | undefined;
-    try {
-      results = await session.run({ [inputName]: tensor });
+    const feeds: Record<string, TensorDesc> = {
+      [inputName]: { data: batchData, dims: [batchLen, CREPE_FRAME_SIZE], dtype: "float32" },
+    };
 
-      const outputName = session.outputNames[0] ?? "output";
-      const output = results[outputName];
-      if (!output) throw new Error(`CREPE: no output. Available: ${Object.keys(results).join(", ")}`);
+    const results = await runVcInference(modelId, feeds);
+    const outputName = info.outputNames[0] ?? "output";
+    const output = results[outputName];
+    if (!output) throw new Error(`CREPE: no output. Available: ${Object.keys(results).join(", ")}`);
 
-      const data = output.data as Float32Array;
-
-      for (let i = 0; i < batchLen; i++) {
-        const frameIdx = batchStart + i;
-        const probs = data.slice(i * CREPE_BINS, (i + 1) * CREPE_BINS);
-        const { frequency, confidence } = decodePitch(probs);
-        pitchFrames.push({
-          timeSec: (frameIdx * hopSamples) / sampleRate,
-          frequencyHz: confidence > 0.15 ? frequency : 0,
-          confidence,
-        });
-      }
-    } finally {
-      disposeOrtTensor(tensor);
-      disposeOrtResults(results);
+    const data = output.data as Float32Array;
+    for (let i = 0; i < batchLen; i++) {
+      const frameIdx = batchStart + i;
+      const probs = data.slice(i * CREPE_BINS, (i + 1) * CREPE_BINS);
+      const { frequency, confidence } = decodePitch(probs);
+      pitchFrames.push({
+        timeSec: (frameIdx * hopSamples) / sampleRate,
+        frequencyHz: confidence > 0.15 ? frequency : 0,
+        confidence,
+      });
     }
   }
 

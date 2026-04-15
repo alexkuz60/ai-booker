@@ -18,19 +18,22 @@
  * The output sample rate depends on the model config (typically 32kHz or 40kHz for RVC v2).
  */
 
-import * as ort from "onnxruntime-web";
-import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
-import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
+import {
+  ensureVcSession,
+  runVcInference,
+  validateInferenceOutput,
+  type TensorDesc,
+  type SessionInfo,
+} from "./vcInferenceSession";
 import { alignPitchToEmbeddings } from "./vcPipeline";
 import { applyFeatureRetrieval } from "./vcIndexSearch";
 import type { VcFeatures } from "./vcPipeline";
 
 // RVC v2 constants — mel-scale pitch quantization (matches Applio/RVC reference)
-const F0_HZ_MIN = 50;            // Min F0 in Hz
-const F0_HZ_MAX = 1100;          // Max F0 in Hz
-// Precomputed mel-scale boundaries
-const F0_MEL_MIN = 1127.0 * Math.log(1 + F0_HZ_MIN / 700.0);   // ≈ 77.97
-const F0_MEL_MAX = 1127.0 * Math.log(1 + F0_HZ_MAX / 700.0);   // ≈ 908.87
+const F0_HZ_MIN = 50;
+const F0_HZ_MAX = 1100;
+const F0_MEL_MIN = 1127.0 * Math.log(1 + F0_HZ_MIN / 700.0);
+const F0_MEL_MAX = 1127.0 * Math.log(1 + F0_HZ_MAX / 700.0);
 
 /** Supported RVC output sample rates */
 export const RVC_OUTPUT_SR_OPTIONS = [32_000, 40_000, 44_100, 48_000] as const;
@@ -52,50 +55,21 @@ export interface VcResampleMetrics {
 }
 
 export interface VcSynthesisResult {
-  /** Synthesized audio samples (Float32Array) */
   audio: Float32Array;
-  /** Sample rate of synthesized audio */
   sampleRate: number;
-  /** Duration in seconds */
   durationSec: number;
-  /** Inference time in ms */
   inferenceMs: number;
-  /** Whether SR was auto-detected from model metadata */
   srAutoDetected: boolean;
-  /** Output resampling metrics */
   resampleMetrics: VcResampleMetrics;
 }
 
 export interface VcSynthesisOptions {
-  /** Speaker ID for multi-speaker models (default 0) */
   speakerId?: number;
-  /** Pitch shift in semitones (-12 to +12, default 0) */
   pitchShift?: number;
-  /** Custom RVC model ID in OPFS cache (default "rvc-v2") */
   modelId?: string;
-  /** RVC model native sample rate (default 40kHz for most RVC v2 models) */
   outputSampleRate?: RvcOutputSR;
-  /**
-   * Feature Ratio (index_rate): 0.0–1.0 (default 0.75).
-   * Controls blend between raw ContentVec embeddings and FAISS-retrieved
-   * training data embeddings. Higher = more similar to training voice,
-   * lower = more faithful to source articulation.
-   * When no FAISS index is loaded, this is ignored.
-   */
   indexRate?: number;
-  /**
-   * Consonant Protection: 0.0–0.5 (default 0.33).
-   * Protects unvoiced consonants (sibilants, plosives) from VC artifacts.
-   * Applied only when feature retrieval (index) is enabled by blending
-   * retrieved embeddings back toward the original encoder embeddings on
-   * unvoiced frames. Ignored when no index is loaded.
-   */
   protect?: number;
-  /**
-   * Pre-loaded training embeddings for feature retrieval.
-   * If provided along with indexRate > 0, applies KNN-based blending
-   * to make output more similar to training voice.
-   */
   indexData?: {
     data: Float32Array;
     rows: number;
@@ -103,40 +77,26 @@ export interface VcSynthesisOptions {
   };
 }
 
-/**
- * Convert continuous F0 (Hz) to coarse pitch bin index.
- * Uses **mel-scale** quantization to 255 bins [1..255], 0 = unvoiced.
- * This matches the reference RVC v2 / Applio implementation:
- *   f0_mel = 1127 * ln(1 + f0/700)
- *   bin = clip((f0_mel - mel_min) * 254 / (mel_max - mel_min) + 1, 1, 255)
- */
 function f0ToCoarsePitch(f0Hz: number): number {
-  if (f0Hz <= 0) return 0; // unvoiced
+  if (f0Hz <= 0) return 0;
   const clamped = Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, f0Hz));
   const mel = 1127.0 * Math.log(1 + clamped / 700.0);
   const bin = (mel - F0_MEL_MIN) * 254 / (F0_MEL_MAX - F0_MEL_MIN) + 1;
   return Math.max(1, Math.min(255, Math.round(bin)));
 }
 
-/**
- * Apply pitch shift in semitones to F0 values.
- */
 function applyPitchShift(f0Hz: number, semitones: number): number {
   if (f0Hz <= 0 || semitones === 0) return f0Hz;
   const shifted = f0Hz * Math.pow(2, semitones / 12);
-  // Clamp to valid range so coarse bins stay in [1,255]
   return Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, shifted));
 }
 
 /**
- * Try to detect output sample rate from ONNX model metadata.
- * RVC models sometimes include "sample_rate" or "sr" in custom metadata.
- * Falls back to heuristic based on output tensor dimensions.
+ * Try to detect output sample rate from session metadata.
  */
-function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | null {
+function detectOutputSRFromInfo(info: SessionInfo): RvcOutputSR | null {
   try {
-    // Check model metadata for sample_rate hint
-    const meta = (session as any).handler?.metadata as Record<string, string> | undefined;
+    const meta = info.metadata;
     if (meta) {
       for (const [key, val] of Object.entries(meta)) {
         const k = key.toLowerCase();
@@ -148,16 +108,10 @@ function detectOutputSRFromModel(session: ort.InferenceSession): RvcOutputSR | n
         }
       }
     }
-  } catch {
-    // Metadata access may not be supported — that's OK
-  }
+  } catch {}
   return null;
 }
 
-/**
- * Resample raw RVC output to project-standard 44.1 kHz using OfflineAudioContext.
- * Returns resampled audio + metrics.
- */
 async function resampleToProjectSR(
   samples: Float32Array, sourceSR: number,
 ): Promise<{ resampled: Float32Array; metrics: VcResampleMetrics }> {
@@ -192,14 +146,46 @@ async function resampleToProjectSR(
   };
 }
 
-
 /**
- * Synthesize voice-converted audio from extracted VC features.
- *
- * @param features - Output from extractVcFeatures()
- * @param options  - Synthesis configuration
- * @returns Synthesized audio with target voice timbre
+ * Log tensor statistics for debugging.
  */
+function logTensorStats(label: string, desc: TensorDesc): void {
+  const dims = `[${desc.dims}]`;
+  if (desc.dtype === "float32") {
+    const d = desc.data as Float32Array;
+    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+    for (let i = 0; i < d.length; i++) {
+      const val = d[i];
+      if (val < min) min = val;
+      if (val > max) max = val;
+      sum += val;
+      sumSq += val * val;
+    }
+    const mean = sum / d.length;
+    const std = Math.sqrt(sumSq / d.length - mean * mean);
+    const zeros = d.reduce((c, v) => c + (v === 0 ? 1 : 0), 0);
+    console.info(
+      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
+      `min=${min.toFixed(4)}, max=${max.toFixed(4)}, mean=${mean.toFixed(4)}, ` +
+      `std=${std.toFixed(4)}, zeros=${zeros}/${d.length}`
+    );
+  } else if (desc.dtype === "int64") {
+    const d = desc.data as BigInt64Array;
+    let min = d[0], max = d[0];
+    for (let i = 1; i < d.length; i++) {
+      if (d[i] < min) min = d[i];
+      if (d[i] > max) max = d[i];
+    }
+    const zeros = Array.from(d).filter(v => v === 0n).length;
+    console.info(
+      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
+      `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
+    );
+  } else {
+    console.info(`[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}`);
+  }
+}
+
 export async function synthesizeVoice(
   features: VcFeatures,
   options?: VcSynthesisOptions,
@@ -210,14 +196,14 @@ export async function synthesizeVoice(
   const protect = Math.max(0, Math.min(0.5, options?.protect ?? 0.33));
   const indexRate = Math.max(0, Math.min(1, options?.indexRate ?? 0.75));
 
-  const session = await createVcSession(modelId);
+  const info = await ensureVcSession(modelId);
 
   // Determine output SR: user override > auto-detect > default (40kHz)
   let srAutoDetected = false;
   let outputSR = options?.outputSampleRate ?? RVC_OUTPUT_SR_DEFAULT;
 
   if (!options?.outputSampleRate) {
-    const detectedSR = detectOutputSRFromModel(session);
+    const detectedSR = detectOutputSRFromInfo(info);
     if (detectedSR) {
       outputSR = detectedSR;
       srAutoDetected = true;
@@ -226,13 +212,8 @@ export async function synthesizeVoice(
   }
 
   // ── Critical: 2x upsample ContentVec embeddings ──────────────────────
-  // Reference RVC pipeline does: F.interpolate(feats, scale_factor=2)
-  // ContentVec produces ~50 fps (hop=320 @ 16kHz), but RVC v2 decoder
-  // expects ~100 fps. Decoder upsample product ≈ 400, so:
-  //   100 fps × 400 = 40,000 samples/sec (correct for 40kHz model)
-  //   50 fps × 400 = 20,000 samples/sec (2x slower — the bug we had)
   const srcT = features.numFrames;
-  const T = srcT * 2; // 2x temporal upsample
+  const T = srcT * 2;
   const upEmb = new Float32Array(T * features.embeddingDim);
   for (let i = 0; i < T; i++) {
     const srcIdx = i / 2;
@@ -249,8 +230,6 @@ export async function synthesizeVoice(
   }
 
   // ── Feature Retrieval (index_rate) ───────────────────────────────────
-  // If training data index is loaded, blend source embeddings with
-  // KNN-retrieved training embeddings. Modifies upEmb in-place.
   let protectSourceEmbeddings: Float32Array | null = null;
   let retrievalApplied = false;
   if (indexRate > 0 && options?.indexData) {
@@ -274,8 +253,6 @@ export async function synthesizeVoice(
   const alignedF0 = alignPitchToEmbeddings(features.pitchFrames, T);
 
   // ── Consonant Protection ─────────────────────────────────────────────
-  // Reference RVC implementation blends retrieved embeddings back toward the
-  // original encoder features on unvoiced frames. It does NOT zero out F0.
   if (protect < 0.5 && retrievalApplied && protectSourceEmbeddings) {
     let protectedFrames = 0;
     for (let i = 0; i < T; i++) {
@@ -288,10 +265,7 @@ export async function synthesizeVoice(
         }
       }
     }
-
-    console.info(
-      `[vcSynthesis] Protect blend: ${protectedFrames}/${T} unvoiced frames, factor=${protect}`
-    );
+    console.info(`[vcSynthesis] Protect blend: ${protectedFrames}/${T} unvoiced frames, factor=${protect}`);
   }
 
   // Build pitch tensors
@@ -300,9 +274,6 @@ export async function synthesizeVoice(
 
   for (let i = 0; i < T; i++) {
     let f0 = applyPitchShift(alignedF0[i], pitchShift);
-    // Clamp F0 to valid range — prevents coarse/fine mismatch artifacts
-    // (coarse is mel-quantized to [1,255] within [F0_HZ_MIN, F0_HZ_MAX],
-    //  fine must stay in the same range for the decoder to work correctly)
     if (f0 > 0) {
       f0 = Math.max(F0_HZ_MIN, Math.min(F0_HZ_MAX, f0));
     }
@@ -310,89 +281,51 @@ export async function synthesizeVoice(
     pitchFine[i] = f0;
   }
 
-  // Prepare ONNX tensors
-  // feats: [1, T, 768] — using 2x upsampled embeddings
-  const featsTensor = new ort.Tensor("float32", upEmb, [1, T, features.embeddingDim]);
-  // p_len: [1] — int64
-  const pLenData = BigInt64Array.from([BigInt(T)]);
-  const pLenTensor = new ort.Tensor("int64", pLenData, [1]);
-  // pitch: [1, T] — int64 coarse bins
-  const pitchData = BigInt64Array.from(Array.from(pitchCoarse, (v) => BigInt(Math.round(v))));
-  const pitchTensor = new ort.Tensor("int64", pitchData, [1, T]);
-  // pitchf: [1, T] — float32 fine Hz
-  const pitchfTensor = new ort.Tensor("float32", pitchFine, [1, T]);
-  // sid: [1] — int64
-  const sidData = BigInt64Array.from([BigInt(speakerId)]);
-  const sidTensor = new ort.Tensor("int64", sidData, [1]);
+  // Prepare TensorDesc feeds
+  const featsDesc: TensorDesc = { data: upEmb, dims: [1, T, features.embeddingDim], dtype: "float32" };
+  const pLenDesc: TensorDesc = { data: BigInt64Array.from([BigInt(T)]), dims: [1], dtype: "int64" };
+  const pitchDesc: TensorDesc = {
+    data: BigInt64Array.from(Array.from(pitchCoarse, (v) => BigInt(Math.round(v)))),
+    dims: [1, T],
+    dtype: "int64",
+  };
+  const pitchfDesc: TensorDesc = { data: pitchFine, dims: [1, T], dtype: "float32" };
+  const sidDesc: TensorDesc = { data: BigInt64Array.from([BigInt(speakerId)]), dims: [1], dtype: "int64" };
 
   // Build feeds — match model's expected input names
-  const inputNames = session.inputNames;
-  const feeds: Record<string, ort.Tensor> = {};
+  const inputNames = info.inputNames;
+  const feeds: Record<string, TensorDesc> = {};
 
   console.info(`[vcSynthesis] Model input names: [${inputNames.join(", ")}]`);
 
-  // Map known input names to tensors (case-insensitive, flexible matching)
   for (const name of inputNames) {
     const key = name.toLowerCase();
     if (key === "feats" || key === "phone" || key === "hubert") {
-      feeds[name] = featsTensor;
+      feeds[name] = featsDesc;
     } else if (key === "p_len" || key === "plen" || key === "lengths") {
-      feeds[name] = pLenTensor;
+      feeds[name] = pLenDesc;
     } else if (key === "pitch" || key === "f0_coarse" || key === "f0coarse") {
-      feeds[name] = pitchTensor;
+      feeds[name] = pitchDesc;
     } else if (key === "pitchf" || key === "f0" || key === "f0_fine" || key === "nsff0") {
-      feeds[name] = pitchfTensor;
+      feeds[name] = pitchfDesc;
     } else if (key === "sid" || key === "speaker_id" || key === "spk_id") {
-      feeds[name] = sidTensor;
+      feeds[name] = sidDesc;
     }
   }
 
   // Fallback: map by position if name matching was incomplete
   if (Object.keys(feeds).length < inputNames.length) {
-    const orderedTensors = [featsTensor, pLenTensor, pitchTensor, pitchfTensor, sidTensor];
-    for (let i = 0; i < Math.min(inputNames.length, orderedTensors.length); i++) {
+    const ordered = [featsDesc, pLenDesc, pitchDesc, pitchfDesc, sidDesc];
+    for (let i = 0; i < Math.min(inputNames.length, ordered.length); i++) {
       if (!feeds[inputNames[i]]) {
-        feeds[inputNames[i]] = orderedTensors[i];
+        feeds[inputNames[i]] = ordered[i];
       }
     }
   }
 
-  // Log actual feed shapes + statistics for debugging
+  // Log feed statistics
   for (const [k, v] of Object.entries(feeds)) {
-    const dims = `[${v.dims}]`;
-    if (v.type === "float32") {
-      const d = v.data as Float32Array;
-      let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
-      for (let i = 0; i < d.length; i++) {
-        const val = d[i];
-        if (val < min) min = val;
-        if (val > max) max = val;
-        sum += val;
-        sumSq += val * val;
-      }
-      const mean = sum / d.length;
-      const std = Math.sqrt(sumSq / d.length - mean * mean);
-      const zeros = d.reduce((c, v) => c + (v === 0 ? 1 : 0), 0);
-      console.info(
-        `[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}, ` +
-        `min=${min.toFixed(4)}, max=${max.toFixed(4)}, mean=${mean.toFixed(4)}, ` +
-        `std=${std.toFixed(4)}, zeros=${zeros}/${d.length}`
-      );
-    } else if (v.type === "int64") {
-      const d = v.data as BigInt64Array;
-      let min = d[0], max = d[0];
-      for (let i = 1; i < d.length; i++) {
-        if (d[i] < min) min = d[i];
-        if (d[i] > max) max = d[i];
-      }
-      const zeros = Array.from(d).filter(v => v === 0n).length;
-      console.info(
-        `[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}, ` +
-        `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
-      );
-    } else {
-      console.info(`[vcSynthesis] feed "${k}": shape=${dims}, type=${v.type}`);
-    }
+    logTensorStats(k, v);
   }
 
   console.info(
@@ -403,62 +336,52 @@ export async function synthesizeVoice(
   );
 
   const startMs = performance.now();
-  let results: Record<string, ort.Tensor> | undefined;
-  try {
-    results = await session.run(feeds);
-    const inferenceMs = Math.round(performance.now() - startMs);
+  const results = await runVcInference(modelId, feeds);
+  const inferenceMs = Math.round(performance.now() - startMs);
 
-    // Extract output audio
-    const outputName = session.outputNames[0] ?? "audio";
-    const output = results[outputName];
-    if (!output) {
-      throw new Error(
-        `[vcSynthesis] No output tensor. Available: ${Object.keys(results).join(", ")}`
-      );
-    }
-
-    const rawAudio = new Float32Array(output.data as Float32Array);
-
-    // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
-    validateInferenceOutput(rawAudio, modelId, "RVC audio output");
-
-    // Diagnostic: output tensor statistics
-    {
-      let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
-      for (let i = 0; i < rawAudio.length; i++) {
-        const v = rawAudio[i];
-        if (v < min) min = v;
-        if (v > max) max = v;
-        sum += v;
-        sumSq += v * v;
-      }
-      const mean = sum / rawAudio.length;
-      const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
-      console.info(
-        `[vcSynthesis] OUTPUT "${outputName}": shape=[${output.dims}], ` +
-        `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
-        `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
-      );
-    }
-
-    // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility.
-    const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
-    const finalSR = PROJECT_OUTPUT_SR;
-    const durationSec = finalAudio.length / finalSR;
-
-    console.info(
-      `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
-      `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
-      `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
-    );
-
-    return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected, resampleMetrics };
-  } finally {
-    // Dispose all input tensors
-    for (const t of Object.values(feeds)) disposeOrtTensor(t);
-    // Dispose output tensors
-    disposeOrtResults(results);
+  // Extract output audio
+  const outputName = info.outputNames[0] ?? "audio";
+  const output = results[outputName];
+  if (!output) {
+    throw new Error(`[vcSynthesis] No output tensor. Available: ${Object.keys(results).join(", ")}`);
   }
+
+  const rawAudio = new Float32Array(output.data as Float32Array);
+
+  // Validate output — detect WebGPU corruption
+  validateInferenceOutput(rawAudio, modelId, "RVC audio output");
+
+  // Diagnostic: output tensor statistics
+  {
+    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+    for (let i = 0; i < rawAudio.length; i++) {
+      const v = rawAudio[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      sumSq += v * v;
+    }
+    const mean = sum / rawAudio.length;
+    const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
+    console.info(
+      `[vcSynthesis] OUTPUT "${outputName}": dims=[${output.dims}], ` +
+      `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
+      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
+    );
+  }
+
+  // Resample RVC output → 44.1 kHz
+  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
+  const finalSR = PROJECT_OUTPUT_SR;
+  const durationSec = finalAudio.length / finalSR;
+
+  console.info(
+    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
+    `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
+    `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
+  );
+
+  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected, resampleMetrics };
 }
 
 /**
@@ -475,26 +398,20 @@ export function vcAudioToWav(audio: Float32Array, sampleRate: number): Blob {
   const buffer = new ArrayBuffer(headerSize + dataSize);
   const view = new DataView(buffer);
 
-  // RIFF header
   writeString(view, 0, "RIFF");
   view.setUint32(4, 36 + dataSize, true);
   writeString(view, 8, "WAVE");
-
-  // fmt chunk
   writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);          // chunk size
-  view.setUint16(20, 1, true);           // PCM
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, bitsPerSample, true);
-
-  // data chunk
   writeString(view, 36, "data");
   view.setUint32(40, dataSize, true);
 
-  // PCM samples — clamp and convert float32 → int16
   let offset = headerSize;
   for (let i = 0; i < audio.length; i++) {
     const s = Math.max(-1, Math.min(1, audio[i]));
@@ -511,4 +428,3 @@ function writeString(view: DataView, offset: number, str: string) {
     view.setUint8(offset + i, str.charCodeAt(i));
   }
 }
-

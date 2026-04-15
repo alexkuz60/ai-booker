@@ -8,9 +8,12 @@
  * Mel spectrogram params: SR=16000, n_fft=1024, hop=160, n_mels=128
  */
 
-import * as ort from "onnxruntime-web";
-import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
-import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
+import {
+  ensureVcSession,
+  runVcInference,
+  validateInferenceOutput,
+  type TensorDesc,
+} from "./vcInferenceSession";
 import type { PitchFrame, CrepeResult } from "./vcCrepe";
 
 const EXPECTED_SR = 16_000;
@@ -214,12 +217,9 @@ export async function extractPitchRmvpe(
   console.info(`[RMVPE] Mel spectrogram: ${mel.numFrames} frames (padded to ${mel.paddedFrames}) in ${melMs}ms`);
 
   // Step 2: Run RMVPE inference
-  const session = await createVcSession("rmvpe");
-  const inputName = session.inputNames[0] ?? "input";
+  const info = await ensureVcSession("rmvpe");
+  const inputName = info.inputNames[0] ?? "input";
 
-  // RMVPE expects [1, n_mels, n_frames] or [1, 1, n_mels, n_frames]
-  // Try [1, 1, n_frames, n_mels] first (common ONNX layout)
-  // Transpose mel data from [frames, mels] to [mels, frames] for model input
   const transposed = new Float32Array(mel.paddedFrames * N_MELS);
   for (let t = 0; t < mel.paddedFrames; t++) {
     for (let m = 0; m < N_MELS; m++) {
@@ -227,73 +227,69 @@ export async function extractPitchRmvpe(
     }
   }
 
-  const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.paddedFrames]);
-  let results: Record<string, ort.Tensor> | undefined;
-  try {
-    results = await session.run({ [inputName]: tensor });
+  const feeds: Record<string, TensorDesc> = {
+    [inputName]: { data: transposed, dims: [1, N_MELS, mel.paddedFrames], dtype: "float32" },
+  };
 
-    const outputName = session.outputNames[0] ?? "output";
-    const output = results[outputName];
-    if (!output) throw new Error(`RMVPE: no output. Available: ${Object.keys(results).join(", ")}`);
+  const results = await runVcInference("rmvpe", feeds);
 
-    const data = output.data as Float32Array;
-    validateInferenceOutput(data, "rmvpe", "pitch probabilities");
-    const outputShape = Array.from(output.dims, Number).filter(d => d > 1);
+  const outputName = info.outputNames[0] ?? "output";
+  const output = results[outputName];
+  if (!output) throw new Error(`RMVPE: no output. Available: ${Object.keys(results).join(", ")}`);
 
-    // RMVPE exports are commonly either [1, T, 360] or [1, 360, T].
-    let nPitchBins = 360;
-    let rawFrameCount = Math.floor(data.length / nPitchBins);
-    let layout: "frame-major" | "bin-major" = "frame-major";
+  const data = output.data as Float32Array;
+  validateInferenceOutput(data, "rmvpe", "pitch probabilities");
+  const outputShape = output.dims.filter(d => d > 1);
 
-    if (outputShape.length >= 2) {
-      const a = outputShape[outputShape.length - 2];
-      const b = outputShape[outputShape.length - 1];
-      if (b === 360) {
-        rawFrameCount = a;
-        nPitchBins = b;
-        layout = "frame-major";
-      } else if (a === 360) {
-        rawFrameCount = b;
-        nPitchBins = a;
-        layout = "bin-major";
-      }
+  let nPitchBins = 360;
+  let rawFrameCount = Math.floor(data.length / nPitchBins);
+  let layout: "frame-major" | "bin-major" = "frame-major";
+
+  if (outputShape.length >= 2) {
+    const a = outputShape[outputShape.length - 2];
+    const b = outputShape[outputShape.length - 1];
+    if (b === 360) {
+      rawFrameCount = a;
+      nPitchBins = b;
+      layout = "frame-major";
+    } else if (a === 360) {
+      rawFrameCount = b;
+      nPitchBins = a;
+      layout = "bin-major";
     }
-
-    const nOutputFrames = Math.min(rawFrameCount, mel.numFrames);
-
-    const pitchFrames: PitchFrame[] = [];
-    const frameDurationSec = HOP_LENGTH / sampleRate;
-
-    for (let i = 0; i < nOutputFrames; i++) {
-      const probs = new Float32Array(nPitchBins);
-      if (layout === "frame-major") {
-        probs.set(data.subarray(i * nPitchBins, (i + 1) * nPitchBins));
-      } else {
-        for (let bin = 0; bin < nPitchBins; bin++) {
-          probs[bin] = data[bin * rawFrameCount + i];
-        }
-      }
-      const { frequency, confidence } = decodeRmvpeF0(probs, nPitchBins);
-      pitchFrames.push({
-        timeSec: i * frameDurationSec,
-        frequencyHz: frequency,
-        confidence,
-      });
-    }
-
-    const inferenceMs = Math.round(performance.now() - startMs);
-    const meanConfidence = pitchFrames.length > 0
-      ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
-      : 0;
-
-    console.info(
-      `[RMVPE] ${samples.length} samples → ${pitchFrames.length} frames, ` +
-      `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms, layout=${layout}, shape=[${outputShape.join(", ")}])`
-    );
-
-    return { frames: pitchFrames, inferenceMs, meanConfidence };
-  } finally {
-    disposeOrtTensor(tensor);
-    disposeOrtResults(results);
   }
+
+  const nOutputFrames = Math.min(rawFrameCount, mel.numFrames);
+
+  const pitchFrames: PitchFrame[] = [];
+  const frameDurationSec = HOP_LENGTH / sampleRate;
+
+  for (let i = 0; i < nOutputFrames; i++) {
+    const probs = new Float32Array(nPitchBins);
+    if (layout === "frame-major") {
+      probs.set(data.subarray(i * nPitchBins, (i + 1) * nPitchBins));
+    } else {
+      for (let bin = 0; bin < nPitchBins; bin++) {
+        probs[bin] = data[bin * rawFrameCount + i];
+      }
+    }
+    const { frequency, confidence } = decodeRmvpeF0(probs, nPitchBins);
+    pitchFrames.push({
+      timeSec: i * frameDurationSec,
+      frequencyHz: frequency,
+      confidence,
+    });
+  }
+
+  const inferenceMs = Math.round(performance.now() - startMs);
+  const meanConfidence = pitchFrames.length > 0
+    ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
+    : 0;
+
+  console.info(
+    `[RMVPE] ${samples.length} samples → ${pitchFrames.length} frames, ` +
+    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms, layout=${layout}, shape=[${outputShape.join(", ")}])`
+  );
+
+  return { frames: pitchFrames, inferenceMs, meanConfidence };
 }

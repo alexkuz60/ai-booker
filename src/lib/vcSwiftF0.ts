@@ -6,29 +6,20 @@
  *
  * Input:  raw 16 kHz mono Float32Array [1, N]
  * Output: pitch_hz [1, T] + confidence [1, T]
- *
- * Parameters: SR=16000, hop=256, frame=1024, fmin=46.875, fmax=2093.75
- * Reference: https://github.com/lars76/swift-f0
  */
 
-import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
-import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
+import {
+  ensureVcSession,
+  runVcInference,
+  type TensorDesc,
+} from "./vcInferenceSession";
 import type { PitchFrame, CrepeResult } from "./vcCrepe";
 
 const EXPECTED_SR = 16_000;
 const HOP_LENGTH = 256;
 const MIN_AUDIO_LENGTH = 256;
-const CENTER_OFFSET = (1024 - 1) / 2 - (1024 - 256) / 2; // 127.5
+const CENTER_OFFSET = (1024 - 1) / 2 - (1024 - 256) / 2;
 
-/**
- * Run SwiftF0 on 16 kHz mono audio.
- * Model must be pre-downloaded to OPFS via vcModelCache.
- *
- * SwiftF0 takes raw waveform input [1, N] and outputs:
- *   - pitch_hz [1, T] — estimated F0 in Hz per frame
- *   - confidence [1, T] — voicing confidence 0..1
- */
 export async function extractPitchSwiftF0(
   samples: Float32Array,
   sampleRate = EXPECTED_SR,
@@ -39,7 +30,6 @@ export async function extractPitchSwiftF0(
 
   const startMs = performance.now();
 
-  // Pad to minimum length if needed
   let audio = samples;
   if (audio.length < MIN_AUDIO_LENGTH) {
     const padded = new Float32Array(MIN_AUDIO_LENGTH);
@@ -47,66 +37,60 @@ export async function extractPitchSwiftF0(
     audio = padded;
   }
 
-  // Create session and run inference
-  const session = await createVcSession("swiftf0");
-  const inputName = session.inputNames[0] ?? "input";
+  const info = await ensureVcSession("swiftf0");
+  const inputName = info.inputNames[0] ?? "input";
 
-  // SwiftF0 expects [1, N] raw waveform
-  const tensor = new ort.Tensor("float32", audio, [1, audio.length]);
-  let results: Record<string, ort.Tensor> | undefined;
-  try {
-    results = await session.run({ [inputName]: tensor });
+  const feeds: Record<string, TensorDesc> = {
+    [inputName]: { data: new Float32Array(audio), dims: [1, audio.length], dtype: "float32" },
+  };
 
-    // SwiftF0 outputs two tensors: pitch_hz and confidence
-    const outputNames = session.outputNames;
-    if (outputNames.length < 2) {
-      throw new Error(`SwiftF0: expected 2 outputs, got ${outputNames.length}: ${outputNames.join(", ")}`);
-    }
+  const results = await runVcInference("swiftf0", feeds);
 
-    const pitchName = outputNames.find(name => name.toLowerCase().includes("pitch")) ?? outputNames[0];
-    const confName = outputNames.find(name => name.toLowerCase().includes("conf"))
-      ?? outputNames.find(name => name !== pitchName)
-      ?? outputNames[1];
-
-    const pitchData = results[pitchName]?.data as Float32Array | undefined;
-    const confData = results[confName]?.data as Float32Array | undefined;
-
-    if (!pitchData || !confData || pitchData.length !== confData.length) {
-      throw new Error(
-        `SwiftF0: invalid outputs (pitch=${pitchName}:${pitchData?.length ?? 0}, conf=${confName}:${confData?.length ?? 0}). Available: ${Object.keys(results).join(", ")}`
-      );
-    }
-
-    const numFrames = pitchData.length;
-    const pitchFrames: PitchFrame[] = [];
-
-    for (let i = 0; i < numFrames; i++) {
-      const timeSec = (i * HOP_LENGTH + CENTER_OFFSET) / sampleRate;
-      const hz = pitchData[i];
-      const conf = confData[i];
-      const safeConf = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;
-      const safeHz = Number.isFinite(hz) && hz >= 50 && hz <= 1100 ? hz : 0;
-
-      pitchFrames.push({
-        timeSec,
-        frequencyHz: safeConf > 0.5 ? safeHz : 0,
-        confidence: safeConf,
-      });
-    }
-
-    const inferenceMs = Math.round(performance.now() - startMs);
-    const meanConfidence = pitchFrames.length > 0
-      ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
-      : 0;
-
-    console.info(
-      `[SwiftF0] ${samples.length} samples → ${pitchFrames.length} frames, ` +
-      `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms`
-    );
-
-    return { frames: pitchFrames, inferenceMs, meanConfidence };
-  } finally {
-    disposeOrtTensor(tensor);
-    disposeOrtResults(results);
+  const outputNames = info.outputNames;
+  if (outputNames.length < 2) {
+    throw new Error(`SwiftF0: expected 2 outputs, got ${outputNames.length}: ${outputNames.join(", ")}`);
   }
+
+  const pitchName = outputNames.find(name => name.toLowerCase().includes("pitch")) ?? outputNames[0];
+  const confName = outputNames.find(name => name.toLowerCase().includes("conf"))
+    ?? outputNames.find(name => name !== pitchName)
+    ?? outputNames[1];
+
+  const pitchData = results[pitchName]?.data as Float32Array | undefined;
+  const confData = results[confName]?.data as Float32Array | undefined;
+
+  if (!pitchData || !confData || pitchData.length !== confData.length) {
+    throw new Error(
+      `SwiftF0: invalid outputs (pitch=${pitchName}:${pitchData?.length ?? 0}, conf=${confName}:${confData?.length ?? 0})`
+    );
+  }
+
+  const numFrames = pitchData.length;
+  const pitchFrames: PitchFrame[] = [];
+
+  for (let i = 0; i < numFrames; i++) {
+    const timeSec = (i * HOP_LENGTH + CENTER_OFFSET) / sampleRate;
+    const hz = pitchData[i];
+    const conf = confData[i];
+    const safeConf = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;
+    const safeHz = Number.isFinite(hz) && hz >= 50 && hz <= 1100 ? hz : 0;
+
+    pitchFrames.push({
+      timeSec,
+      frequencyHz: safeConf > 0.5 ? safeHz : 0,
+      confidence: safeConf,
+    });
+  }
+
+  const inferenceMs = Math.round(performance.now() - startMs);
+  const meanConfidence = pitchFrames.length > 0
+    ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
+    : 0;
+
+  console.info(
+    `[SwiftF0] ${samples.length} samples → ${pitchFrames.length} frames, ` +
+    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms`
+  );
+
+  return { frames: pitchFrames, inferenceMs, meanConfidence };
 }
