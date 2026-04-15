@@ -12,6 +12,7 @@ const DEFAULT_FFT_SIZE = 2048;
 const DEFAULT_HOP = 512;
 const DEFAULT_HEIGHT = 200;
 const DEFAULT_WIDTH = 600;
+const FREQ_AXIS_WIDTH = 50;
 
 export interface SpectrogramOptions {
   fftSize?: number;
@@ -239,8 +240,14 @@ export function renderSpectrogram(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
+  
+  // Fill background
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, width, height);
+  
+  // Fill frequency axis background
+  ctx.fillStyle = "#0a0a0a";
+  ctx.fillRect(0, 0, FREQ_AXIS_WIDTH, height);
 
   const frames = computeSTFT(samples, fftSize, hop);
   if (frames.length === 0) return;
@@ -252,12 +259,13 @@ export function renderSpectrogram(
   // Build mel-scale bin lookup table
   const melBins = buildMelBinLookup(height, numBins, nyquist);
 
-  // Create ImageData
-  const imgData = ctx.createImageData(width, height);
+  // Create ImageData for spectrogram area only
+  const spectroWidth = width - FREQ_AXIS_WIDTH;
+  const imgData = ctx.createImageData(spectroWidth, height);
   const data = imgData.data;
 
-  for (let x = 0; x < width; x++) {
-    const frameIdx = Math.floor((x / width) * frames.length);
+  for (let x = 0; x < spectroWidth; x++) {
+    const frameIdx = Math.floor((x / spectroWidth) * frames.length);
     const frame = frames[Math.min(frameIdx, frames.length - 1)];
 
     for (let y = 0; y < height; y++) {
@@ -265,7 +273,7 @@ export function renderSpectrogram(
       const db = frame[binIdx];
       const normalized = Math.max(0, Math.min(1, (db - minDb) / dbRange));
       const [r, g, b] = colorFn(normalized);
-      const idx = (y * width + x) * 4;
+      const idx = (y * spectroWidth + x) * 4;
       data[idx] = r;
       data[idx + 1] = g;
       data[idx + 2] = b;
@@ -273,29 +281,43 @@ export function renderSpectrogram(
     }
   }
 
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(imgData, FREQ_AXIS_WIDTH, 0);
 
-  // Draw frequency axis labels (mel-spaced)
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  // Draw vertical separator line
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(FREQ_AXIS_WIDTH - 0.5, 0);
+  ctx.lineTo(FREQ_AXIS_WIDTH - 0.5, height);
+  ctx.stroke();
+
+  // Draw frequency axis labels (mel-spaced) in dedicated area
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.font = "10px monospace";
+  ctx.textAlign = "right";
   const freqLabels = [100, 300, 500, 1000, 2000, 4000, 8000].filter(f => f < nyquist);
   for (const freq of freqLabels) {
     const yPos = freqToMelY(freq, height, nyquist);
     if (yPos > 12 && yPos < height - 4) {
-      ctx.fillText(`${freq >= 1000 ? `${freq / 1000}k` : freq}`, 2, yPos + 3);
-      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      const label = freq >= 1000 ? `${freq / 1000}k` : freq.toString();
+      ctx.fillText(label, FREQ_AXIS_WIDTH - 5, yPos + 3);
+      
+      // Draw grid line
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.setLineDash([2, 4]);
       ctx.beginPath();
-      ctx.moveTo(30, yPos);
+      ctx.moveTo(FREQ_AXIS_WIDTH, yPos);
       ctx.lineTo(width, yPos);
       ctx.stroke();
       ctx.setLineDash([]);
     }
   }
+  ctx.textAlign = "left";
 
   // ── F0 pitch contour overlay ──
   if (f0Frames && f0Frames.length > 0) {
     const durationSec = samples.length / sampleRate;
+    const spectroWidth = width - FREQ_AXIS_WIDTH;
     ctx.strokeStyle = f0Color;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([]);
@@ -308,7 +330,7 @@ export function renderSpectrogram(
         started = false;
         continue;
       }
-      const x = Math.round((frame.timeSec / durationSec) * width);
+      const x = FREQ_AXIS_WIDTH + Math.round((frame.timeSec / durationSec) * spectroWidth);
       const y = freqToMelY(frame.frequencyHz, height, nyquist);
 
       if (y < 0 || y >= height) { started = false; continue; }
@@ -331,19 +353,21 @@ export function renderSpectrogram(
 
   // Draw label
   if (label) {
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(0, 0, ctx.measureText(label).width + 12, 18);
+    const labelX = FREQ_AXIS_WIDTH;
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(labelX, 0, ctx.measureText(label).width + 12, 18);
     ctx.fillStyle = "#fff";
     ctx.font = "bold 11px sans-serif";
-    ctx.fillText(label, 6, 13);
+    ctx.fillText(label, labelX + 6, 13);
   }
 
   // Draw time axis
   const durationSec = samples.length / sampleRate;
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  const spectroWidth = width - FREQ_AXIS_WIDTH;
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = "9px monospace";
   for (let t = 0.5; t < durationSec; t += 0.5) {
-    const xPos = Math.round((t / durationSec) * width);
+    const xPos = FREQ_AXIS_WIDTH + Math.round((t / durationSec) * spectroWidth);
     ctx.fillText(`${t.toFixed(1)}s`, xPos + 2, height - 3);
   }
 }
