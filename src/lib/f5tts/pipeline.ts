@@ -106,7 +106,11 @@ export async function synthesizeF5(
   const encoderMs = Math.round(performance.now() - tEnc0);
 
   const encOutputNames = Object.keys(encResult);
-  console.info(`[f5tts] Encoder outputs: [${encOutputNames.join(", ")}] (${encoderMs}ms)`);
+  for (const n of encOutputNames) {
+    const t = encResult[n];
+    console.info(`[f5tts] Encoder output "${n}": dims=[${t.dims}] dtype=${t.dtype} len=${(t.data as any).length}`);
+  }
+  console.info(`[f5tts] Encoder: ${encoderMs}ms`);
 
   // ── Stage 2: Transformer (iterative NFE loop) ──
   const tTrans0 = performance.now();
@@ -124,15 +128,26 @@ export async function synthesizeF5(
     // Forward all encoder outputs except noise
     for (const name of encOutputNames) {
       if (name === "noise") continue;
-      const t = encResult[name];
+      const enc = encResult[name];
       transInputs[name] = {
-        data: t.data as Float32Array,
-        dims: t.dims,
-        dtype: t.dtype ?? "float32",
+        data: enc.data as Float32Array,
+        dims: enc.dims,
+        dtype: enc.dtype ?? "float32",
       };
     }
 
+    if (step === 0) {
+      console.info(`[f5tts] Transformer step 0 inputs:`);
+      for (const [k, v] of Object.entries(transInputs)) {
+        console.info(`  "${k}": dims=[${v.dims}] dtype=${v.dtype} len=${(v.data as any).length}`);
+      }
+    }
+
+    const tStep0 = performance.now();
     const stepResult = await runVcInference("f5tts-transformer", transInputs);
+    if (step === 0) {
+      console.info(`[f5tts] Transformer step 0 took ${Math.round(performance.now() - tStep0)}ms, outputs: [${Object.keys(stepResult).join(", ")}]`);
+    }
     const resultNames = Object.keys(stepResult);
     noise = stepResult["noise"] ?? stepResult[resultNames[0]];
 
