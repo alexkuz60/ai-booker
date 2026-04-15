@@ -148,6 +148,22 @@ export async function extractVcFeatures(
 }
 
 /**
+ * Lightweight F0-only extraction: resample → normalize → pitch.
+ * Skips the encoder (ContentVec/WavLM) entirely — much faster and
+ * avoids model compatibility issues when only pitch contour is needed.
+ */
+export async function extractF0Only(
+  audio: ArrayBuffer | Blob,
+  pitchAlgorithm: PitchAlgorithm = "crepe-tiny",
+  hopMs = 10,
+): Promise<PitchFrame[]> {
+  const { samples: rawSamples } = await resampleTo16kMono(audio);
+  const { samples } = normalizeRms(rawSamples);
+  const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
+  return result.frames;
+}
+
+
  * Interpolate F0 to match ContentVec frame count.
  * ContentVec produces ~50 frames/sec, CREPE at ~100 frames/sec.
  * Linear interpolation to align temporal resolution.
