@@ -57,8 +57,9 @@ export interface VcPipelineOptions {
 
 /**
  * Extract pitch using the selected algorithm.
+ * Exported so callers can get F0 without running the full encoder pipeline.
  */
-async function extractPitchWithAlgorithm(
+export async function extractPitchWithAlgorithm(
   samples: Float32Array,
   algorithm: PitchAlgorithm,
   hopMs: number,
