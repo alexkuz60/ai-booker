@@ -128,6 +128,13 @@ self.onmessage = async (e: MessageEvent) => {
           } else if (srcData instanceof Int32Array) {
             const copy = new Int32Array(srcData);
             outBuf = copy.buffer;
+          } else if (srcData instanceof Int16Array) {
+            const copy = new Int16Array(srcData);
+            outBuf = copy.buffer;
+          } else if (srcData instanceof Uint16Array) {
+            // float16 tensors come as Uint16Array
+            const copy = new Uint16Array(srcData);
+            outBuf = copy.buffer;
           } else {
             // Fallback: treat as float32
             const copy = new Float32Array(srcData as any);
