@@ -8,7 +8,14 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import {
+  createVcSession,
+  validateInferenceOutput,
+  WebGPUCorruptError,
+  releaseVcSession,
+  getSessionBackend,
+  setForcedBackend,
+} from "./vcInferenceSession";
 import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { ContentVecResult } from "./vcContentVec";
 
@@ -32,6 +39,20 @@ export async function extractWavLM(
     throw new Error(`WavLM requires ${EXPECTED_SR}Hz input, got ${sampleRate}Hz`);
   }
 
+  try {
+    return await _runWavLM(samples);
+  } catch (err) {
+    if (err instanceof WebGPUCorruptError && getSessionBackend("wavlm") === "webgpu") {
+      console.warn(`[WavLM] WebGPU corruption detected — falling back to WASM`);
+      await releaseVcSession("wavlm");
+      setForcedBackend("wasm");
+      return await _runWavLM(samples);
+    }
+    throw err;
+  }
+}
+
+async function _runWavLM(samples: Float32Array): Promise<ContentVecResult> {
   const session = await createVcSession("wavlm");
 
   // WavLM ONNX (Xenova/Transformers.js) uses input_values [1, T]
