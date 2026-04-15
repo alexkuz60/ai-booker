@@ -9,7 +9,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 import type { PitchFrame, CrepeResult } from "./vcCrepe";
 
 const EXPECTED_SR = 16_000;
@@ -234,6 +234,7 @@ export async function extractPitchRmvpe(
   if (!output) throw new Error(`RMVPE: no output. Available: ${Object.keys(results).join(", ")}`);
 
   const data = output.data as Float32Array;
+  validateInferenceOutput(data, "rmvpe", "pitch probabilities");
   const outputShape = output.dims;
 
   // Determine number of pitch bins from output shape

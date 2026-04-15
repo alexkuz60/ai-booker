@@ -19,7 +19,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 import { alignPitchToEmbeddings } from "./vcPipeline";
 import { applyFeatureRetrieval } from "./vcIndexSearch";
 import type { VcFeatures } from "./vcPipeline";
@@ -416,6 +416,9 @@ export async function synthesizeVoice(
 
   const rawAudio = new Float32Array(output.data as Float32Array);
 
+  // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
+  validateInferenceOutput(rawAudio, modelId, "RVC audio output");
+
   // Diagnostic: output tensor statistics
   {
     let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
@@ -428,12 +431,10 @@ export async function synthesizeVoice(
     }
     const mean = sum / rawAudio.length;
     const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
-    const nanCount = rawAudio.reduce((c, v) => c + (Number.isNaN(v) ? 1 : 0), 0);
-    const infCount = rawAudio.reduce((c, v) => c + (!Number.isFinite(v) && !Number.isNaN(v) ? 1 : 0), 0);
     console.info(
       `[vcSynthesis] OUTPUT "${outputName}": shape=[${output.dims}], ` +
       `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
-      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}, NaN=${nanCount}, Inf=${infCount}`
+      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
     );
   }
 

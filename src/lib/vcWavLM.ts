@@ -8,7 +8,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 import type { ContentVecResult } from "./vcContentVec";
 
 /** WavLM expects 16 kHz input */
@@ -85,6 +85,9 @@ export async function extractWavLM(
   // Shape is typically [1, T, 768] or [T, 768]
   const numFrames = shape.length === 3 ? shape[1] : shape[0];
   const dim = shape[shape.length - 1];
+
+  // Validate output — detect WebGPU corruption
+  validateInferenceOutput(data, "wavlm", "embeddings");
 
   console.info(
     `[WavLM] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`

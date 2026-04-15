@@ -7,7 +7,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 
 /** ContentVec expects 16 kHz input */
 const EXPECTED_SR = 16_000;
@@ -82,6 +82,9 @@ export async function extractContentVec(
   // Shape is typically [1, T, 768] or [T, 768]
   const numFrames = shape.length === 3 ? shape[1] : shape[0];
   const dim = shape[shape.length - 1];
+
+  // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
+  validateInferenceOutput(data, "contentvec", "embeddings");
 
   console.info(
     `[ContentVec] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
