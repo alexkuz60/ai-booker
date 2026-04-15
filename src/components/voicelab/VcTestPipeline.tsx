@@ -298,6 +298,9 @@ export function VcTestPipeline({
       audio.play().catch(() => { setPlaying(false); });
     } catch (err: any) {
       console.error("[VcTestPipeline] Test error:", err);
+      // Release ALL sessions on any pipeline failure to free VRAM
+      await releaseAllVcSessions().catch(() => {});
+      console.info("[VcTestPipeline] Sessions released after error");
       const isGpuCorrupt = err.name === "WebGPUCorruptError";
       const hint = isGpuCorrupt
         ? (isRu ? "\n⚠️ Рекомендуется переключить бэкенд на CPU (WASM)." : "\n⚠️ Consider switching backend to CPU (WASM).")
