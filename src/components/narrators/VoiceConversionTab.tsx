@@ -119,9 +119,9 @@ export function VoiceConversionTab({
       }
 
       try {
-        const refFeatures = await extractVcFeatures(blob, { pitchAlgorithm, encoder: vcEncoder });
+        const refFrames = await extractF0Only(blob, pitchAlgorithm);
         if (!cancelled) {
-          setRefF0(refFeatures.pitchFrames);
+          setRefF0(refFrames);
         }
       } catch (e) {
         console.warn("[VcTest] Failed to extract F0 from reference:", e);
