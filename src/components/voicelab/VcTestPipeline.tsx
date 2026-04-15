@@ -140,15 +140,24 @@ export function VcTestPipeline({
   }, []);
 
   const handleReplay = useCallback(() => {
-    if (!resultBlobUrl) return;
+    if (!rvcBlob) return;
     handleStop();
-    const audio = new Audio(resultBlobUrl);
+    const url = URL.createObjectURL(rvcBlob);
+    const audio = new Audio(url);
     audioRef.current = audio;
-    audio.onended = () => setPlaying(false);
-    audio.onerror = () => { setPlaying(false); toast.error(isRu ? "Ошибка воспроизведения" : "Playback error"); };
+    audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url); };
+    audio.onerror = () => {
+      setPlaying(false);
+      URL.revokeObjectURL(url);
+      toast.error(isRu ? "Ошибка воспроизведения RVC" : "RVC playback error");
+    };
     setPlaying(true);
-    audio.play().catch(() => { setPlaying(false); });
-  }, [resultBlobUrl, handleStop, isRu]);
+    audio.play().catch((err) => {
+      setPlaying(false);
+      URL.revokeObjectURL(url);
+      toast.error(err instanceof Error ? err.message : (isRu ? "Ошибка воспроизведения RVC" : "RVC playback error"));
+    });
+  }, [rvcBlob, handleStop, isRu]);
 
   const handleReplayTts = useCallback(() => {
     if (!ttsBlob) return;
@@ -358,7 +367,8 @@ export function VcTestPipeline({
               setters[slotIndex](frames);
             } catch (e) {
               console.warn("[SpectrogramPanel] F0 recalc error:", e);
-              toast.error(isRu ? "Ошибка пересчёта F0" : "F0 recalculation error");
+              const msg = e instanceof Error ? e.message : String(e);
+              toast.error(isRu ? `Ошибка пересчёта F0: ${msg}` : `F0 recalculation error: ${msg}`);
             } finally {
               setRecalcingSlots(prev => { const next = new Set(prev); next.delete(slotIndex); return next; });
             }

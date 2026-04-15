@@ -18,7 +18,9 @@ const DEFAULT_HOP_MS = 10; // 10ms hop → 100 Hz frame rate
 /** Number of CREPE pitch bins (360 bins covering 32–1975 Hz in cents scale) */
 const CREPE_BINS = 360;
 const CENTS_PER_BIN = 20;
-const FMIN_CENTS = 1997.3794; // 12 * 100 * log2(32.70)
+const FMIN_CENTS = 2051.1488; // 1200 * log2(32.70 / 10)
+const F0_MIN = 50;
+const F0_MAX = 1100;
 
 export interface PitchFrame {
   /** Time in seconds from start */
@@ -73,7 +75,11 @@ function decodePitch(probs: Float32Array): { frequency: number; confidence: numb
   }
   const refinedBin = weightTotal > 0 ? weightedSum / weightTotal : maxIdx;
 
-  return { frequency: binToFrequency(refinedBin), confidence };
+  const frequency = binToFrequency(refinedBin);
+  return {
+    frequency: frequency >= F0_MIN && frequency <= F0_MAX ? frequency : 0,
+    confidence,
+  };
 }
 
 /**
