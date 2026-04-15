@@ -31,13 +31,21 @@ interface WorkerTensorInput {
   dtype: string; // "float32" | "int64" | "bool"
 }
 
-function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): ort.Tensor["data"] {
+function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): { data: ort.Tensor["data"]; ortDtype: string } {
   switch (dtype) {
-    case "float32": return new Float32Array(buffer);
-    case "int64": return new BigInt64Array(buffer);
-    case "int32": return new Int32Array(buffer);
-    case "bool": return new Uint8Array(buffer);
-    default: return new Float32Array(buffer);
+    case "float32": return { data: new Float32Array(buffer), ortDtype: "float32" };
+    case "int64": return { data: new BigInt64Array(buffer), ortDtype: "int64" };
+    case "int32_as_int64": {
+      // Main thread sends int32 to avoid BigInt64Array serialization overhead.
+      // Convert to int64 here in the worker where ORT expects it.
+      const i32 = new Int32Array(buffer);
+      const i64 = new BigInt64Array(i32.length);
+      for (let i = 0; i < i32.length; i++) i64[i] = BigInt(i32[i]);
+      return { data: i64, ortDtype: "int64" };
+    }
+    case "int32": return { data: new Int32Array(buffer), ortDtype: "int32" };
+    case "bool": return { data: new Uint8Array(buffer), ortDtype: "bool" };
+    default: return { data: new Float32Array(buffer), ortDtype: "float32" };
   }
 }
 
@@ -94,8 +102,8 @@ self.onmessage = async (e: MessageEvent) => {
         // Build ORT tensors from serialized inputs
         const feeds: Record<string, ort.Tensor> = {};
         for (const inp of inputs) {
-          const data = bufferToTypedArray(inp.buffer, inp.dtype);
-          feeds[inp.name] = new ort.Tensor(inp.dtype as any, data, inp.dims);
+          const { data, ortDtype } = bufferToTypedArray(inp.buffer, inp.dtype);
+          feeds[inp.name] = new ort.Tensor(ortDtype as any, data, inp.dims);
         }
 
         // Run inference

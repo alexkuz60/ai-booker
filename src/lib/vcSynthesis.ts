@@ -293,16 +293,17 @@ export async function synthesizeVoice(
     pitchFine[i] = f0;
   }
 
-  // Prepare TensorDesc feeds — use int32 (WebGPU/WGSL has no int64 support)
+  // Prepare TensorDesc feeds — use int32_as_int64: ships as Int32Array (no BigInt
+  // serialization overhead), worker converts to BigInt64Array for ORT which requires int64.
   const featsDesc: TensorDesc = { data: upEmb, dims: [1, T, features.embeddingDim], dtype: "float32" };
-  const pLenDesc: TensorDesc = { data: Int32Array.from([T]), dims: [1], dtype: "int32" };
+  const pLenDesc: TensorDesc = { data: Int32Array.from([T]), dims: [1], dtype: "int32_as_int64" };
   const pitchDesc: TensorDesc = {
     data: Int32Array.from(pitchCoarse, (v) => Math.round(v)),
     dims: [1, T],
-    dtype: "int32",
+    dtype: "int32_as_int64",
   };
   const pitchfDesc: TensorDesc = { data: pitchFine, dims: [1, T], dtype: "float32" };
-  const sidDesc: TensorDesc = { data: Int32Array.from([speakerId]), dims: [1], dtype: "int32" };
+  const sidDesc: TensorDesc = { data: Int32Array.from([speakerId]), dims: [1], dtype: "int32_as_int64" };
 
   // Build feeds — match model's expected input names
   const inputNames = info.inputNames;

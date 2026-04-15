@@ -41,7 +41,7 @@ export interface VramUsageSnapshot {
 export interface TensorDesc {
   data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
   dims: number[];
-  dtype: "float32" | "int64" | "int32" | "bool";
+  dtype: "float32" | "int64" | "int32" | "int32_as_int64" | "bool";
 }
 
 /**
