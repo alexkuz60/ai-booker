@@ -137,7 +137,48 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-      </SidebarContent>
+
+        <Separator className="mx-3 my-1" />
+
+        {/* Experimental: Voice Lab */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {labNav.map((item) => {
+                const locked = isLocked(item.url);
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      tooltip={collapsed ? (lang === "ru" ? item.title : item.titleEn) + (locked ? " 🔒" : "") + " 🧪" : undefined}
+                    >
+                      <NavLink
+                        to={locked ? "#" : item.url}
+                        end={false}
+                        className={cn(
+                          "hover:bg-red-500/10 text-red-400/80 hover:text-red-400",
+                          locked && "opacity-40 cursor-not-allowed",
+                          isActive(item.url) && "bg-red-500/15 text-red-400"
+                        )}
+                        activeClassName="bg-red-500/15 text-red-400"
+                        onClick={(e: React.MouseEvent) => handleNavClick(item.url, e)}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && (
+                          <span className="font-body text-sm flex items-center gap-1.5">
+                            {lang === "ru" ? item.title : item.titleEn}
+                            {locked && <Lock className="h-3 w-3" />}
+                          </span>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
       {/* Footer: toggles + profile */}
       <SidebarFooter className="px-2 pb-3 space-y-1">
