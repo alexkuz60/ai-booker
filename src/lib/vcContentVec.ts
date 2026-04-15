@@ -65,7 +65,9 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
     if (key === "source" || key === "input" || key === "audio") {
       feeds[name] = { data: new Float32Array(samples), dims: [1, 1, samples.length], dtype: "float32" };
     } else if (key === "padding_mask" || key === "attention_mask") {
-      feeds[name] = { data: new Uint8Array(samples.length), dims: [1, samples.length], dtype: "bool" };
+      const mask = new Uint8Array(samples.length);
+      mask.fill(1); // 1 = attend to all positions; 0 = ignore
+      feeds[name] = { data: mask, dims: [1, samples.length], dtype: "bool" };
     }
   }
   if (Object.keys(feeds).length === 0) {
