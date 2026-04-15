@@ -83,17 +83,12 @@ export async function synthesizeF5(
   // ── Stage 1: Encoder ──
   const tEnc0 = performance.now();
 
-  // Reference audio: Int16 sent as Int32 (ORT expects int32 for this input)
-  const refAudioI32 = new Int32Array(reference.audio.length);
-  for (let i = 0; i < reference.audio.length; i++) {
-    refAudioI32[i] = reference.audio[i];
-  }
-
+  // Reference audio: encoder expects raw int16 PCM
   const encoderInputs: Record<string, TensorDesc> = {
     audio: {
-      data: refAudioI32,
+      data: reference.audio,
       dims: [1, 1, reference.samples],
-      dtype: "int32",
+      dtype: "int16",
     },
     text_ids: {
       data: tokens,
