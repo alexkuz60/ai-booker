@@ -119,7 +119,7 @@ export default function VoiceLab() {
     if (!projectStorage) { setCharacters([]); return; }
     try {
       const localChars = await readCharacterIndex(projectStorage);
-      const chars: LabCharacter[] = localChars.map(c => ({
+      const chars: LabCharacter[] = localChars.filter(c => !!(c.voice_config as any)?.voice_id).map(c => ({
         id: c.id,
         name: c.name,
         gender: c.gender,
