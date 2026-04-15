@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
+import { F5TtsLabPanel } from "@/components/voicelab/F5TtsLabPanel";
 import { buildTtsRequestFromConfig } from "@/lib/buildTtsRequestFromConfig";
 import { PROVIDER_LABELS, getVoiceDisplayName } from "@/lib/voiceMatching";
 import type { CharacterIndex } from "@/pages/parser/types";
@@ -57,6 +58,7 @@ const TABS: SidebarTab[] = [
   { id: "references", label: { ru: "Референсы", en: "References" }, icon: Music },
   { id: "indexes", label: { ru: "Индексы", en: "Indexes" }, icon: Database },
   { id: "vc", label: { ru: "Voice Conversion", en: "Voice Conversion" }, icon: Zap },
+  { id: "f5tts", label: { ru: "F5-TTS", en: "F5-TTS" }, icon: FlaskConical },
 ];
 
 // ─── Character type for VC ──────────────────────────
@@ -534,6 +536,10 @@ export default function VoiceLab() {
               onSaveVcConfig={handleSaveVcConfig}
               projectStorage={projectStorage}
             />
+          )}
+
+          {effectiveTab === "f5tts" && (
+            <F5TtsLabPanel isRu={isRu} />
           )}
         </div>
       </ScrollArea>
