@@ -15,7 +15,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { convertVoiceFull, extractF0Only, type VcPipelineOptions } from "@/lib/vcPipeline";
-import { getModelStatus, VC_MODEL_REGISTRY } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, hasModel } from "@/lib/vcModelCache";
 import type { PitchAlgorithm, SpeechEncoder } from "@/lib/vcModelCache";
 import type { RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
@@ -186,6 +186,23 @@ export function VcTestPipeline({
       if (missing.length > 0) {
         setErrorMsg(isRu ? `Модели не загружены: ${missing.map(m => m.label).join(", ")}.` : `Models not cached: ${missing.map(m => m.label).join(", ")}.`);
         setStage("error"); return;
+      }
+      // Check selected pitch model availability (optional models like crepe-full, rmvpe, swiftf0)
+      if (pitchAlgorithm !== "crepe-tiny") {
+        const pitchReady = await hasModel(pitchAlgorithm);
+        if (!pitchReady) {
+          const algoName = pitchAlgorithm === "crepe-full" ? "CREPE Full" : pitchAlgorithm === "rmvpe" ? "RMVPE" : "SwiftF0";
+          setErrorMsg(isRu ? `Pitch-модель «${algoName}» не загружена. Скачайте её в разделе «Модели».` : `Pitch model "${algoName}" is not downloaded. Download it in the "Models" section.`);
+          setStage("error"); return;
+        }
+      }
+      // Check selected encoder model availability
+      if (vcEncoder !== "contentvec") {
+        const encReady = await hasModel(vcEncoder);
+        if (!encReady) {
+          setErrorMsg(isRu ? `Энкодер «WavLM» не загружен. Скачайте его в разделе «Модели».` : `Encoder "WavLM" is not downloaded. Download it in the "Models" section.`);
+          setStage("error"); return;
+        }
       }
       const req = buildTtsRequest();
       if (!req) { setErrorMsg(isRu ? "Не удалось построить TTS-запрос" : "Failed to build TTS request"); setStage("error"); return; }
@@ -361,6 +378,15 @@ export function VcTestPipeline({
             const setters = [setTtsF0, setRefF0, setRvcF0];
             const blob = blobs[slotIndex];
             if (!blob) return;
+            // Check pitch model availability before recalc
+            if (pitchAlgorithm !== "crepe-tiny") {
+              const pitchReady = await hasModel(pitchAlgorithm);
+              if (!pitchReady) {
+                const algoName = pitchAlgorithm === "crepe-full" ? "CREPE Full" : pitchAlgorithm === "rmvpe" ? "RMVPE" : "SwiftF0";
+                toast.error(isRu ? `Pitch-модель «${algoName}» не загружена` : `Pitch model "${algoName}" not downloaded`);
+                return;
+              }
+            }
             setRecalcingSlots(prev => new Set(prev).add(slotIndex));
             try {
               const frames = await extractF0Only(blob, pitchAlgorithm);

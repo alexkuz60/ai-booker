@@ -113,13 +113,21 @@ export async function createVcSession(
   console.info(`[vcSession] Creating session for "${modelId}" (backend: ${backend}, ${(buffer.byteLength / 1e6).toFixed(1)} MB)`);
   const startMs = performance.now();
 
-  const session = await ort.InferenceSession.create(
+  // Timeout for session creation — large models can hang during shader compilation
+  const SESSION_TIMEOUT_MS = 120_000; // 2 minutes max
+  const sessionPromise = ort.InferenceSession.create(
     new Uint8Array(buffer),
     {
       executionProviders,
       graphOptimizationLevel: graphOpt,
     },
   );
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(
+      `Session creation for "${modelId}" timed out after ${SESSION_TIMEOUT_MS / 1000}s. Try switching to CPU (WASM) backend.`
+    )), SESSION_TIMEOUT_MS),
+  );
+  const session = await Promise.race([sessionPromise, timeoutPromise]);
 
   const elapsed = Math.round(performance.now() - startMs);
   const actualBackend = executionProviders[0] as VcBackend;
