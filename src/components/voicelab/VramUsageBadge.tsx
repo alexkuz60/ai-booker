@@ -32,7 +32,7 @@ export function VramUsageBadge({ isRu, className }: VramUsageBadgeProps) {
         <Gauge className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {isRu ? "Текущий VRAM" : "Current VRAM"}
+            {isRu ? "VRAM (оценка)" : "VRAM (estimate)"}
           </p>
           <div className="mt-0.5 flex items-center gap-1.5">
             <span className="text-xs font-medium tabular-nums text-foreground">

@@ -29,6 +29,7 @@ import {
   HardDrive, FlaskConical, BarChart3,
 } from "lucide-react";
 import { IndexStatsPanel } from "@/components/voicelab/IndexStatsPanel";
+import { VramUsageBadge } from "@/components/voicelab/VramUsageBadge";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -448,7 +449,7 @@ export default function VoiceLab() {
           })}
         </nav>
         {/* Status badges */}
-        <div className="p-3 border-t border-border space-y-1">
+        <div className="p-3 border-t border-border space-y-2">
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             {coreModelsReady
               ? <CheckCircle2 className="h-3 w-3 text-primary" />
@@ -463,6 +464,7 @@ export default function VoiceLab() {
             <Database className="h-3 w-3" />
             <span>{isRu ? "Индексы" : "Indexes"}: {localIndexes.length}</span>
           </div>
+          <VramUsageBadge isRu={isRu} />
         </div>
       </div>
 
