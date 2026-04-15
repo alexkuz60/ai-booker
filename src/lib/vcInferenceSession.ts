@@ -212,16 +212,3 @@ export function validateInferenceOutput(
   }
 }
 
-/**
- * Force switch to WASM backend: release all sessions, set forced backend.
- * Returns true if backend was actually changed.
- */
-export async function forceWasmFallback(): Promise<boolean> {
-  const current = forcedBackend ?? resolvedBackend;
-  if (current === "wasm") return false;
-  console.warn(`[vcSession] ⚠️ Forcing WASM fallback due to WebGPU corruption`);
-  await releaseAllVcSessions();
-  forcedBackend = "wasm";
-  resolvedBackend = "wasm";
-  return true;
-}

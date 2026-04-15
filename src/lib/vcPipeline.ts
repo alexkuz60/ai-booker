@@ -236,19 +236,7 @@ export async function convertVoiceFull(
   audio: ArrayBuffer | Blob,
   options?: VcPipelineOptions,
 ): Promise<VcFullResult> {
-  try {
-    return await _convertVoiceFullImpl(audio, options);
-  } catch (err) {
-    if (err instanceof WebGPUCorruptError) {
-      console.warn(`[vcPipeline] WebGPU corruption detected, retrying with WASM...`, err.message);
-      const switched = await forceWasmFallback();
-      if (switched) {
-        options?.onProgress?.("resample", 0);
-        return await _convertVoiceFullImpl(audio, options);
-      }
-    }
-    throw err;
-  }
+  return _convertVoiceFullImpl(audio, options);
 }
 
 /** Internal implementation of the full VC pipeline */
