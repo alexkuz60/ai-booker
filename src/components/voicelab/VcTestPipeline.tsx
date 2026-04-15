@@ -254,7 +254,11 @@ export function VcTestPipeline({
       audio.play().catch(() => { setPlaying(false); });
     } catch (err: any) {
       console.error("[VcTestPipeline] Test error:", err);
-      setErrorMsg(err.message || String(err));
+      const isGpuCorrupt = err.name === "WebGPUCorruptError";
+      const hint = isGpuCorrupt
+        ? (isRu ? "\n⚠️ Рекомендуется переключить бэкенд на CPU (WASM)." : "\n⚠️ Consider switching backend to CPU (WASM).")
+        : "";
+      setErrorMsg((err.message || String(err)) + hint);
       setStage("error");
     }
   }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder, dryWet, activeBackend, vcReferenceId, onF0Extracted]);
