@@ -13,7 +13,7 @@ import type { BookerProState } from "@/hooks/useBookerPro";
 import { useGpuDevices } from "@/hooks/useGpuDevices";
 import { MyDevicesPanel } from "@/components/profile/tabs/MyDevicesPanel";
 import { GpuStatusCard } from "@/components/profile/tabs/GpuStatusCard";
-import { ModelDownloadPanel } from "@/components/profile/tabs/ModelDownloadPanel";
+
 
 interface BookerProSectionProps {
   pro: BookerProState;
