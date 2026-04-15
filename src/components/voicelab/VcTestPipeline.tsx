@@ -341,9 +341,9 @@ export function VcTestPipeline({
         <SpectrogramPanel
           isRu={isRu}
           slots={[
-            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(255, 255, 255, 0.9)" },
-            { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(255, 255, 255, 0.9)" },
-            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(255, 255, 255, 0.9)" },
+            { label: isRu ? "Вход: TTS" : "Input: TTS", blob: ttsBlob, f0Frames: ttsF0, f0Color: "rgba(0, 0, 0, 0.9)" },
+            { label: isRu ? "Референс" : "Reference", blob: refBlob, f0Frames: refF0, f0Color: "rgba(0, 0, 0, 0.9)" },
+            { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(0, 0, 0, 0.9)" },
           ]}
           onClose={() => setShowSpectrograms(false)}
           recalcingSlots={recalcingSlots}
