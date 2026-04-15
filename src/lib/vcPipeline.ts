@@ -163,6 +163,8 @@ export async function extractF0Only(
   const { samples: rawSamples } = await resampleTo16kMono(audio);
   const { samples } = normalizeRms(rawSamples);
   const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
+  // Release the pitch session to free VRAM — F0-only is often called ad-hoc
+  await releaseVcSession(pitchAlgorithm).catch(() => {});
   return result.frames;
 }
 
