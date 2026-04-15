@@ -160,3 +160,68 @@ export async function releaseAllVcSessions(): Promise<void> {
 export function getLoadedSessions(): string[] {
   return Array.from(sessionCache.keys());
 }
+
+// ── WebGPU corruption detection ─────────────────────────────────────────
+
+/**
+ * Custom error class thrown when ONNX inference output is corrupted
+ * (all zeros, NaN, Inf). Signals the pipeline to retry with WASM.
+ */
+export class WebGPUCorruptError extends Error {
+  constructor(modelId: string, detail: string) {
+    super(`[WebGPUCorrupt] Model "${modelId}": ${detail}`);
+    this.name = "WebGPUCorruptError";
+  }
+}
+
+/**
+ * Validate Float32Array output from ONNX inference.
+ * Throws WebGPUCorruptError if output is all zeros, contains NaN/Inf,
+ * or has suspiciously low variance (likely corrupted).
+ */
+export function validateInferenceOutput(
+  data: Float32Array,
+  modelId: string,
+  label = "output",
+): void {
+  if (data.length === 0) {
+    throw new WebGPUCorruptError(modelId, `${label} is empty`);
+  }
+  let nanCount = 0, infCount = 0, zeroCount = 0;
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (Number.isNaN(v)) { nanCount++; continue; }
+    if (!Number.isFinite(v)) { infCount++; continue; }
+    if (v === 0) zeroCount++;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  if (nanCount > 0) {
+    throw new WebGPUCorruptError(modelId, `${label} contains ${nanCount} NaN values`);
+  }
+  if (infCount > 0) {
+    throw new WebGPUCorruptError(modelId, `${label} contains ${infCount} Inf values`);
+  }
+  if (zeroCount === data.length) {
+    throw new WebGPUCorruptError(modelId, `${label} is all zeros (${data.length} samples)`);
+  }
+  // If >99% zeros with tiny range, likely corrupted
+  if (zeroCount > data.length * 0.99 && max - min < 1e-10) {
+    throw new WebGPUCorruptError(modelId, `${label} is effectively silent (${zeroCount}/${data.length} zeros)`);
+  }
+}
+
+/**
+ * Force switch to WASM backend: release all sessions, set forced backend.
+ * Returns true if backend was actually changed.
+ */
+export async function forceWasmFallback(): Promise<boolean> {
+  const current = forcedBackend ?? resolvedBackend;
+  if (current === "wasm") return false;
+  console.warn(`[vcSession] ⚠️ Forcing WASM fallback due to WebGPU corruption`);
+  await releaseAllVcSessions();
+  forcedBackend = "wasm";
+  resolvedBackend = "wasm";
+  return true;
+}

@@ -7,7 +7,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 
 /** ContentVec expects 16 kHz input */
 const EXPECTED_SR = 16_000;

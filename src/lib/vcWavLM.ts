@@ -8,7 +8,7 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession } from "./vcInferenceSession";
+import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
 import type { ContentVecResult } from "./vcContentVec";
 
 /** WavLM expects 16 kHz input */
