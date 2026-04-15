@@ -7,7 +7,14 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import {
+  createVcSession,
+  validateInferenceOutput,
+  WebGPUCorruptError,
+  releaseVcSession,
+  getSessionBackend,
+  setForcedBackend,
+} from "./vcInferenceSession";
 import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 
 /** ContentVec expects 16 kHz input */

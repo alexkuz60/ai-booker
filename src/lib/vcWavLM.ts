@@ -8,7 +8,14 @@
  */
 
 import * as ort from "onnxruntime-web";
-import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import {
+  createVcSession,
+  validateInferenceOutput,
+  WebGPUCorruptError,
+  releaseVcSession,
+  getSessionBackend,
+  setForcedBackend,
+} from "./vcInferenceSession";
 import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { ContentVecResult } from "./vcContentVec";
 
