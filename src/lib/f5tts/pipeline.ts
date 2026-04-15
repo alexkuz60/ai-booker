@@ -95,7 +95,7 @@ export async function synthesizeF5(
       dims: [1, 1, reference.samples],
       dtype: "int32",
     },
-    text: {
+    text_ids: {
       data: tokens,
       dims: [1, tokens.length],
       dtype: "int32",
