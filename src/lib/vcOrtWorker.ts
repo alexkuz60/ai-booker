@@ -34,6 +34,7 @@ interface WorkerTensorInput {
 function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): { data: ort.Tensor["data"]; ortDtype: string } {
   switch (dtype) {
     case "float32": return { data: new Float32Array(buffer), ortDtype: "float32" };
+    case "float16": return { data: new Uint16Array(buffer), ortDtype: "float16" };
     case "int64": return { data: new BigInt64Array(buffer), ortDtype: "int64" };
     case "int32_as_int64": {
       // Main thread sends int32 to avoid BigInt64Array serialization overhead.
@@ -44,6 +45,7 @@ function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): { data: ort.Ten
       return { data: i64, ortDtype: "int64" };
     }
     case "int32": return { data: new Int32Array(buffer), ortDtype: "int32" };
+    case "int16": return { data: new Int16Array(buffer), ortDtype: "int16" };
     case "bool": return { data: new Uint8Array(buffer), ortDtype: "bool" };
     default: return { data: new Float32Array(buffer), ortDtype: "float32" };
   }
