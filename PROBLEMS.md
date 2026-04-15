@@ -188,6 +188,13 @@
 - Инвариант: `openOrCreate` допустим ТОЛЬКО в 4 точках: createProject, importZip, createTranslationProject, restoreTranslation.
 - Файлы: `useProjectStorage.ts`, `useLibrary.ts`, `LibraryView.tsx`, `localProjectResolver.ts`, `projectCleanup.ts`, `useBookRestore.ts`, `translationProject.ts`, `Translation.tsx`.
 
+### ББ. All-zeros RVC output при использовании RMVPE — ✅ РЕШЕНО (B33)
+- Проблема: при выборе RMVPE (золотой стандарт pitch extraction) RVC-синтез стабильно возвращал массив нулей (`all zeros, 203200 samples`). С другими питчерами (CREPE Tiny/Full, SwiftF0) пайплайн работал корректно.
+- Корневая причина: три одновременных WebGPU-сессии (encoder + RMVPE + RVC v2) превышали VRAM-бюджет GPU. RMVPE тяжелее остальных питчеров (~200 МБ), что приводило к контенции GPU-ресурсов и corrupted выходу RVC.
+- Решение: staged GPU release — encoder и pitch сессии освобождаются **до** запуска RVC-синтеза. GPU получает чистые ресурсы для RVC. Пиковое потребление VRAM снизилось с ~2600 МБ до ~1200 МБ.
+- Побочный эффект: все питчеры стали работать заметно быстрее (RVC работает без конкуренции за GPU).
+- Файл: `src/lib/vcPipeline.ts`.
+
 ### Ф. Сброс pipeline-флагов перевода при перезагрузке — ✅ РЕШЕНО (B21)
 - Проблема: конкурентные записи в `project.json` при холодном старте перезаписывали метаданные без `pipelineProgress`.
 - Решение: `readProjectMetaForWrite()` с retry при первом `null`, блокировка записи если meta остаётся `null`.
