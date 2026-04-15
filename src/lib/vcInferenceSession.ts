@@ -42,6 +42,33 @@ const sessionBackends = new Map<string, VcBackend>();
 /** Serialize ONNX inference per model — ORT rejects concurrent session.run() calls */
 const sessionRunQueues = new Map<string, Promise<void>>();
 
+/** Deduplicate concurrent session creation per model to avoid orphaned GPU sessions */
+const sessionCreatePromises = new Map<string, Promise<ort.InferenceSession>>();
+
+/** Reference count active users of a model session */
+const sessionRefCounts = new Map<string, number>();
+
+function retainSession(modelId: string): void {
+  sessionRefCounts.set(modelId, (sessionRefCounts.get(modelId) ?? 0) + 1);
+}
+
+function releaseSessionRef(modelId: string): number {
+  const current = sessionRefCounts.get(modelId) ?? 0;
+  if (current <= 1) {
+    sessionRefCounts.delete(modelId);
+    return 0;
+  }
+  const next = current - 1;
+  sessionRefCounts.set(modelId, next);
+  return next;
+}
+
+async function waitForSessionCreation(modelId: string): Promise<void> {
+  const pending = sessionCreatePromises.get(modelId);
+  if (!pending) return;
+  await pending.catch(() => undefined);
+}
+
 async function runSessionExclusive<T>(modelId: string, task: () => Promise<T>): Promise<T> {
   const previous = sessionRunQueues.get(modelId);
   if (previous) {
@@ -154,69 +181,109 @@ export async function createVcSession(
   modelId: string,
   options?: VcSessionOptions,
 ): Promise<ort.InferenceSession> {
-  // Return cached session if available
+  retainSession(modelId);
+
   const cached = sessionCache.get(modelId);
   if (cached) return cached;
 
-  // Read model from OPFS
-  const buffer = await readModel(modelId);
-  if (!buffer) {
-    throw new Error(`[vcSession] Model "${modelId}" not found in OPFS cache. Download it first.`);
+  const pending = sessionCreatePromises.get(modelId);
+  if (pending) {
+    console.info(`[vcSession] Awaiting in-flight session creation for "${modelId}"`);
+    try {
+      return await pending;
+    } catch (error) {
+      releaseSessionRef(modelId);
+      throw error;
+    }
   }
 
-  const backend = options?.preferredBackend ?? (await getAvailableBackend());
-  const graphOpt = options?.graphOptimization ?? "all";
+  const createPromise = (async (): Promise<ort.InferenceSession> => {
+    const buffer = await readModel(modelId);
+    if (!buffer) {
+      throw new Error(`[vcSession] Model "${modelId}" not found in OPFS cache. Download it first.`);
+    }
 
-  // Build execution providers list with fallback
-  const executionProviders: string[] =
-    backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
+    const backend = options?.preferredBackend ?? (await getAvailableBackend());
+    const graphOpt = options?.graphOptimization ?? "all";
 
-  console.info(`[vcSession] Creating session for "${modelId}" (backend: ${backend}, ${(buffer.byteLength / 1e6).toFixed(1)} MB)`);
-  const startMs = performance.now();
+    // Build execution providers list with fallback
+    const executionProviders: string[] =
+      backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
 
-  // Timeout for session creation — large models can hang during shader compilation
-  const SESSION_TIMEOUT_MS = 120_000; // 2 minutes max
-  const sessionPromise = ort.InferenceSession.create(
-    new Uint8Array(buffer),
-    {
-      executionProviders,
-      graphOptimizationLevel: graphOpt,
-    },
-  );
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(
-      `Session creation for "${modelId}" timed out after ${SESSION_TIMEOUT_MS / 1000}s. Try switching to CPU (WASM) backend.`
-    )), SESSION_TIMEOUT_MS),
-  );
-  const session = await Promise.race([sessionPromise, timeoutPromise]);
+    console.info(`[vcSession] Creating session for "${modelId}" (backend: ${backend}, ${(buffer.byteLength / 1e6).toFixed(1)} MB)`);
+    const startMs = performance.now();
 
-  const elapsed = Math.round(performance.now() - startMs);
-  const actualBackend = executionProviders[0] as VcBackend;
-  console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms (backend: ${actualBackend})`);
+    // Timeout for session creation — large models can hang during shader compilation
+    const SESSION_TIMEOUT_MS = 120_000; // 2 minutes max
+    const sessionPromise = ort.InferenceSession.create(
+      new Uint8Array(buffer),
+      {
+        executionProviders,
+        graphOptimizationLevel: graphOpt,
+      },
+    );
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(
+        `Session creation for "${modelId}" timed out after ${SESSION_TIMEOUT_MS / 1000}s. Try switching to CPU (WASM) backend.`
+      )), SESSION_TIMEOUT_MS),
+    );
+    const session = await Promise.race([sessionPromise, timeoutPromise]);
 
-  const lockedSession = createLockedSession(modelId, session);
-  sessionCache.set(modelId, lockedSession);
-  sessionTargets.set(modelId, session);
-  sessionSizes.set(modelId, buffer.byteLength);
-  sessionBackends.set(modelId, actualBackend);
-  logVramUsage("load", modelId);
-  return lockedSession;
+    const elapsed = Math.round(performance.now() - startMs);
+    const actualBackend = executionProviders[0] as VcBackend;
+    console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms (backend: ${actualBackend})`);
+
+    const lockedSession = createLockedSession(modelId, session);
+    sessionCache.set(modelId, lockedSession);
+    sessionTargets.set(modelId, session);
+    sessionSizes.set(modelId, buffer.byteLength);
+    sessionBackends.set(modelId, actualBackend);
+    logVramUsage("load", modelId);
+    return lockedSession;
+  })();
+
+  sessionCreatePromises.set(modelId, createPromise);
+
+  try {
+    return await createPromise;
+  } catch (error) {
+    releaseSessionRef(modelId);
+    throw error;
+  } finally {
+    if (sessionCreatePromises.get(modelId) === createPromise) {
+      sessionCreatePromises.delete(modelId);
+    }
+  }
 }
 
 /** Release a cached session */
 export async function releaseVcSession(modelId: string): Promise<void> {
+  await waitForSessionCreation(modelId);
+
+  const remainingRefs = releaseSessionRef(modelId);
+  if (remainingRefs > 0) {
+    console.info(`[vcSession] Retaining session "${modelId}" (${remainingRefs} refs left)`);
+    return;
+  }
+
   await waitForSessionIdle(modelId);
+
+  if ((sessionRefCounts.get(modelId) ?? 0) > 0) {
+    console.info(`[vcSession] Skip release for "${modelId}" — session was reacquired`);
+    return;
+  }
 
   const session = sessionTargets.get(modelId) ?? sessionCache.get(modelId);
   if (session) {
+    sessionCache.delete(modelId);
+    sessionTargets.delete(modelId);
+    sessionSizes.delete(modelId);
+    sessionBackends.delete(modelId);
+    sessionRunQueues.delete(modelId);
+
     try {
       await session.release();
     } finally {
-      sessionCache.delete(modelId);
-      sessionTargets.delete(modelId);
-      sessionSizes.delete(modelId);
-      sessionBackends.delete(modelId);
-      sessionRunQueues.delete(modelId);
       logVramUsage("release", modelId);
     }
   }
@@ -224,6 +291,10 @@ export async function releaseVcSession(modelId: string): Promise<void> {
 
 /** Release all cached sessions */
 export async function releaseAllVcSessions(): Promise<void> {
+  if (sessionCreatePromises.size > 0) {
+    await Promise.allSettled(Array.from(sessionCreatePromises.values()));
+  }
+
   const ids = Array.from(new Set([
     ...sessionCache.keys(),
     ...sessionTargets.keys(),
@@ -233,15 +304,26 @@ export async function releaseAllVcSessions(): Promise<void> {
     await waitForSessionIdle(modelId);
   }
 
-  for (const modelId of ids) {
-    const session = sessionTargets.get(modelId) ?? sessionCache.get(modelId);
-    try { await session.release(); } catch { /* ok */ }
-  }
+  const sessions = ids
+    .map((modelId) => sessionTargets.get(modelId) ?? sessionCache.get(modelId))
+    .filter((session): session is ort.InferenceSession => !!session);
+
   sessionCache.clear();
   sessionTargets.clear();
   sessionSizes.clear();
   sessionBackends.clear();
   sessionRunQueues.clear();
+  sessionCreatePromises.clear();
+  sessionRefCounts.clear();
+
+  for (const session of sessions) {
+    try {
+      await session.release();
+    } catch {
+      // ok
+    }
+  }
+
   console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
 }
 
@@ -300,4 +382,3 @@ export function validateInferenceOutput(
     throw new WebGPUCorruptError(modelId, `${label} is effectively silent (${zeroCount}/${data.length} zeros)`);
   }
 }
-
