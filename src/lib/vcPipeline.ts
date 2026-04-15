@@ -164,6 +164,7 @@ export async function extractF0Only(
 }
 
 
+/**
  * Interpolate F0 to match ContentVec frame count.
  * ContentVec produces ~50 frames/sec, CREPE at ~100 frames/sec.
  * Linear interpolation to align temporal resolution.
