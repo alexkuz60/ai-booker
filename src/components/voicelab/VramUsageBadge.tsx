@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Gauge, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   getVramUsageSnapshot,
   subscribeVramUsage,
+  releaseAllVcSessions,
   type VramUsageSnapshot,
 } from "@/lib/vcInferenceSession";
 
