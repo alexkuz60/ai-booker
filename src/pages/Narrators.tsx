@@ -701,9 +701,6 @@ const Narrators = () => {
                       <TabsTrigger value="salutespeech" className="flex-1 text-xs">Salute</TabsTrigger>
                       <TabsTrigger value="elevenlabs" className="flex-1 text-xs">ElevenLabs</TabsTrigger>
                       <TabsTrigger value="proxyapi" className="flex-1 text-xs">OpenAI</TabsTrigger>
-                      <TabsTrigger value="vc" className="flex-1 text-xs gap-1">
-                        <Zap className="h-3 w-3" />VC
-                      </TabsTrigger>
                     </TabsList>
 
                     {/* ─── Yandex ─── */}
@@ -874,18 +871,6 @@ const Narrators = () => {
                       </div>
                     </TabsContent>
 
-                    {/* ─── Voice Conversion (Booker Pro) ─── */}
-                    <TabsContent value="vc">
-                      <VoiceConversionTab
-                        isRu={isRu}
-                        characterName={selectedChar.name}
-                        characterId={selectedChar.id}
-                        voiceConfig={selectedChar.voice_config}
-                        onUpdateVcConfig={handleUpdateVcConfig}
-                        ttsProvider={voiceProvider}
-                        buildTtsRequest={buildTtsRequest}
-                      />
-                    </TabsContent>
                   </Tabs>
 
                   <Separator />
