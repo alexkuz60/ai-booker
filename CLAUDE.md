@@ -163,7 +163,8 @@ When restoring from server (`openSavedBook`):
 - **Core models** (ContentVec, CREPE Tiny, RVC v2) are required for Booker Pro activation.
 - **Pitch models** (CREPE Full, SwiftF0, RMVPE) are optional, downloaded on demand.
 - **Encoder models** (WavLM-Base-Plus INT8) are optional, recommended for expressive TTS.
-- Pipeline stages: resample → **RMS normalize** → encoder (ContentVec|WavLM) → pitch (F0) → RVC v2 → WAV.
+- Pipeline stages: resample → **RMS normalize** → encoder (ContentVec|WavLM) → pitch (F0) → **release encoder+pitch** → RVC v2 → WAV.
+- **Staged GPU release**: encoder and pitch sessions are released BEFORE RVC synthesis to avoid GPU contention (especially with RMVPE).
 - RMS normalization targets -23 dBFS with soft ceiling limiter at -1 dBFS.
 - `SpeechEncoder` type: `"contentvec" | "wavlm"` — stored in `voice_config.vc_encoder`.
 - WavLM-Base-Plus outputs 768-dim embeddings — drop-in compatible with RVC v2 decoder.
