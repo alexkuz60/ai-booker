@@ -537,6 +537,10 @@ export default function VoiceLab() {
               projectStorage={projectStorage}
             />
           )}
+
+          {effectiveTab === "f5tts" && (
+            <F5TtsLabPanel isRu={isRu} />
+          )}
         </div>
       </ScrollArea>
     </div>
