@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { renderSpectrogramFromBlob, type SpectrogramOptions } from "@/lib/vcSpectrogram";
 import type { PitchFrame } from "@/lib/vcCrepe";
-import { X, BarChart3 } from "lucide-react";
+import { X, BarChart3, RefreshCw } from "lucide-react";
 
 export interface SpectrogramSlot {
   label: string;
@@ -24,13 +24,17 @@ interface SpectrogramPanelProps {
   isRu: boolean;
   slots: SpectrogramSlot[];
   onClose?: () => void;
+  /** Callback to recalculate F0 for a specific slot index */
+  onRecalcF0?: (slotIndex: number) => void;
+  /** Which slot indices are currently recalculating */
+  recalcingSlots?: Set<number>;
 }
 
 const RENDER_HEIGHT = 160;
 const BASE_FFT = 2048;
 const BASE_HOP = 256;
 
-export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps) {
+export function SpectrogramPanel({ isRu, slots, onClose, onRecalcF0, recalcingSlots }: SpectrogramPanelProps) {
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [rendering, setRendering] = useState(false);
@@ -116,14 +120,28 @@ export function SpectrogramPanel({ isRu, slots, onClose }: SpectrogramPanelProps
         {slots.map((slot, idx) => (
           <div key={idx} className="relative w-full min-w-0">
             {slot.blob ? (
-              <canvas
-                key={`canvas-${idx}-${canvasWidth}`}
-                ref={(el) => { canvasRefs.current[idx] = el; }}
-                width={canvasWidth || 480}
-                height={RENDER_HEIGHT}
-                className="block w-full rounded border border-border/30 bg-black"
-                style={{ imageRendering: "pixelated" }}
-              />
+              <>
+                <canvas
+                  key={`canvas-${idx}-${canvasWidth}`}
+                  ref={(el) => { canvasRefs.current[idx] = el; }}
+                  width={canvasWidth || 480}
+                  height={RENDER_HEIGHT}
+                  className="block w-full rounded border border-border/30 bg-black"
+                  style={{ imageRendering: "pixelated" }}
+                />
+                {onRecalcF0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-1 right-1 h-6 gap-1 px-1.5 text-[10px] bg-black/50 hover:bg-black/70 text-white/80 hover:text-white"
+                    disabled={recalcingSlots?.has(idx)}
+                    onClick={() => onRecalcF0(idx)}
+                  >
+                    <RefreshCw className={`h-3 w-3 ${recalcingSlots?.has(idx) ? "animate-spin" : ""}`} />
+                    F0
+                  </Button>
+                )}
+              </>
             ) : (
               <div
                 className="flex items-center justify-center rounded border border-dashed border-border/30 bg-muted/40"
