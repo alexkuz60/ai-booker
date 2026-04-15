@@ -255,12 +255,12 @@ export function renderSpectrogram(
   const numBins = fftSize / 2;
   const dbRange = maxDb - minDb;
   const nyquist = sampleRate / 2;
+  const spectroWidth = width - FREQ_AXIS_WIDTH;
 
   // Build mel-scale bin lookup table
   const melBins = buildMelBinLookup(height, numBins, nyquist);
 
   // Create ImageData for spectrogram area only
-  const spectroWidth = width - FREQ_AXIS_WIDTH;
   const imgData = ctx.createImageData(spectroWidth, height);
   const data = imgData.data;
 
@@ -317,7 +317,6 @@ export function renderSpectrogram(
   // ── F0 pitch contour overlay ──
   if (f0Frames && f0Frames.length > 0) {
     const durationSec = samples.length / sampleRate;
-    const spectroWidth = width - FREQ_AXIS_WIDTH;
     ctx.strokeStyle = f0Color;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([]);
@@ -363,7 +362,6 @@ export function renderSpectrogram(
 
   // Draw time axis
   const durationSec = samples.length / sampleRate;
-  const spectroWidth = width - FREQ_AXIS_WIDTH;
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = "9px monospace";
   for (let t = 0.5; t < durationSec; t += 0.5) {
