@@ -179,6 +179,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+      </SidebarContent>
 
       {/* Footer: toggles + profile */}
       <SidebarFooter className="px-2 pb-3 space-y-1">
