@@ -45,20 +45,16 @@ export function SpectrogramPanel({ isRu, slots, onClose, onRecalcF0, recalcingSl
   useEffect(() => {
     const el = canvasWrapRef.current;
     if (!el) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
         const w = Math.floor(entry.contentRect.width);
-        if (w > 0) {
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(() => setCanvasWidth(w), 300);
-        }
+        if (w > 0) setCanvasWidth(w);
       }
     });
     ro.observe(el);
     const w = Math.floor(el.clientWidth);
     if (w > 0) setCanvasWidth(w);
-    return () => { ro.disconnect(); if (timer) clearTimeout(timer); };
+    return () => { ro.disconnect(); };
   }, []);
 
   const renderAll = useCallback(async () => {
