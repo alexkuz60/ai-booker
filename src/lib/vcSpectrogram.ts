@@ -234,7 +234,7 @@ export function renderSpectrogram(
   const colorFn = PALETTES[options?.palette ?? "magma"] ?? magmaColors;
   const label = options?.label;
   const f0Frames = options?.f0Frames;
-  const f0Color = options?.f0Color ?? "rgba(255, 255, 255, 0.9)";
+  const f0Color = options?.f0Color ?? "rgba(0, 0, 0, 0.9)";
 
   canvas.width = width;
   canvas.height = height;
