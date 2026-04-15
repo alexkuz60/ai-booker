@@ -41,7 +41,7 @@ const extraNav = [
 ];
 
 const labNav = [
-  { title: "Голос. лаб.", titleEn: "Voice Lab", url: "/voice-lab", icon: FlaskConical },
+  { title: "VoiceLab", titleEn: "VoiceLab", url: "/voice-lab", icon: FlaskConical },
 ];
 
 export function AppSidebar() {
