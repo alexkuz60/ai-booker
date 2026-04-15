@@ -23,8 +23,22 @@ function formatVram(bytes: number): string {
 
 export function VramUsageBadge({ isRu, className }: VramUsageBadgeProps) {
   const [snapshot, setSnapshot] = useState<VramUsageSnapshot>(() => getVramUsageSnapshot());
+  const [releasing, setReleasing] = useState(false);
 
   useEffect(() => subscribeVramUsage(setSnapshot), []);
+
+  const handleRelease = useCallback(async () => {
+    setReleasing(true);
+    try {
+      await releaseAllVcSessions();
+      toast.success(isRu ? "GPU сессии освобождены" : "GPU sessions released");
+    } catch (err) {
+      console.error("[VramUsageBadge] Release failed:", err);
+      toast.error(isRu ? "Ошибка очистки GPU" : "GPU cleanup failed");
+    } finally {
+      setReleasing(false);
+    }
+  }, [isRu]);
 
   return (
     <div
@@ -33,7 +47,7 @@ export function VramUsageBadge({ isRu, className }: VramUsageBadgeProps) {
     >
       <div className="flex items-start gap-2">
         <Gauge className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {isRu ? "VRAM (оценка)" : "VRAM (estimate)"}
           </p>
@@ -52,6 +66,20 @@ export function VramUsageBadge({ isRu, className }: VramUsageBadgeProps) {
           </p>
         </div>
       </div>
+      {snapshot.totalSessions > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1.5 h-6 w-full gap-1 text-[10px]"
+          onClick={handleRelease}
+          disabled={releasing}
+        >
+          {releasing
+            ? <Loader2 className="h-3 w-3 animate-spin" />
+            : <Trash2 className="h-3 w-3" />}
+          {isRu ? "Очистка GPU" : "Release GPU"}
+        </Button>
+      )}
     </div>
   );
 }
