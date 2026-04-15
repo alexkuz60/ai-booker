@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Cpu, Download, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import {
-  VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ALL_MODELS,
+  VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, VC_ALL_MODELS,
   downloadAllModels, getModelStatus, getTotalModelSize, clearAllModels,
   VC_MODEL_CACHE_EVENT, type ModelDownloadProgress,
 } from "@/lib/vcModelCache";
@@ -183,6 +183,21 @@ export function ModelDownloadPanel({
           {isRu ? "Алгоритмы определения тона (F0)" : "Pitch Detection (F0)"}
         </p>
         {VC_PITCH_MODELS.map(m => (
+          <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-muted/20">
+            <span className="text-muted-foreground font-mono">{m.label}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">{formatBytes(m.sizeBytes)}</span>
+              {modelStatuses[m.id]
+                ? <CheckCircle2 className="h-3 w-3 text-primary" />
+                : <XCircle className="h-3 w-3 text-muted-foreground/50" />
+              }
+            </div>
+          </div>
+        ))}
+        <p className="text-[11px] text-muted-foreground pt-1 px-2">
+          {isRu ? "Энкодеры речи" : "Speech Encoders"}
+        </p>
+        {VC_ENCODER_MODELS.map(m => (
           <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-muted/20">
             <span className="text-muted-foreground font-mono">{m.label}</span>
             <div className="flex items-center gap-2">
