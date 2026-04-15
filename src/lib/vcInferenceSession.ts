@@ -27,6 +27,15 @@ export interface VcSessionOptions {
   graphOptimization?: "disabled" | "basic" | "extended" | "all";
 }
 
+export interface VramUsageSnapshot {
+  estimatedBytes: number;
+  gpuSessions: number;
+  totalSessions: number;
+  models: string[];
+}
+
+type VramUsageListener = (snapshot: VramUsageSnapshot) => void;
+
 /** Cached sessions keyed by modelId */
 const sessionCache = new Map<string, ort.InferenceSession>();
 
@@ -47,6 +56,9 @@ const sessionCreatePromises = new Map<string, Promise<ort.InferenceSession>>();
 
 /** Reference count active users of a model session */
 const sessionRefCounts = new Map<string, number>();
+
+/** Reactive listeners for Voice Lab VRAM indicator */
+const vramListeners = new Set<VramUsageListener>();
 
 function retainSession(modelId: string): void {
   sessionRefCounts.set(modelId, (sessionRefCounts.get(modelId) ?? 0) + 1);
@@ -124,14 +136,49 @@ function createLockedSession(modelId: string, session: ort.InferenceSession): or
   }) as ort.InferenceSession;
 }
 
-/** Log estimated VRAM usage across all loaded sessions */
+export function getVramUsageSnapshot(): VramUsageSnapshot {
+  const loadedIds = Array.from(new Set([
+    ...sessionCache.keys(),
+    ...sessionTargets.keys(),
+  ]));
+  const gpuModels = loadedIds.filter((modelId) => sessionBackends.get(modelId) === "webgpu");
+  const estimatedBytes = gpuModels.reduce((sum, modelId) => sum + (sessionSizes.get(modelId) ?? 0), 0);
+
+  return {
+    estimatedBytes,
+    gpuSessions: gpuModels.length,
+    totalSessions: loadedIds.length,
+    models: gpuModels,
+  };
+}
+
+function notifyVramUsage(): void {
+  const snapshot = getVramUsageSnapshot();
+  vramListeners.forEach((listener) => {
+    try {
+      listener(snapshot);
+    } catch {
+      // Ignore listener errors so session lifecycle is not affected
+    }
+  });
+}
+
+/** Subscribe to estimated VRAM usage updates */
+export function subscribeVramUsage(listener: VramUsageListener): () => void {
+  vramListeners.add(listener);
+  listener(getVramUsageSnapshot());
+  return () => {
+    vramListeners.delete(listener);
+  };
+}
+
+/** Log estimated VRAM usage across all loaded WebGPU sessions */
 function logVramUsage(action: string, modelId: string): void {
-  let totalBytes = 0;
-  for (const sz of sessionSizes.values()) totalBytes += sz;
-  const models = Array.from(sessionSizes.keys()).join(", ");
+  const snapshot = getVramUsageSnapshot();
   console.info(
-    `[vcSession] 💾 VRAM after ${action} "${modelId}": ~${(totalBytes / 1e6).toFixed(1)} MB total | loaded: [${models}]`,
+    `[vcSession] 💾 VRAM after ${action} "${modelId}": ~${(snapshot.estimatedBytes / 1e6).toFixed(1)} MB total | loaded: [${snapshot.models.join(", ")}]`,
   );
+  notifyVramUsage();
 }
 
 /** Detect if WebGPU execution provider is available (uses shared adapter) */
@@ -325,6 +372,7 @@ export async function releaseAllVcSessions(): Promise<void> {
   }
 
   console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
+  notifyVramUsage();
 }
 
 /** Get info about loaded sessions */
