@@ -60,11 +60,18 @@ export async function extractPitchSwiftF0(
     throw new Error(`SwiftF0: expected 2 outputs, got ${outputNames.length}: ${outputNames.join(", ")}`);
   }
 
-  const pitchData = results[outputNames[0]]?.data as Float32Array;
-  const confData = results[outputNames[1]]?.data as Float32Array;
+  const pitchName = outputNames.find(name => name.toLowerCase().includes("pitch")) ?? outputNames[0];
+  const confName = outputNames.find(name => name.toLowerCase().includes("conf"))
+    ?? outputNames.find(name => name !== pitchName)
+    ?? outputNames[1];
 
-  if (!pitchData || !confData) {
-    throw new Error(`SwiftF0: missing output data. Available: ${Object.keys(results).join(", ")}`);
+  const pitchData = results[pitchName]?.data as Float32Array | undefined;
+  const confData = results[confName]?.data as Float32Array | undefined;
+
+  if (!pitchData || !confData || pitchData.length !== confData.length) {
+    throw new Error(
+      `SwiftF0: invalid outputs (pitch=${pitchName}:${pitchData?.length ?? 0}, conf=${confName}:${confData?.length ?? 0}). Available: ${Object.keys(results).join(", ")}`
+    );
   }
 
   const numFrames = pitchData.length;
@@ -74,11 +81,13 @@ export async function extractPitchSwiftF0(
     const timeSec = (i * HOP_LENGTH + CENTER_OFFSET) / sampleRate;
     const hz = pitchData[i];
     const conf = confData[i];
+    const safeConf = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;
+    const safeHz = Number.isFinite(hz) && hz >= 50 && hz <= 1100 ? hz : 0;
 
     pitchFrames.push({
       timeSec,
-      frequencyHz: conf > 0.5 ? hz : 0, // voicing threshold
-      confidence: conf,
+      frequencyHz: safeConf > 0.5 ? safeHz : 0, // voicing threshold
+      confidence: safeConf,
     });
   }
 

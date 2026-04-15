@@ -235,17 +235,43 @@ export async function extractPitchRmvpe(
 
   const data = output.data as Float32Array;
   validateInferenceOutput(data, "rmvpe", "pitch probabilities");
-  const outputShape = output.dims;
+  const outputShape = Array.from(output.dims, Number).filter(d => d > 1);
 
-  // Determine number of pitch bins from output shape
-  const nPitchBins = outputShape.length >= 2 ? Number(outputShape[outputShape.length - 1]) : 360;
-  const nOutputFrames = Math.floor(data.length / nPitchBins);
+  // RMVPE exports are commonly either [1, T, 360] or [1, 360, T].
+  // We must detect which axis is the pitch-bin axis, otherwise decoding
+  // turns into flat high-frequency lines or truncated contours.
+  let nPitchBins = 360;
+  let rawFrameCount = Math.floor(data.length / nPitchBins);
+  let layout: "frame-major" | "bin-major" = "frame-major";
+
+  if (outputShape.length >= 2) {
+    const a = outputShape[outputShape.length - 2];
+    const b = outputShape[outputShape.length - 1];
+    if (b === 360) {
+      rawFrameCount = a;
+      nPitchBins = b;
+      layout = "frame-major";
+    } else if (a === 360) {
+      rawFrameCount = b;
+      nPitchBins = a;
+      layout = "bin-major";
+    }
+  }
+
+  const nOutputFrames = Math.min(rawFrameCount, mel.numFrames);
 
   const pitchFrames: PitchFrame[] = [];
   const frameDurationSec = HOP_LENGTH / sampleRate;
 
   for (let i = 0; i < nOutputFrames; i++) {
-    const probs = data.slice(i * nPitchBins, (i + 1) * nPitchBins);
+    const probs = new Float32Array(nPitchBins);
+    if (layout === "frame-major") {
+      probs.set(data.subarray(i * nPitchBins, (i + 1) * nPitchBins));
+    } else {
+      for (let bin = 0; bin < nPitchBins; bin++) {
+        probs[bin] = data[bin * rawFrameCount + i];
+      }
+    }
     const { frequency, confidence } = decodeRmvpeF0(probs, nPitchBins);
     pitchFrames.push({
       timeSec: i * frameDurationSec,
@@ -261,7 +287,7 @@ export async function extractPitchRmvpe(
 
   console.info(
     `[RMVPE] ${samples.length} samples → ${pitchFrames.length} frames, ` +
-    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms)`
+    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms, layout=${layout}, shape=[${outputShape.join(", ")}])`
   );
 
   return { frames: pitchFrames, inferenceMs, meanConfidence };
