@@ -82,6 +82,18 @@ export function VcTestPipeline({
   const [rvcF0, setRvcF0] = useState<PitchFrame[] | undefined>();
   const [recalcingSlots, setRecalcingSlots] = useState<Set<number>>(new Set());
 
+  const markSlotRecalcStart = useCallback((slotIndex: number) => {
+    setRecalcingSlots(prev => new Set(prev).add(slotIndex));
+  }, []);
+
+  const markSlotRecalcDone = useCallback((slotIndex: number) => {
+    setRecalcingSlots(prev => {
+      const next = new Set(prev);
+      next.delete(slotIndex);
+      return next;
+    });
+  }, []);
+
   // Backend
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(getForcedBackend() ?? "auto");
   const [activeBackend, setActiveBackend] = useState<VcBackend | null>(null);
@@ -100,11 +112,14 @@ export function VcTestPipeline({
         if (!blob || cancelled) return;
         setRefBlob(blob);
       }
+      markSlotRecalcStart(1);
       try {
         const frames = await extractF0Only(blob, pitchAlgorithm);
         if (!cancelled) setRefF0(frames);
       } catch (e) {
         console.warn("[VcTest] Failed to extract F0 from reference:", e);
+      } finally {
+        if (!cancelled) markSlotRecalcDone(1);
       }
     };
     void load();
@@ -266,9 +281,11 @@ export function VcTestPipeline({
 
       // Extract F0 from RVC output for spectrogram — uses lightweight F0-only path
       // which creates a fresh session that gets released by the pipeline
+      markSlotRecalcStart(2);
       extractF0Only(result.wav, pitchAlgorithm)
         .then(frames => setRvcF0(frames))
         .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e));
+        .finally(() => markSlotRecalcDone(2));
 
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
@@ -375,6 +392,7 @@ export function VcTestPipeline({
           onClose={() => setShowSpectrograms(false)}
           recalcingSlots={recalcingSlots}
           onRecalcF0={async (slotIndex) => {
+            if (recalcingSlots.size > 0) return;
             const blobs = [ttsBlob, refBlob, rvcBlob];
             const setters = [setTtsF0, setRefF0, setRvcF0];
             const blob = blobs[slotIndex];
@@ -388,7 +406,7 @@ export function VcTestPipeline({
                 return;
               }
             }
-            setRecalcingSlots(prev => new Set(prev).add(slotIndex));
+            markSlotRecalcStart(slotIndex);
             try {
               const frames = await extractF0Only(blob, pitchAlgorithm);
               setters[slotIndex](frames);
@@ -397,7 +415,7 @@ export function VcTestPipeline({
               const msg = e instanceof Error ? e.message : String(e);
               toast.error(isRu ? `Ошибка пересчёта F0: ${msg}` : `F0 recalculation error: ${msg}`);
             } finally {
-              setRecalcingSlots(prev => { const next = new Set(prev); next.delete(slotIndex); return next; });
+              markSlotRecalcDone(slotIndex);
             }
           }}
         />

@@ -160,12 +160,15 @@ export async function extractF0Only(
   pitchAlgorithm: PitchAlgorithm = "crepe-tiny",
   hopMs = 10,
 ): Promise<PitchFrame[]> {
-  const { samples: rawSamples } = await resampleTo16kMono(audio);
-  const { samples } = normalizeRms(rawSamples);
-  const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
-  // Release the pitch session to free VRAM — F0-only is often called ad-hoc
-  await releaseVcSession(pitchAlgorithm).catch(() => {});
-  return result.frames;
+  try {
+    const { samples: rawSamples } = await resampleTo16kMono(audio);
+    const { samples } = normalizeRms(rawSamples);
+    const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
+    return result.frames;
+  } finally {
+    // Release the pitch session to free VRAM — F0-only is often called ad-hoc
+    await releaseVcSession(pitchAlgorithm).catch(() => {});
+  }
 }
 
 
