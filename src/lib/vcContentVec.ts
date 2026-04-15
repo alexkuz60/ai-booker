@@ -13,7 +13,6 @@ import {
   WebGPUCorruptError,
   releaseVcSession,
   getSessionBackend,
-  setForcedBackend,
 } from "./vcInferenceSession";
 import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 

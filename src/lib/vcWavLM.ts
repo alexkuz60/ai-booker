@@ -14,7 +14,6 @@ import {
   WebGPUCorruptError,
   releaseVcSession,
   getSessionBackend,
-  setForcedBackend,
 } from "./vcInferenceSession";
 import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { ContentVecResult } from "./vcContentVec";
