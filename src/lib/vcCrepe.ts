@@ -111,8 +111,8 @@ export async function extractPitch(
   const startMs = performance.now();
   const pitchFrames: PitchFrame[] = [];
 
-  // Process frames in batches for efficiency
-  const BATCH_SIZE = 64;
+  // Process frames in batches — smaller batches for large models to avoid browser hangs
+  const BATCH_SIZE = modelId === "crepe-full" ? 16 : 64;
   for (let batchStart = 0; batchStart < audioFrames.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, audioFrames.length);
     const batchLen = batchEnd - batchStart;
