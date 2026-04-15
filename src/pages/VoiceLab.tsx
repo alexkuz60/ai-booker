@@ -57,6 +57,7 @@ const TABS: SidebarTab[] = [
   { id: "references", label: { ru: "Референсы", en: "References" }, icon: Music },
   { id: "indexes", label: { ru: "Индексы", en: "Indexes" }, icon: Database },
   { id: "vc", label: { ru: "Voice Conversion", en: "Voice Conversion" }, icon: Zap },
+  { id: "f5tts", label: { ru: "F5-TTS", en: "F5-TTS" }, icon: FlaskConical },
 ];
 
 // ─── Character type for VC ──────────────────────────
