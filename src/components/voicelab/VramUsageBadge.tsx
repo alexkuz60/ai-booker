@@ -66,20 +66,18 @@ export function VramUsageBadge({ isRu, className }: VramUsageBadgeProps) {
           </p>
         </div>
       </div>
-      {snapshot.totalSessions > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-1.5 h-6 w-full gap-1 text-[10px]"
-          onClick={handleRelease}
-          disabled={releasing}
-        >
-          {releasing
-            ? <Loader2 className="h-3 w-3 animate-spin" />
-            : <Trash2 className="h-3 w-3" />}
-          {isRu ? "Очистка GPU" : "Release GPU"}
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-1.5 h-6 w-full gap-1 text-[10px]"
+        onClick={handleRelease}
+        disabled={releasing}
+      >
+        {releasing
+          ? <Loader2 className="h-3 w-3 animate-spin" />
+          : <Trash2 className="h-3 w-3" />}
+        {isRu ? "Очистка GPU" : "Release GPU"}
+      </Button>
     </div>
   );
 }
