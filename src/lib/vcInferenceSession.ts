@@ -39,9 +39,9 @@ export interface VramUsageSnapshot {
  * Replaces direct ort.Tensor creation in consumer code.
  */
 export interface TensorDesc {
-  data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
+  data: Float32Array | BigInt64Array | Int32Array | Uint8Array | Uint16Array | Int16Array;
   dims: number[];
-  dtype: "float32" | "int64" | "int32" | "int32_as_int64" | "bool";
+  dtype: "float32" | "float16" | "int64" | "int32" | "int32_as_int64" | "int16" | "bool";
 }
 
 /**
