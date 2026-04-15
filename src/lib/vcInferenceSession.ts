@@ -307,11 +307,15 @@ export async function runVcInference(
   // Deserialize outputs
   const results: Record<string, TensorDesc> = {};
   for (const out of response.outputs) {
-    let data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
+    let data: Float32Array | BigInt64Array | Int32Array | Uint8Array | Uint16Array | Int16Array;
     if (out.dtype === "int64") {
       data = new BigInt64Array(out.buffer);
     } else if (out.dtype === "int32") {
       data = new Int32Array(out.buffer);
+    } else if (out.dtype === "int16") {
+      data = new Int16Array(out.buffer);
+    } else if (out.dtype === "float16") {
+      data = new Uint16Array(out.buffer);
     } else if (out.dtype === "bool") {
       data = new Uint8Array(out.buffer);
     } else {
