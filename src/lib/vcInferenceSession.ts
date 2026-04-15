@@ -30,11 +30,72 @@ export interface VcSessionOptions {
 /** Cached sessions keyed by modelId */
 const sessionCache = new Map<string, ort.InferenceSession>();
 
+/** Underlying raw sessions kept separately from the lock proxy wrapper */
+const sessionTargets = new Map<string, ort.InferenceSession>();
+
 /** Track model buffer sizes for VRAM estimation */
 const sessionSizes = new Map<string, number>();
 
 /** Track which backend each session was created with */
 const sessionBackends = new Map<string, VcBackend>();
+
+/** Serialize ONNX inference per model — ORT rejects concurrent session.run() calls */
+const sessionRunQueues = new Map<string, Promise<void>>();
+
+async function runSessionExclusive<T>(modelId: string, task: () => Promise<T>): Promise<T> {
+  const previous = sessionRunQueues.get(modelId);
+  if (previous) {
+    console.info(`[vcSession] Queueing inference for "${modelId}" until previous run completes`);
+  }
+
+  let releaseQueue!: () => void;
+  const current = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+
+  sessionRunQueues.set(
+    modelId,
+    (previous ?? Promise.resolve()).catch(() => undefined).then(() => current),
+  );
+
+  await (previous?.catch(() => undefined) ?? Promise.resolve());
+
+  try {
+    return await task();
+  } finally {
+    releaseQueue();
+  }
+}
+
+async function waitForSessionIdle(modelId: string): Promise<void> {
+  while (true) {
+    const pending = sessionRunQueues.get(modelId);
+    if (!pending) return;
+
+    await pending.catch(() => undefined);
+
+    if (sessionRunQueues.get(modelId) === pending) {
+      sessionRunQueues.delete(modelId);
+      return;
+    }
+  }
+}
+
+function createLockedSession(modelId: string, session: ort.InferenceSession): ort.InferenceSession {
+  return new Proxy(session, {
+    get(target, prop, receiver) {
+      if (prop === "run") {
+        return (...args: any[]) => runSessionExclusive(
+          modelId,
+          () => (target.run as (...innerArgs: any[]) => Promise<any>)(...args),
+        );
+      }
+
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as ort.InferenceSession;
+}
 
 /** Log estimated VRAM usage across all loaded sessions */
 function logVramUsage(action: string, modelId: string): void {
@@ -133,34 +194,54 @@ export async function createVcSession(
   const actualBackend = executionProviders[0] as VcBackend;
   console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms (backend: ${actualBackend})`);
 
-  sessionCache.set(modelId, session);
+  const lockedSession = createLockedSession(modelId, session);
+  sessionCache.set(modelId, lockedSession);
+  sessionTargets.set(modelId, session);
   sessionSizes.set(modelId, buffer.byteLength);
   sessionBackends.set(modelId, actualBackend);
   logVramUsage("load", modelId);
-  return session;
+  return lockedSession;
 }
 
 /** Release a cached session */
 export async function releaseVcSession(modelId: string): Promise<void> {
-  const session = sessionCache.get(modelId);
+  await waitForSessionIdle(modelId);
+
+  const session = sessionTargets.get(modelId) ?? sessionCache.get(modelId);
   if (session) {
-    await session.release();
-    sessionCache.delete(modelId);
-    sessionSizes.delete(modelId);
-    sessionBackends.delete(modelId);
-    logVramUsage("release", modelId);
+    try {
+      await session.release();
+    } finally {
+      sessionCache.delete(modelId);
+      sessionTargets.delete(modelId);
+      sessionSizes.delete(modelId);
+      sessionBackends.delete(modelId);
+      sessionRunQueues.delete(modelId);
+      logVramUsage("release", modelId);
+    }
   }
 }
 
 /** Release all cached sessions */
 export async function releaseAllVcSessions(): Promise<void> {
-  const ids = Array.from(sessionCache.keys());
-  for (const [, session] of sessionCache) {
+  const ids = Array.from(new Set([
+    ...sessionCache.keys(),
+    ...sessionTargets.keys(),
+  ]));
+
+  for (const modelId of ids) {
+    await waitForSessionIdle(modelId);
+  }
+
+  for (const modelId of ids) {
+    const session = sessionTargets.get(modelId) ?? sessionCache.get(modelId);
     try { await session.release(); } catch { /* ok */ }
   }
   sessionCache.clear();
+  sessionTargets.clear();
   sessionSizes.clear();
   sessionBackends.clear();
+  sessionRunQueues.clear();
   console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
 }
 

@@ -39,6 +39,7 @@ export function SpectrogramPanel({ isRu, slots, onClose, onRecalcF0, recalcingSl
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [rendering, setRendering] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(0);
+  const isAnyRecalcRunning = (recalcingSlots?.size ?? 0) > 0;
 
   // Track the inner canvas wrapper width with debounce
   useEffect(() => {
@@ -134,7 +135,7 @@ export function SpectrogramPanel({ isRu, slots, onClose, onRecalcF0, recalcingSl
                     variant="ghost"
                     size="sm"
                     className="absolute top-1 right-1 h-6 gap-1 px-1.5 text-[10px] bg-black/50 hover:bg-black/70 text-white/80 hover:text-white"
-                    disabled={recalcingSlots?.has(idx)}
+                    disabled={isAnyRecalcRunning}
                     onClick={() => onRecalcF0(idx)}
                   >
                     <RefreshCw className={`h-3 w-3 ${recalcingSlots?.has(idx) ? "animate-spin" : ""}`} />
