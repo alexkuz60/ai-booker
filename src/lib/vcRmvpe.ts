@@ -10,6 +10,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { PitchFrame, CrepeResult } from "./vcCrepe";
 
 const EXPECTED_SR = 16_000;
@@ -227,68 +228,72 @@ export async function extractPitchRmvpe(
   }
 
   const tensor = new ort.Tensor("float32", transposed, [1, N_MELS, mel.paddedFrames]);
-  const results = await session.run({ [inputName]: tensor });
+  let results: Record<string, ort.Tensor> | undefined;
+  try {
+    results = await session.run({ [inputName]: tensor });
 
-  const outputName = session.outputNames[0] ?? "output";
-  const output = results[outputName];
-  if (!output) throw new Error(`RMVPE: no output. Available: ${Object.keys(results).join(", ")}`);
+    const outputName = session.outputNames[0] ?? "output";
+    const output = results[outputName];
+    if (!output) throw new Error(`RMVPE: no output. Available: ${Object.keys(results).join(", ")}`);
 
-  const data = output.data as Float32Array;
-  validateInferenceOutput(data, "rmvpe", "pitch probabilities");
-  const outputShape = Array.from(output.dims, Number).filter(d => d > 1);
+    const data = output.data as Float32Array;
+    validateInferenceOutput(data, "rmvpe", "pitch probabilities");
+    const outputShape = Array.from(output.dims, Number).filter(d => d > 1);
 
-  // RMVPE exports are commonly either [1, T, 360] or [1, 360, T].
-  // We must detect which axis is the pitch-bin axis, otherwise decoding
-  // turns into flat high-frequency lines or truncated contours.
-  let nPitchBins = 360;
-  let rawFrameCount = Math.floor(data.length / nPitchBins);
-  let layout: "frame-major" | "bin-major" = "frame-major";
+    // RMVPE exports are commonly either [1, T, 360] or [1, 360, T].
+    let nPitchBins = 360;
+    let rawFrameCount = Math.floor(data.length / nPitchBins);
+    let layout: "frame-major" | "bin-major" = "frame-major";
 
-  if (outputShape.length >= 2) {
-    const a = outputShape[outputShape.length - 2];
-    const b = outputShape[outputShape.length - 1];
-    if (b === 360) {
-      rawFrameCount = a;
-      nPitchBins = b;
-      layout = "frame-major";
-    } else if (a === 360) {
-      rawFrameCount = b;
-      nPitchBins = a;
-      layout = "bin-major";
-    }
-  }
-
-  const nOutputFrames = Math.min(rawFrameCount, mel.numFrames);
-
-  const pitchFrames: PitchFrame[] = [];
-  const frameDurationSec = HOP_LENGTH / sampleRate;
-
-  for (let i = 0; i < nOutputFrames; i++) {
-    const probs = new Float32Array(nPitchBins);
-    if (layout === "frame-major") {
-      probs.set(data.subarray(i * nPitchBins, (i + 1) * nPitchBins));
-    } else {
-      for (let bin = 0; bin < nPitchBins; bin++) {
-        probs[bin] = data[bin * rawFrameCount + i];
+    if (outputShape.length >= 2) {
+      const a = outputShape[outputShape.length - 2];
+      const b = outputShape[outputShape.length - 1];
+      if (b === 360) {
+        rawFrameCount = a;
+        nPitchBins = b;
+        layout = "frame-major";
+      } else if (a === 360) {
+        rawFrameCount = b;
+        nPitchBins = a;
+        layout = "bin-major";
       }
     }
-    const { frequency, confidence } = decodeRmvpeF0(probs, nPitchBins);
-    pitchFrames.push({
-      timeSec: i * frameDurationSec,
-      frequencyHz: frequency,
-      confidence,
-    });
+
+    const nOutputFrames = Math.min(rawFrameCount, mel.numFrames);
+
+    const pitchFrames: PitchFrame[] = [];
+    const frameDurationSec = HOP_LENGTH / sampleRate;
+
+    for (let i = 0; i < nOutputFrames; i++) {
+      const probs = new Float32Array(nPitchBins);
+      if (layout === "frame-major") {
+        probs.set(data.subarray(i * nPitchBins, (i + 1) * nPitchBins));
+      } else {
+        for (let bin = 0; bin < nPitchBins; bin++) {
+          probs[bin] = data[bin * rawFrameCount + i];
+        }
+      }
+      const { frequency, confidence } = decodeRmvpeF0(probs, nPitchBins);
+      pitchFrames.push({
+        timeSec: i * frameDurationSec,
+        frequencyHz: frequency,
+        confidence,
+      });
+    }
+
+    const inferenceMs = Math.round(performance.now() - startMs);
+    const meanConfidence = pitchFrames.length > 0
+      ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
+      : 0;
+
+    console.info(
+      `[RMVPE] ${samples.length} samples → ${pitchFrames.length} frames, ` +
+      `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms, layout=${layout}, shape=[${outputShape.join(", ")}])`
+    );
+
+    return { frames: pitchFrames, inferenceMs, meanConfidence };
+  } finally {
+    disposeOrtTensor(tensor);
+    disposeOrtResults(results);
   }
-
-  const inferenceMs = Math.round(performance.now() - startMs);
-  const meanConfidence = pitchFrames.length > 0
-    ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
-    : 0;
-
-  console.info(
-    `[RMVPE] ${samples.length} samples → ${pitchFrames.length} frames, ` +
-    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms (mel ${melMs}ms, layout=${layout}, shape=[${outputShape.join(", ")}])`
-  );
-
-  return { frames: pitchFrames, inferenceMs, meanConfidence };
 }

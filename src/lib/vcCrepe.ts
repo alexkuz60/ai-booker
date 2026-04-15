@@ -9,6 +9,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import { frameAudio } from "./vcResample";
 
 const EXPECTED_SR = 16_000;
@@ -134,23 +135,29 @@ export async function extractPitch(
     }
 
     const tensor = new ort.Tensor("float32", batchData, [batchLen, CREPE_FRAME_SIZE]);
-    const results = await session.run({ [inputName]: tensor });
+    let results: Record<string, ort.Tensor> | undefined;
+    try {
+      results = await session.run({ [inputName]: tensor });
 
-    const outputName = session.outputNames[0] ?? "output";
-    const output = results[outputName];
-    if (!output) throw new Error(`CREPE: no output. Available: ${Object.keys(results).join(", ")}`);
+      const outputName = session.outputNames[0] ?? "output";
+      const output = results[outputName];
+      if (!output) throw new Error(`CREPE: no output. Available: ${Object.keys(results).join(", ")}`);
 
-    const data = output.data as Float32Array;
+      const data = output.data as Float32Array;
 
-    for (let i = 0; i < batchLen; i++) {
-      const frameIdx = batchStart + i;
-      const probs = data.slice(i * CREPE_BINS, (i + 1) * CREPE_BINS);
-      const { frequency, confidence } = decodePitch(probs);
-      pitchFrames.push({
-        timeSec: (frameIdx * hopSamples) / sampleRate,
-        frequencyHz: confidence > 0.15 ? frequency : 0, // lowered threshold for TTS input
-        confidence,
-      });
+      for (let i = 0; i < batchLen; i++) {
+        const frameIdx = batchStart + i;
+        const probs = data.slice(i * CREPE_BINS, (i + 1) * CREPE_BINS);
+        const { frequency, confidence } = decodePitch(probs);
+        pitchFrames.push({
+          timeSec: (frameIdx * hopSamples) / sampleRate,
+          frequencyHz: confidence > 0.15 ? frequency : 0,
+          confidence,
+        });
+      }
+    } finally {
+      disposeOrtTensor(tensor);
+      disposeOrtResults(results);
     }
   }
 

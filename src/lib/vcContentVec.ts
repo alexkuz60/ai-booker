@@ -8,6 +8,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 
 /** ContentVec expects 16 kHz input */
 const EXPECTED_SR = 16_000;
@@ -63,37 +64,45 @@ export async function extractContentVec(
     feeds[inputNames[0] ?? "source"] = inputTensor;
   }
 
-  const results = await session.run(feeds);
-  const inferenceMs = Math.round(performance.now() - startMs);
+  let results: Record<string, ort.Tensor> | undefined;
+  try {
+    results = await session.run(feeds);
+    const inferenceMs = Math.round(performance.now() - startMs);
 
-  const outputNames = session.outputNames;
-  const outputName = outputNames[0] ?? "embed";
-  const output = results[outputName];
+    const outputNames = session.outputNames;
+    const outputName = outputNames[0] ?? "embed";
+    const output = results[outputName];
 
-  if (!output) {
-    throw new Error(
-      `ContentVec: no output tensor. Available: ${Object.keys(results).join(", ")}`
+    if (!output) {
+      throw new Error(
+        `ContentVec: no output tensor. Available: ${Object.keys(results).join(", ")}`
+      );
+    }
+
+    const data = output.data as Float32Array;
+    const shape = output.dims as readonly number[];
+    
+    // Shape is typically [1, T, 768] or [T, 768]
+    const numFrames = shape.length === 3 ? shape[1] : shape[0];
+    const dim = shape[shape.length - 1];
+
+    // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
+    validateInferenceOutput(data, "contentvec", "embeddings");
+
+    console.info(
+      `[ContentVec] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
     );
+
+    return {
+      embeddings: new Float32Array(data),
+      numFrames,
+      dim,
+      inferenceMs,
+    };
+  } finally {
+    // Dispose input tensors
+    for (const t of Object.values(feeds)) disposeOrtTensor(t);
+    // Dispose output tensors
+    disposeOrtResults(results);
   }
-
-  const data = output.data as Float32Array;
-  const shape = output.dims as readonly number[];
-  
-  // Shape is typically [1, T, 768] or [T, 768]
-  const numFrames = shape.length === 3 ? shape[1] : shape[0];
-  const dim = shape[shape.length - 1];
-
-  // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
-  validateInferenceOutput(data, "contentvec", "embeddings");
-
-  console.info(
-    `[ContentVec] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
-  );
-
-  return {
-    embeddings: new Float32Array(data),
-    numFrames,
-    dim,
-    inferenceMs,
-  };
 }

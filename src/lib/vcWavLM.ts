@@ -9,6 +9,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { ContentVecResult } from "./vcContentVec";
 
 /** WavLM expects 16 kHz input */
@@ -62,41 +63,47 @@ export async function extractWavLM(
     feeds[inputNames[0] ?? "input_values"] = inputTensor;
   }
 
-  const results = await session.run(feeds);
-  const inferenceMs = Math.round(performance.now() - startMs);
+  let results: Record<string, ort.Tensor> | undefined;
+  try {
+    results = await session.run(feeds);
+    const inferenceMs = Math.round(performance.now() - startMs);
 
-  const outputNames = session.outputNames;
-  // WavLM typically outputs "last_hidden_state" or first output
-  const outputName =
-    outputNames.find(n => n.toLowerCase().includes("hidden_state")) ??
-    outputNames.find(n => n.toLowerCase().includes("output")) ??
-    outputNames[0] ?? "last_hidden_state";
-  const output = results[outputName];
+    const outputNames = session.outputNames;
+    // WavLM typically outputs "last_hidden_state" or first output
+    const outputName =
+      outputNames.find(n => n.toLowerCase().includes("hidden_state")) ??
+      outputNames.find(n => n.toLowerCase().includes("output")) ??
+      outputNames[0] ?? "last_hidden_state";
+    const output = results[outputName];
 
-  if (!output) {
-    throw new Error(
-      `WavLM: no output tensor "${outputName}". Available: ${Object.keys(results).join(", ")}`
+    if (!output) {
+      throw new Error(
+        `WavLM: no output tensor "${outputName}". Available: ${Object.keys(results).join(", ")}`
+      );
+    }
+
+    const data = output.data as Float32Array;
+    const shape = output.dims as readonly number[];
+
+    // Shape is typically [1, T, 768] or [T, 768]
+    const numFrames = shape.length === 3 ? shape[1] : shape[0];
+    const dim = shape[shape.length - 1];
+
+    // Validate output — detect WebGPU corruption
+    validateInferenceOutput(data, "wavlm", "embeddings");
+
+    console.info(
+      `[WavLM] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
     );
+
+    return {
+      embeddings: new Float32Array(data),
+      numFrames,
+      dim,
+      inferenceMs,
+    };
+  } finally {
+    for (const t of Object.values(feeds)) disposeOrtTensor(t);
+    disposeOrtResults(results);
   }
-
-  const data = output.data as Float32Array;
-  const shape = output.dims as readonly number[];
-
-  // Shape is typically [1, T, 768] or [T, 768]
-  const numFrames = shape.length === 3 ? shape[1] : shape[0];
-  const dim = shape[shape.length - 1];
-
-  // Validate output — detect WebGPU corruption
-  validateInferenceOutput(data, "wavlm", "embeddings");
-
-  console.info(
-    `[WavLM] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
-  );
-
-  return {
-    embeddings: new Float32Array(data),
-    numFrames,
-    dim,
-    inferenceMs,
-  };
 }

@@ -14,7 +14,7 @@ import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
 import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
-import { getSessionBackend } from "./vcInferenceSession";
+import { getSessionBackend, releaseVcSession } from "./vcInferenceSession";
 import type { PitchAlgorithm, SpeechEncoder } from "./vcModelCache";
 
 export interface VcFeatures {
@@ -54,6 +54,8 @@ export interface VcPipelineOptions {
   synthesis?: VcSynthesisOptions;
   /** Dry/Wet mix ratio: 0.0 = pure TTS (dry), 1.0 = pure RVC (wet). Default 1.0 */
   dryWet?: number;
+  /** Release ONNX sessions after pipeline completes to free VRAM. Default true. */
+  releaseSessions?: boolean;
 }
 
 /**
@@ -161,6 +163,8 @@ export async function extractF0Only(
   const { samples: rawSamples } = await resampleTo16kMono(audio);
   const { samples } = normalizeRms(rawSamples);
   const result = await extractPitchWithAlgorithm(samples, pitchAlgorithm, hopMs);
+  // Release the pitch session to free VRAM — F0-only is often called ad-hoc
+  await releaseVcSession(pitchAlgorithm).catch(() => {});
   return result.frames;
 }
 
@@ -285,6 +289,18 @@ async function _convertVoiceFullImpl(
     `[vcPipeline] Full VC complete: ${features.durationSec.toFixed(2)}s input → ` +
     `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
   );
+
+  // ── Release ONNX sessions to free VRAM ──
+  const shouldRelease = options?.releaseSessions !== false; // default true
+  if (shouldRelease) {
+    const encoder = options?.encoder ?? "contentvec";
+    const pitchAlgo = options?.pitchAlgorithm ?? "crepe-tiny";
+    const modelsToRelease = [encoder, pitchAlgo, options?.synthesis?.modelId ?? "rvc-v2"];
+    for (const modelId of modelsToRelease) {
+      await releaseVcSession(modelId).catch(() => {});
+    }
+    console.info(`[vcPipeline] Released sessions: [${modelsToRelease.join(", ")}]`);
+  }
 
   return { wav, features, synthesis, resample, totalMs };
 }

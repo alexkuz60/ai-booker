@@ -13,6 +13,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import type { PitchFrame, CrepeResult } from "./vcCrepe";
 
 const EXPECTED_SR = 16_000;
@@ -52,54 +53,60 @@ export async function extractPitchSwiftF0(
 
   // SwiftF0 expects [1, N] raw waveform
   const tensor = new ort.Tensor("float32", audio, [1, audio.length]);
-  const results = await session.run({ [inputName]: tensor });
+  let results: Record<string, ort.Tensor> | undefined;
+  try {
+    results = await session.run({ [inputName]: tensor });
 
-  // SwiftF0 outputs two tensors: pitch_hz and confidence
-  const outputNames = session.outputNames;
-  if (outputNames.length < 2) {
-    throw new Error(`SwiftF0: expected 2 outputs, got ${outputNames.length}: ${outputNames.join(", ")}`);
-  }
+    // SwiftF0 outputs two tensors: pitch_hz and confidence
+    const outputNames = session.outputNames;
+    if (outputNames.length < 2) {
+      throw new Error(`SwiftF0: expected 2 outputs, got ${outputNames.length}: ${outputNames.join(", ")}`);
+    }
 
-  const pitchName = outputNames.find(name => name.toLowerCase().includes("pitch")) ?? outputNames[0];
-  const confName = outputNames.find(name => name.toLowerCase().includes("conf"))
-    ?? outputNames.find(name => name !== pitchName)
-    ?? outputNames[1];
+    const pitchName = outputNames.find(name => name.toLowerCase().includes("pitch")) ?? outputNames[0];
+    const confName = outputNames.find(name => name.toLowerCase().includes("conf"))
+      ?? outputNames.find(name => name !== pitchName)
+      ?? outputNames[1];
 
-  const pitchData = results[pitchName]?.data as Float32Array | undefined;
-  const confData = results[confName]?.data as Float32Array | undefined;
+    const pitchData = results[pitchName]?.data as Float32Array | undefined;
+    const confData = results[confName]?.data as Float32Array | undefined;
 
-  if (!pitchData || !confData || pitchData.length !== confData.length) {
-    throw new Error(
-      `SwiftF0: invalid outputs (pitch=${pitchName}:${pitchData?.length ?? 0}, conf=${confName}:${confData?.length ?? 0}). Available: ${Object.keys(results).join(", ")}`
+    if (!pitchData || !confData || pitchData.length !== confData.length) {
+      throw new Error(
+        `SwiftF0: invalid outputs (pitch=${pitchName}:${pitchData?.length ?? 0}, conf=${confName}:${confData?.length ?? 0}). Available: ${Object.keys(results).join(", ")}`
+      );
+    }
+
+    const numFrames = pitchData.length;
+    const pitchFrames: PitchFrame[] = [];
+
+    for (let i = 0; i < numFrames; i++) {
+      const timeSec = (i * HOP_LENGTH + CENTER_OFFSET) / sampleRate;
+      const hz = pitchData[i];
+      const conf = confData[i];
+      const safeConf = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;
+      const safeHz = Number.isFinite(hz) && hz >= 50 && hz <= 1100 ? hz : 0;
+
+      pitchFrames.push({
+        timeSec,
+        frequencyHz: safeConf > 0.5 ? safeHz : 0,
+        confidence: safeConf,
+      });
+    }
+
+    const inferenceMs = Math.round(performance.now() - startMs);
+    const meanConfidence = pitchFrames.length > 0
+      ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
+      : 0;
+
+    console.info(
+      `[SwiftF0] ${samples.length} samples → ${pitchFrames.length} frames, ` +
+      `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms`
     );
+
+    return { frames: pitchFrames, inferenceMs, meanConfidence };
+  } finally {
+    disposeOrtTensor(tensor);
+    disposeOrtResults(results);
   }
-
-  const numFrames = pitchData.length;
-  const pitchFrames: PitchFrame[] = [];
-
-  for (let i = 0; i < numFrames; i++) {
-    const timeSec = (i * HOP_LENGTH + CENTER_OFFSET) / sampleRate;
-    const hz = pitchData[i];
-    const conf = confData[i];
-    const safeConf = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;
-    const safeHz = Number.isFinite(hz) && hz >= 50 && hz <= 1100 ? hz : 0;
-
-    pitchFrames.push({
-      timeSec,
-      frequencyHz: safeConf > 0.5 ? safeHz : 0, // voicing threshold
-      confidence: safeConf,
-    });
-  }
-
-  const inferenceMs = Math.round(performance.now() - startMs);
-  const meanConfidence = pitchFrames.length > 0
-    ? pitchFrames.reduce((s, f) => s + f.confidence, 0) / pitchFrames.length
-    : 0;
-
-  console.info(
-    `[SwiftF0] ${samples.length} samples → ${pitchFrames.length} frames, ` +
-    `meanConf=${meanConfidence.toFixed(2)}, ${inferenceMs}ms`
-  );
-
-  return { frames: pitchFrames, inferenceMs, meanConfidence };
 }
