@@ -39,9 +39,9 @@ export interface VramUsageSnapshot {
  * Replaces direct ort.Tensor creation in consumer code.
  */
 export interface TensorDesc {
-  data: Float32Array | BigInt64Array | Uint8Array;
+  data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
   dims: number[];
-  dtype: "float32" | "int64" | "bool";
+  dtype: "float32" | "int64" | "int32" | "bool";
 }
 
 /**
@@ -307,9 +307,11 @@ export async function runVcInference(
   // Deserialize outputs
   const results: Record<string, TensorDesc> = {};
   for (const out of response.outputs) {
-    let data: Float32Array | BigInt64Array | Uint8Array;
+    let data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
     if (out.dtype === "int64") {
       data = new BigInt64Array(out.buffer);
+    } else if (out.dtype === "int32") {
+      data = new Int32Array(out.buffer);
     } else if (out.dtype === "bool") {
       data = new Uint8Array(out.buffer);
     } else {

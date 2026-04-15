@@ -35,6 +35,7 @@ function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): ort.Tensor["dat
   switch (dtype) {
     case "float32": return new Float32Array(buffer);
     case "int64": return new BigInt64Array(buffer);
+    case "int32": return new Int32Array(buffer);
     case "bool": return new Uint8Array(buffer);
     default: return new Float32Array(buffer);
   }
@@ -113,6 +114,9 @@ self.onmessage = async (e: MessageEvent) => {
             outBuf = copy.buffer;
           } else if (srcData instanceof BigInt64Array) {
             const copy = new BigInt64Array(srcData);
+            outBuf = copy.buffer;
+          } else if (srcData instanceof Int32Array) {
+            const copy = new Int32Array(srcData);
             outBuf = copy.buffer;
           } else {
             // Fallback: treat as float32

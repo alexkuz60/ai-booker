@@ -181,6 +181,18 @@ function logTensorStats(label: string, desc: TensorDesc): void {
       `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
       `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
     );
+  } else if (desc.dtype === "int32") {
+    const d = desc.data as Int32Array;
+    let min = d[0], max = d[0];
+    for (let i = 1; i < d.length; i++) {
+      if (d[i] < min) min = d[i];
+      if (d[i] > max) max = d[i];
+    }
+    const zeros = Array.from(d).filter(v => v === 0).length;
+    console.info(
+      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
+      `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
+    );
   } else {
     console.info(`[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}`);
   }
@@ -281,16 +293,16 @@ export async function synthesizeVoice(
     pitchFine[i] = f0;
   }
 
-  // Prepare TensorDesc feeds
+  // Prepare TensorDesc feeds — use int32 (WebGPU/WGSL has no int64 support)
   const featsDesc: TensorDesc = { data: upEmb, dims: [1, T, features.embeddingDim], dtype: "float32" };
-  const pLenDesc: TensorDesc = { data: BigInt64Array.from([BigInt(T)]), dims: [1], dtype: "int64" };
+  const pLenDesc: TensorDesc = { data: Int32Array.from([T]), dims: [1], dtype: "int32" };
   const pitchDesc: TensorDesc = {
-    data: BigInt64Array.from(Array.from(pitchCoarse, (v) => BigInt(Math.round(v)))),
+    data: Int32Array.from(pitchCoarse, (v) => Math.round(v)),
     dims: [1, T],
-    dtype: "int64",
+    dtype: "int32",
   };
   const pitchfDesc: TensorDesc = { data: pitchFine, dims: [1, T], dtype: "float32" };
-  const sidDesc: TensorDesc = { data: BigInt64Array.from([BigInt(speakerId)]), dims: [1], dtype: "int64" };
+  const sidDesc: TensorDesc = { data: Int32Array.from([speakerId]), dims: [1], dtype: "int32" };
 
   // Build feeds — match model's expected input names
   const inputNames = info.inputNames;
