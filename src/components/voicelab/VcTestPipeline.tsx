@@ -418,6 +418,8 @@ export function VcTestPipeline({
               const msg = e instanceof Error ? e.message : String(e);
               toast.error(isRu ? `Ошибка пересчёта F0: ${msg}` : `F0 recalculation error: ${msg}`);
             } finally {
+              await releaseAllVcSessions().catch(() => {});
+              console.info("[SpectrogramPanel] Released all VC sessions after manual F0 recalc");
               markSlotRecalcDone(slotIndex);
             }
           }}
