@@ -125,8 +125,15 @@ export const VC_ENCODER_MODELS: VcModelEntry[] = [
   },
 ];
 
-/** All models combined (core + optional pitch + optional encoders) */
-export const VC_ALL_MODELS: VcModelEntry[] = [...VC_MODEL_REGISTRY, ...VC_PITCH_MODELS, ...VC_ENCODER_MODELS];
+/** F5-TTS models — registered here so readModel()/resolveModelFile() can find them */
+export const F5_TTS_MODELS: VcModelEntry[] = [
+  { id: "f5tts-encoder", label: "F5-TTS Encoder", url: "https://huggingface.co/nsarang/F5-TTS-ONNX/resolve/main/encoder_fp32.onnx", sizeBytes: 2_500_000, description: "F5-TTS preprocessor" },
+  { id: "f5tts-transformer", label: "F5-TTS Transformer (FP16)", url: "https://huggingface.co/nsarang/F5-TTS-ONNX/resolve/main/transformer_fp16.onnx", sizeBytes: 200_000_000, description: "F5-TTS flow-matching denoiser" },
+  { id: "f5tts-decoder", label: "F5-TTS Decoder", url: "https://huggingface.co/nsarang/F5-TTS-ONNX/resolve/main/decoder_fp32.onnx", sizeBytes: 5_000_000, description: "F5-TTS vocoder (24kHz)" },
+];
+
+/** All models combined (core + optional pitch + optional encoders + F5-TTS) */
+export const VC_ALL_MODELS: VcModelEntry[] = [...VC_MODEL_REGISTRY, ...VC_PITCH_MODELS, ...VC_ENCODER_MODELS, ...F5_TTS_MODELS];
 
 const VC_CACHE_DIR = "vc-models";
 export const VC_MODEL_CACHE_EVENT = "booker-pro:vc-model-cache-changed";
