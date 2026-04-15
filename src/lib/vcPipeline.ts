@@ -254,22 +254,19 @@ async function _convertVoiceFullImpl(
   const t0 = performance.now();
   const dryWet = Math.max(0, Math.min(1, options?.dryWet ?? 1.0));
   const shouldRelease = options?.releaseSessions !== false; // default true
-  const encoder = options?.encoder ?? "contentvec";
-  const pitchAlgo = options?.pitchAlgorithm ?? "crepe-tiny";
-  const modelsToRelease = [encoder, pitchAlgo, options?.synthesis?.modelId ?? "rvc-v2"];
+  const encoderModelId = options?.encoder ?? "contentvec";
+  const pitchModelId = options?.pitchAlgorithm ?? "crepe-tiny";
+  const rvcModelId = options?.synthesis?.modelId ?? "rvc-v2";
 
   try {
-    // Extract features (resample + ContentVec + CREPE)
+    // Extract features (resample + ContentVec/WavLM + pitch)
     const features = await extractVcFeatures(audio, options);
 
     // Release encoder & pitch sessions BEFORE synthesis to free GPU memory.
-    // RMVPE + ContentVec + RVC simultaneously can exceed GPU capacity,
-    // causing corrupted (all-zero) RVC output.
-    const encoderModelId = options?.encoder ?? "contentvec";
-    const pitchModelId = options?.pitchAlgorithm ?? "crepe-tiny";
+    // Three simultaneous WebGPU sessions (especially with RMVPE) can exceed
+    // GPU capacity, causing corrupted (all-zero) RVC output.
     await releaseVcSession(encoderModelId).catch(() => {});
     await releaseVcSession(pitchModelId).catch(() => {});
-    console.info(`[vcPipeline] Released pre-synthesis sessions: [${encoderModelId}, ${pitchModelId}]`);
 
     // Synthesize with RVC
     options?.onProgress?.("synthesis", 0);
@@ -307,22 +304,18 @@ async function _convertVoiceFullImpl(
       `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
     );
 
-    // ── Release ONNX sessions to free VRAM ──
+    // Release RVC session (encoder & pitch already released pre-synthesis)
     if (shouldRelease) {
-      for (const modelId of modelsToRelease) {
-        await releaseVcSession(modelId).catch(() => {});
-      }
-      console.info(`[vcPipeline] Released sessions: [${modelsToRelease.join(", ")}]`);
+      await releaseVcSession(rvcModelId).catch(() => {});
     }
 
     return { wav, features, synthesis, resample, totalMs };
   } catch (err) {
-    // Always release sessions on failure to prevent VRAM leak
+    // Always release all sessions on failure to prevent VRAM leak
     if (shouldRelease) {
-      for (const modelId of modelsToRelease) {
-        await releaseVcSession(modelId).catch(() => {});
+      for (const id of [encoderModelId, pitchModelId, rvcModelId]) {
+        await releaseVcSession(id).catch(() => {});
       }
-      console.info(`[vcPipeline] Released sessions after error: [${modelsToRelease.join(", ")}]`);
     }
     throw err;
   }
