@@ -14,7 +14,7 @@ import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
 import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
-import { WebGPUCorruptError, forceWasmFallback, getSessionBackend } from "./vcInferenceSession";
+import { getSessionBackend } from "./vcInferenceSession";
 import type { PitchAlgorithm, SpeechEncoder } from "./vcModelCache";
 
 export interface VcFeatures {
@@ -236,19 +236,7 @@ export async function convertVoiceFull(
   audio: ArrayBuffer | Blob,
   options?: VcPipelineOptions,
 ): Promise<VcFullResult> {
-  try {
-    return await _convertVoiceFullImpl(audio, options);
-  } catch (err) {
-    if (err instanceof WebGPUCorruptError) {
-      console.warn(`[vcPipeline] WebGPU corruption detected, retrying with WASM...`, err.message);
-      const switched = await forceWasmFallback();
-      if (switched) {
-        options?.onProgress?.("resample", 0);
-        return await _convertVoiceFullImpl(audio, options);
-      }
-    }
-    throw err;
-  }
+  return _convertVoiceFullImpl(audio, options);
 }
 
 /** Internal implementation of the full VC pipeline */
