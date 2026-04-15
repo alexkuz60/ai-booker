@@ -86,6 +86,9 @@ export async function extractWavLM(
   const numFrames = shape.length === 3 ? shape[1] : shape[0];
   const dim = shape[shape.length - 1];
 
+  // Validate output — detect WebGPU corruption
+  validateInferenceOutput(data, "wavlm", "embeddings");
+
   console.info(
     `[WavLM] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
   );

@@ -83,6 +83,9 @@ export async function extractContentVec(
   const numFrames = shape.length === 3 ? shape[1] : shape[0];
   const dim = shape[shape.length - 1];
 
+  // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
+  validateInferenceOutput(data, "contentvec", "embeddings");
+
   console.info(
     `[ContentVec] ${samples.length} samples → ${numFrames} frames × ${dim}D, ${inferenceMs}ms`
   );
