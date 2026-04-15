@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBookerPro } from "@/hooks/useBookerPro";
-import { convertVoiceFull, extractVcFeatures, extractF0Only, type VcPipelineOptions } from "@/lib/vcPipeline";
+import { convertVoiceFull, extractF0Only, type VcPipelineOptions } from "@/lib/vcPipeline";
 import { RVC_OUTPUT_SR_OPTIONS, RVC_OUTPUT_SR_DEFAULT, type RvcOutputSR } from "@/lib/vcSynthesis";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
