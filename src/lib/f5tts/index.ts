@@ -7,7 +7,8 @@ export { tokenize, loadVocab, getVocabCoverage, isInVocab, getVocabSize } from "
 export {
   F5_MODEL_REGISTRY, F5_MODEL_CACHE_EVENT,
   isF5ModelCached, getF5ModelStatus, areF5ModelsReady,
-  downloadF5Model, downloadAllF5Models, readF5Model, deleteF5Model,
+  downloadF5Model, downloadAllF5Models, deleteF5Model,
   type F5DownloadProgress,
 } from "./modelRegistry";
 export { ensureF5Sessions, releaseF5Sessions, synthesizeF5, f5AudioToWav } from "./pipeline";
+
