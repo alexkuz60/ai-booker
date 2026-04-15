@@ -315,7 +315,7 @@ const Narrators = () => {
     const provider = (vc.provider as string) || "yandex";
     const resolvedProvider = provider === "elevenlabs" ? "elevenlabs" : provider === "proxyapi" ? "proxyapi" : provider === "salutespeech" ? "salutespeech" : "yandex";
     setVoiceProvider(resolvedProvider);
-    if (voiceTab !== "vc") setVoiceTab(resolvedProvider);
+    setVoiceTab(resolvedProvider);
 
     if (provider === "salutespeech") {
       setSsVoice((vc.voice_id as string) || "Nec_24000");
