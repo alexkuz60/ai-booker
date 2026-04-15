@@ -94,6 +94,11 @@ export function VcTestPipeline({
     });
   }, []);
 
+  const cleanupVcSessions = useCallback(async (reason: string) => {
+    await releaseAllVcSessions().catch(() => {});
+    console.info(`[VcTestPipeline] Released all VC sessions after ${reason}`);
+  }, []);
+
   // Backend
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(getForcedBackend() ?? "auto");
   const [activeBackend, setActiveBackend] = useState<VcBackend | null>(null);
@@ -119,13 +124,14 @@ export function VcTestPipeline({
       } catch (e) {
         console.warn("[VcTest] Failed to extract F0 from reference:", e);
       } finally {
+        await cleanupVcSessions("reference spectrogram F0");
         if (!cancelled) markSlotRecalcDone(1);
       }
     };
     void load();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSpectrograms, vcReferenceId]);
+  }, [showSpectrograms, vcReferenceId, cleanupVcSessions]);
 
   const handleBackendChange = useCallback(async (val: string) => {
     const choice = val as "auto" | VcBackend;
@@ -146,8 +152,9 @@ export function VcTestPipeline({
       audioRef.current?.pause();
       audioRef.current = null;
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
+      void cleanupVcSessions("component unmount");
     };
-  }, [resultBlobUrl]);
+  }, [resultBlobUrl, cleanupVcSessions]);
 
   const handleStop = useCallback(() => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
@@ -191,10 +198,10 @@ export function VcTestPipeline({
     setStage("tts"); setStageProgress(0); setTimingInfo(""); setErrorMsg("");
     setTtsBlob(null); setRvcBlob(null); setTtsF0(undefined); setRvcF0(undefined);
 
-    // Release ALL cached GPU sessions before each test run to prevent
-    // WebGPU buffer conflicts between models (e.g. lingering RMVPE session
-    // corrupting ContentVec output). Sessions are re-created lazily by the pipeline.
-    await releaseAllVcSessions().catch(() => {});
+      // Release ALL cached GPU sessions before each test run to prevent
+      // WebGPU buffer conflicts between models (e.g. lingering RMVPE session
+      // corrupting ContentVec output). Sessions are re-created lazily by the pipeline.
+      await cleanupVcSessions("pre-test reset");
 
     if (showSpectrograms && vcReferenceId && !refBlob) {
       readVcReferenceBlob(vcReferenceId).then(b => { if (b) setRefBlob(b); });
@@ -264,7 +271,6 @@ export function VcTestPipeline({
         `${result.features.durationSec.toFixed(1)}s → ${encLabel} ${t.encoderMs}ms, ${pitchLabel} ${t.crepeMs}ms, RVC ${result.synthesis.inferenceMs}ms, norm ${t.normalizeMs}ms, total ${result.totalMs}ms @ ${srLabel}kHz${srNote}${backendLabel}\n` +
         `Resample: ${rs.inputSamples.toLocaleString()} @ ${srIn}Hz → ${rs.outputSamples.toLocaleString()} @ ${srOut}Hz (${rs.durationSec.toFixed(2)}s, ${rs.resampleMs}ms)`
       );
-      setStage("done");
       setRvcBlob(result.wav);
       setTtsF0(result.features.pitchFrames);
 
@@ -284,13 +290,18 @@ export function VcTestPipeline({
         onF0Extracted(result.features.pitchFrames, currentRefF0);
       }
 
-      // Extract F0 from RVC output for spectrogram — uses lightweight F0-only path
-      // which creates a fresh session that gets released by the pipeline
       markSlotRecalcStart(2);
-      extractF0Only(result.wav, pitchAlgorithm)
-        .then(frames => setRvcF0(frames))
-        .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e))
-        .finally(() => markSlotRecalcDone(2));
+      try {
+        const frames = await extractF0Only(result.wav, pitchAlgorithm);
+        setRvcF0(frames);
+      } catch (e) {
+        console.warn("[VcTest] Failed to extract F0 from RVC output:", e);
+      } finally {
+        markSlotRecalcDone(2);
+      }
+
+      await cleanupVcSessions("successful test diagnostics");
+      setStage("done");
 
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
       const url = URL.createObjectURL(result.wav);
@@ -304,8 +315,7 @@ export function VcTestPipeline({
     } catch (err: any) {
       console.error("[VcTestPipeline] Test error:", err);
       // Release ALL sessions on any pipeline failure to free VRAM
-      await releaseAllVcSessions().catch(() => {});
-      console.info("[VcTestPipeline] Sessions released after error");
+      await cleanupVcSessions("error");
       const isGpuCorrupt = err.name === "WebGPUCorruptError";
       const hint = isGpuCorrupt
         ? (isRu ? "\n⚠️ Рекомендуется переключить бэкенд на CPU (WASM)." : "\n⚠️ Consider switching backend to CPU (WASM).")
@@ -313,7 +323,7 @@ export function VcTestPipeline({
       setErrorMsg((err.message || String(err)) + hint);
       setStage("error");
     }
-  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder, dryWet, activeBackend, vcReferenceId, onF0Extracted]);
+  }, [playing, handleStop, buildTtsRequest, isRu, pitchShift, vcOutputSR, indexRate, protect, vcIndexId, pitchAlgorithm, vcEncoder, dryWet, activeBackend, vcReferenceId, onF0Extracted, resultBlobUrl, refF0, showSpectrograms, refBlob, cleanupVcSessions]);
 
   // Not activated guard
   if (!pro.enabled || !pro.modelsReady) {
@@ -423,8 +433,7 @@ export function VcTestPipeline({
               const msg = e instanceof Error ? e.message : String(e);
               toast.error(isRu ? `Ошибка пересчёта F0: ${msg}` : `F0 recalculation error: ${msg}`);
             } finally {
-              await releaseAllVcSessions().catch(() => {});
-              console.info("[SpectrogramPanel] Released all VC sessions after manual F0 recalc");
+              await cleanupVcSessions("manual F0 recalc");
               markSlotRecalcDone(slotIndex);
             }
           }}
