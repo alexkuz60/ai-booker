@@ -694,7 +694,8 @@ const Narrators = () => {
 
                   <Tabs value={voiceTab} onValueChange={v => {
                     setVoiceTab(v);
-                    if (v !== "vc") { setVoiceProvider(v as typeof voiceProvider); markDirty(); }
+                    setVoiceProvider(v as typeof voiceProvider);
+                    markDirty();
                   }}>
                     <TabsList className="w-full">
                       <TabsTrigger value="yandex" className="flex-1 text-xs">Yandex</TabsTrigger>
