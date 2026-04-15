@@ -1,22 +1,22 @@
 /**
- * vcInferenceSession.ts — Wrapper around ONNX Runtime Web InferenceSession.
- * Provides WebGPU → WASM automatic fallback, lazy init, and session caching.
+ * vcInferenceSession.ts — Worker-proxied ONNX Runtime session manager.
  *
- * Usage:
- *   const session = await createVcSession("contentvec");
- *   const result = await session.run({ source: tensor });
+ * All ORT sessions run inside a Web Worker (vcOrtWorker.ts).
+ * GPU memory (WebGPU buffers, shader caches) is owned by the worker.
+ * `releaseAllVcSessions()` terminates the worker — the ONLY reliable
+ * way to reclaim VRAM in Firefox and Chromium where `session.release()`
+ * does not free GPU memory.
+ *
+ * Public API:
+ *   ensureVcSession(modelId)  — create/cache session in worker
+ *   runVcInference(modelId, feeds) — run inference in worker
+ *   releaseVcSession(modelId) — release one session
+ *   releaseAllVcSessions()    — TERMINATE worker (frees all VRAM)
  */
-import * as ort from "onnxruntime-web";
 import { readModel } from "./vcModelCache";
 import { getSharedAdapter } from "./webgpuAdapter";
 
-// Configure ONNX Runtime Web paths for WASM backend
-// WASM files must be served from CDN because Vite does not serve node_modules assets
-const ORT_VERSION = "1.24.3";
-ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
-ort.env.wasm.numThreads = navigator.hardwareConcurrency
-  ? Math.min(navigator.hardwareConcurrency, 4)
-  : 2;
+// ── Types ───────────────────────────────────────────────────────────────
 
 export type VcBackend = "webgpu" | "wasm";
 
@@ -34,13 +34,41 @@ export interface VramUsageSnapshot {
   models: string[];
 }
 
+/**
+ * Describes a tensor for worker-based inference.
+ * Replaces direct ort.Tensor creation in consumer code.
+ */
+export interface TensorDesc {
+  data: Float32Array | BigInt64Array | Uint8Array;
+  dims: number[];
+  dtype: "float32" | "int64" | "bool";
+}
+
+/**
+ * Session metadata returned by ensureVcSession.
+ * Replaces direct access to ort.InferenceSession properties.
+ */
+export interface SessionInfo {
+  inputNames: string[];
+  outputNames: string[];
+  metadata?: Record<string, string>;
+}
+
 type VramUsageListener = (snapshot: VramUsageSnapshot) => void;
 
-/** Cached sessions keyed by modelId */
-const sessionCache = new Map<string, ort.InferenceSession>();
+// ── Worker lifecycle ────────────────────────────────────────────────────
 
-/** Underlying raw sessions kept separately from the lock proxy wrapper */
-const sessionTargets = new Map<string, ort.InferenceSession>();
+let worker: Worker | null = null;
+let requestIdCounter = 0;
+
+interface PendingRequest {
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+}
+const pendingRequests = new Map<number, PendingRequest>();
+
+/** Session info cache (mirrors worker state) */
+const sessionInfoCache = new Map<string, SessionInfo>();
 
 /** Track model buffer sizes for VRAM estimation */
 const sessionSizes = new Map<string, number>();
@@ -48,101 +76,67 @@ const sessionSizes = new Map<string, number>();
 /** Track which backend each session was created with */
 const sessionBackends = new Map<string, VcBackend>();
 
-/** Serialize ONNX inference per model — ORT rejects concurrent session.run() calls */
-const sessionRunQueues = new Map<string, Promise<void>>();
+/** Deduplicate concurrent session creation per model */
+const sessionCreatePromises = new Map<string, Promise<SessionInfo>>();
 
-/** Deduplicate concurrent session creation per model to avoid orphaned GPU sessions */
-const sessionCreatePromises = new Map<string, Promise<ort.InferenceSession>>();
-
-/** Reference count active users of a model session */
-const sessionRefCounts = new Map<string, number>();
-
-/** Reactive listeners for Voice Lab VRAM indicator */
+/** Reactive VRAM listeners */
 const vramListeners = new Set<VramUsageListener>();
 
-function retainSession(modelId: string): void {
-  sessionRefCounts.set(modelId, (sessionRefCounts.get(modelId) ?? 0) + 1);
-}
-
-function releaseSessionRef(modelId: string): number {
-  const current = sessionRefCounts.get(modelId) ?? 0;
-  if (current <= 1) {
-    sessionRefCounts.delete(modelId);
-    return 0;
+function getOrCreateWorker(): Worker {
+  if (!worker) {
+    worker = new Worker(
+      new URL("./vcOrtWorker.ts", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = handleWorkerMessage;
+    worker.onerror = (err) => {
+      console.error("[vcSession] Worker error:", err);
+    };
+    console.info("[vcSession] Worker created");
   }
-  const next = current - 1;
-  sessionRefCounts.set(modelId, next);
-  return next;
+  return worker;
 }
 
-async function waitForSessionCreation(modelId: string): Promise<void> {
-  const pending = sessionCreatePromises.get(modelId);
+function handleWorkerMessage(e: MessageEvent): void {
+  const { id, type, ...data } = e.data;
+  const pending = pendingRequests.get(id);
   if (!pending) return;
-  await pending.catch(() => undefined);
+  pendingRequests.delete(id);
+
+  if (type === "error") {
+    pending.reject(new Error(data.message));
+  } else {
+    pending.resolve({ type, ...data });
+  }
 }
 
-async function runSessionExclusive<T>(modelId: string, task: () => Promise<T>): Promise<T> {
-  const previous = sessionRunQueues.get(modelId);
-  if (previous) {
-    console.info(`[vcSession] Queueing inference for "${modelId}" until previous run completes`);
-  }
-
-  let releaseQueue!: () => void;
-  const current = new Promise<void>((resolve) => {
-    releaseQueue = resolve;
+function sendToWorker(msg: Record<string, any>, transferables?: Transferable[]): Promise<any> {
+  const id = ++requestIdCounter;
+  return new Promise((resolve, reject) => {
+    pendingRequests.set(id, { resolve, reject });
+    getOrCreateWorker().postMessage({ ...msg, id }, transferables ?? []);
   });
+}
 
-  sessionRunQueues.set(
-    modelId,
-    (previous ?? Promise.resolve()).catch(() => undefined).then(() => current),
-  );
-
-  await (previous?.catch(() => undefined) ?? Promise.resolve());
-
-  try {
-    return await task();
-  } finally {
-    releaseQueue();
+/**
+ * Extract an owned ArrayBuffer from a TypedArray.
+ * If the view covers the entire buffer, returns it directly (zero-copy on transfer).
+ * Otherwise copies the relevant slice.
+ */
+function ownedBuffer(view: ArrayBufferView): ArrayBuffer {
+  const buf = view.buffer as ArrayBuffer;
+  if (view.byteOffset === 0 && view.byteLength === buf.byteLength) {
+    return buf;
   }
+  return buf.slice(view.byteOffset, view.byteOffset + view.byteLength);
 }
 
-async function waitForSessionIdle(modelId: string): Promise<void> {
-  while (true) {
-    const pending = sessionRunQueues.get(modelId);
-    if (!pending) return;
-
-    await pending.catch(() => undefined);
-
-    if (sessionRunQueues.get(modelId) === pending) {
-      sessionRunQueues.delete(modelId);
-      return;
-    }
-  }
-}
-
-function createLockedSession(modelId: string, session: ort.InferenceSession): ort.InferenceSession {
-  return new Proxy(session, {
-    get(target, prop, receiver) {
-      if (prop === "run") {
-        return (...args: any[]) => runSessionExclusive(
-          modelId,
-          () => (target.run as (...innerArgs: any[]) => Promise<any>)(...args),
-        );
-      }
-
-      const value = Reflect.get(target, prop, receiver);
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  }) as ort.InferenceSession;
-}
+// ── VRAM tracking ───────────────────────────────────────────────────────
 
 export function getVramUsageSnapshot(): VramUsageSnapshot {
-  const loadedIds = Array.from(new Set([
-    ...sessionCache.keys(),
-    ...sessionTargets.keys(),
-  ]));
-  const gpuModels = loadedIds.filter((modelId) => sessionBackends.get(modelId) === "webgpu");
-  const estimatedBytes = gpuModels.reduce((sum, modelId) => sum + (sessionSizes.get(modelId) ?? 0), 0);
+  const loadedIds = Array.from(sessionInfoCache.keys());
+  const gpuModels = loadedIds.filter((id) => sessionBackends.get(id) === "webgpu");
+  const estimatedBytes = gpuModels.reduce((sum, id) => sum + (sessionSizes.get(id) ?? 0), 0);
 
   return {
     estimatedBytes,
@@ -155,11 +149,7 @@ export function getVramUsageSnapshot(): VramUsageSnapshot {
 function notifyVramUsage(): void {
   const snapshot = getVramUsageSnapshot();
   vramListeners.forEach((listener) => {
-    try {
-      listener(snapshot);
-    } catch {
-      // Ignore listener errors so session lifecycle is not affected
-    }
+    try { listener(snapshot); } catch {}
   });
 }
 
@@ -167,12 +157,9 @@ function notifyVramUsage(): void {
 export function subscribeVramUsage(listener: VramUsageListener): () => void {
   vramListeners.add(listener);
   listener(getVramUsageSnapshot());
-  return () => {
-    vramListeners.delete(listener);
-  };
+  return () => { vramListeners.delete(listener); };
 }
 
-/** Log estimated VRAM usage across all loaded WebGPU sessions */
 function logVramUsage(action: string, modelId: string): void {
   const snapshot = getVramUsageSnapshot();
   console.info(
@@ -181,19 +168,15 @@ function logVramUsage(action: string, modelId: string): void {
   notifyVramUsage();
 }
 
-/** Detect if WebGPU execution provider is available (uses shared adapter) */
+// ── Backend detection ───────────────────────────────────────────────────
+
+let resolvedBackend: VcBackend | null = null;
+let forcedBackend: VcBackend | null = null;
+
 async function isWebGpuAvailable(): Promise<boolean> {
   const adapter = await getSharedAdapter();
   return !!adapter;
 }
-
-let resolvedBackend: VcBackend | null = null;
-
-/**
- * User-forced backend override. When set, bypasses auto-detection.
- * null = auto (WebGPU → WASM fallback), "wasm" = force CPU, "webgpu" = force GPU.
- */
-let forcedBackend: VcBackend | null = null;
 
 /** Force a specific backend. Pass null to restore auto-detection. */
 export function setForcedBackend(backend: VcBackend | null): void {
@@ -220,31 +203,30 @@ export function getSessionBackend(modelId: string): VcBackend | null {
   return sessionBackends.get(modelId) ?? null;
 }
 
+// ── Public API ──────────────────────────────────────────────────────────
+
 /**
- * Create (or return cached) ONNX InferenceSession for a VC model.
+ * Create (or return cached) ONNX session in the worker.
  * Model must already be downloaded to OPFS via vcModelCache.
+ * Returns session metadata (inputNames, outputNames) for building feeds.
  */
-export async function createVcSession(
+export async function ensureVcSession(
   modelId: string,
   options?: VcSessionOptions,
-): Promise<ort.InferenceSession> {
-  retainSession(modelId);
-
-  const cached = sessionCache.get(modelId);
+): Promise<SessionInfo> {
+  // Return cached info if session is already in worker
+  const cached = sessionInfoCache.get(modelId);
   if (cached) return cached;
 
+  // Deduplicate concurrent creation for same model
   const pending = sessionCreatePromises.get(modelId);
   if (pending) {
     console.info(`[vcSession] Awaiting in-flight session creation for "${modelId}"`);
-    try {
-      return await pending;
-    } catch (error) {
-      releaseSessionRef(modelId);
-      throw error;
-    }
+    return pending;
   }
 
-  const createPromise = (async (): Promise<ort.InferenceSession> => {
+  const createPromise = (async (): Promise<SessionInfo> => {
+    // Read model from OPFS
     const buffer = await readModel(modelId);
     if (!buffer) {
       throw new Error(`[vcSession] Model "${modelId}" not found in OPFS cache. Download it first.`);
@@ -252,50 +234,45 @@ export async function createVcSession(
 
     const backend = options?.preferredBackend ?? (await getAvailableBackend());
     const graphOpt = options?.graphOptimization ?? "all";
-
-    // Build execution providers list with fallback
     const executionProviders: string[] =
       backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
 
     console.info(`[vcSession] Creating session for "${modelId}" (backend: ${backend}, ${(buffer.byteLength / 1e6).toFixed(1)} MB)`);
     const startMs = performance.now();
 
-    // Timeout for session creation — large models can hang during shader compilation
-    const SESSION_TIMEOUT_MS = 120_000; // 2 minutes max
-    const sessionPromise = ort.InferenceSession.create(
-      new Uint8Array(buffer),
+    // Send model buffer to worker (zero-copy transfer)
+    const response = await sendToWorker(
       {
+        type: "createSession",
+        modelId,
+        buffer,
         executionProviders,
-        graphOptimizationLevel: graphOpt,
+        graphOpt,
       },
+      [buffer], // transfer the ArrayBuffer
     );
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(
-        `Session creation for "${modelId}" timed out after ${SESSION_TIMEOUT_MS / 1000}s. Try switching to CPU (WASM) backend.`
-      )), SESSION_TIMEOUT_MS),
-    );
-    const session = await Promise.race([sessionPromise, timeoutPromise]);
 
     const elapsed = Math.round(performance.now() - startMs);
     const actualBackend = executionProviders[0] as VcBackend;
     console.info(`[vcSession] Session "${modelId}" ready in ${elapsed}ms (backend: ${actualBackend})`);
 
-    const lockedSession = createLockedSession(modelId, session);
-    sessionCache.set(modelId, lockedSession);
-    sessionTargets.set(modelId, session);
+    const info: SessionInfo = {
+      inputNames: response.inputNames,
+      outputNames: response.outputNames,
+      metadata: response.metadata,
+    };
+
+    sessionInfoCache.set(modelId, info);
     sessionSizes.set(modelId, buffer.byteLength);
     sessionBackends.set(modelId, actualBackend);
     logVramUsage("load", modelId);
-    return lockedSession;
+
+    return info;
   })();
 
   sessionCreatePromises.set(modelId, createPromise);
-
   try {
     return await createPromise;
-  } catch (error) {
-    releaseSessionRef(modelId);
-    throw error;
   } finally {
     if (sessionCreatePromises.get(modelId) === createPromise) {
       sessionCreatePromises.delete(modelId);
@@ -303,73 +280,95 @@ export async function createVcSession(
   }
 }
 
-/** Release a cached session */
-export async function releaseVcSession(modelId: string): Promise<void> {
-  await waitForSessionCreation(modelId);
+/**
+ * Run inference in the worker.
+ * Session must already be created via ensureVcSession().
+ * Input/output data is transferred (zero-copy) between threads.
+ */
+export async function runVcInference(
+  modelId: string,
+  feeds: Record<string, TensorDesc>,
+): Promise<Record<string, TensorDesc>> {
+  // Serialize inputs for worker
+  const inputs: { name: string; buffer: ArrayBuffer; dims: number[]; dtype: string }[] = [];
+  const transferables: ArrayBuffer[] = [];
 
-  const remainingRefs = releaseSessionRef(modelId);
-  if (remainingRefs > 0) {
-    console.info(`[vcSession] Retaining session "${modelId}" (${remainingRefs} refs left)`);
-    return;
+  for (const [name, desc] of Object.entries(feeds)) {
+    const buf = ownedBuffer(desc.data);
+    inputs.push({ name, buffer: buf, dims: desc.dims, dtype: desc.dtype });
+    transferables.push(buf);
   }
 
-  await waitForSessionIdle(modelId);
+  const response = await sendToWorker(
+    { type: "run", modelId, inputs },
+    transferables,
+  );
 
-  if ((sessionRefCounts.get(modelId) ?? 0) > 0) {
-    console.info(`[vcSession] Skip release for "${modelId}" — session was reacquired`);
-    return;
-  }
-
-  const session = sessionTargets.get(modelId) ?? sessionCache.get(modelId);
-  if (session) {
-    sessionCache.delete(modelId);
-    sessionTargets.delete(modelId);
-    sessionSizes.delete(modelId);
-    sessionBackends.delete(modelId);
-    sessionRunQueues.delete(modelId);
-
-    try {
-      await session.release();
-    } finally {
-      logVramUsage("release", modelId);
+  // Deserialize outputs
+  const results: Record<string, TensorDesc> = {};
+  for (const out of response.outputs) {
+    let data: Float32Array | BigInt64Array | Uint8Array;
+    if (out.dtype === "int64") {
+      data = new BigInt64Array(out.buffer);
+    } else if (out.dtype === "bool") {
+      data = new Uint8Array(out.buffer);
+    } else {
+      data = new Float32Array(out.buffer);
     }
+    results[out.name] = { data, dims: out.dims, dtype: out.dtype as TensorDesc["dtype"] };
   }
+
+  return results;
 }
 
-/** Release all cached sessions */
-export async function releaseAllVcSessions(): Promise<void> {
-  if (sessionCreatePromises.size > 0) {
-    await Promise.allSettled(Array.from(sessionCreatePromises.values()));
-  }
+/** Release a single cached session in the worker */
+export async function releaseVcSession(modelId: string): Promise<void> {
+  if (!sessionInfoCache.has(modelId)) return;
 
-  const ids = Array.from(new Set([
-    ...sessionCache.keys(),
-    ...sessionTargets.keys(),
-  ]));
-
-  for (const modelId of ids) {
-    await waitForSessionIdle(modelId);
-  }
-
-  const sessions = ids
-    .map((modelId) => sessionTargets.get(modelId) ?? sessionCache.get(modelId))
-    .filter((session): session is ort.InferenceSession => !!session);
-
-  sessionCache.clear();
-  sessionTargets.clear();
-  sessionSizes.clear();
-  sessionBackends.clear();
-  sessionRunQueues.clear();
-  sessionCreatePromises.clear();
-  sessionRefCounts.clear();
-
-  for (const session of sessions) {
+  if (worker) {
     try {
-      await session.release();
+      await sendToWorker({ type: "releaseSession", modelId });
     } catch {
-      // ok
+      // Worker may already be terminated
     }
   }
+
+  sessionInfoCache.delete(modelId);
+  sessionSizes.delete(modelId);
+  sessionBackends.delete(modelId);
+  logVramUsage("release", modelId);
+}
+
+/**
+ * TERMINATE the worker — guaranteed VRAM release.
+ *
+ * Unlike session.release() which does NOT free GPU memory in most browsers,
+ * worker.terminate() destroys the WebGPU device context, forcing the browser
+ * to reclaim all associated GPU buffers and shader caches.
+ *
+ * A new worker is created lazily on the next ensureVcSession() call.
+ */
+export async function releaseAllVcSessions(): Promise<void> {
+  const ids = Array.from(sessionInfoCache.keys());
+
+  if (worker) {
+    // Terminate the worker — this is the key to real VRAM release
+    worker.terminate();
+    worker = null;
+    console.info(`[vcSession] 🔥 Worker terminated — VRAM forcefully released`);
+  }
+
+  // Reject all pending requests
+  for (const [, req] of pendingRequests) {
+    req.reject(new Error("Worker terminated for GPU cleanup"));
+  }
+  pendingRequests.clear();
+
+  // Clear all caches
+  sessionInfoCache.clear();
+  sessionSizes.clear();
+  sessionBackends.clear();
+  sessionCreatePromises.clear();
 
   console.info(`[vcSession] 💾 VRAM after releaseAll: 0 MB | released: [${ids.join(", ")}]`);
   notifyVramUsage();
@@ -377,7 +376,7 @@ export async function releaseAllVcSessions(): Promise<void> {
 
 /** Get info about loaded sessions */
 export function getLoadedSessions(): string[] {
-  return Array.from(sessionCache.keys());
+  return Array.from(sessionInfoCache.keys());
 }
 
 // ── WebGPU corruption detection ─────────────────────────────────────────
