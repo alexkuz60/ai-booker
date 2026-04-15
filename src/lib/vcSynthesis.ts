@@ -146,57 +146,6 @@ async function resampleToProjectSR(
   };
 }
 
-/**
- * Log tensor statistics for debugging.
- */
-function logTensorStats(label: string, desc: TensorDesc): void {
-  const dims = `[${desc.dims}]`;
-  if (desc.dtype === "float32") {
-    const d = desc.data as Float32Array;
-    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
-    for (let i = 0; i < d.length; i++) {
-      const val = d[i];
-      if (val < min) min = val;
-      if (val > max) max = val;
-      sum += val;
-      sumSq += val * val;
-    }
-    const mean = sum / d.length;
-    const std = Math.sqrt(sumSq / d.length - mean * mean);
-    const zeros = d.reduce((c, v) => c + (v === 0 ? 1 : 0), 0);
-    console.info(
-      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
-      `min=${min.toFixed(4)}, max=${max.toFixed(4)}, mean=${mean.toFixed(4)}, ` +
-      `std=${std.toFixed(4)}, zeros=${zeros}/${d.length}`
-    );
-  } else if (desc.dtype === "int64") {
-    const d = desc.data as BigInt64Array;
-    let min = d[0], max = d[0];
-    for (let i = 1; i < d.length; i++) {
-      if (d[i] < min) min = d[i];
-      if (d[i] > max) max = d[i];
-    }
-    const zeros = Array.from(d).filter(v => v === 0n).length;
-    console.info(
-      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
-      `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
-    );
-  } else if (desc.dtype === "int32") {
-    const d = desc.data as Int32Array;
-    let min = d[0], max = d[0];
-    for (let i = 1; i < d.length; i++) {
-      if (d[i] < min) min = d[i];
-      if (d[i] > max) max = d[i];
-    }
-    const zeros = Array.from(d).filter(v => v === 0).length;
-    console.info(
-      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
-      `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
-    );
-  } else {
-    console.info(`[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}`);
-  }
-}
 
 export async function synthesizeVoice(
   features: VcFeatures,
@@ -336,10 +285,7 @@ export async function synthesizeVoice(
     }
   }
 
-  // Log feed statistics
-  for (const [k, v] of Object.entries(feeds)) {
-    logTensorStats(k, v);
-  }
+
 
   console.info(
     `[vcSynthesis] Running RVC "${modelId}": ${T} frames, ` +
@@ -364,24 +310,7 @@ export async function synthesizeVoice(
   // Validate output — detect WebGPU corruption
   validateInferenceOutput(rawAudio, modelId, "RVC audio output");
 
-  // Diagnostic: output tensor statistics
-  {
-    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
-    for (let i = 0; i < rawAudio.length; i++) {
-      const v = rawAudio[i];
-      if (v < min) min = v;
-      if (v > max) max = v;
-      sum += v;
-      sumSq += v * v;
-    }
-    const mean = sum / rawAudio.length;
-    const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
-    console.info(
-      `[vcSynthesis] OUTPUT "${outputName}": dims=[${output.dims}], ` +
-      `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
-      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
-    );
-  }
+
 
   // Resample RVC output → 44.1 kHz
   const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
