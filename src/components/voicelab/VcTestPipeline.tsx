@@ -284,7 +284,7 @@ export function VcTestPipeline({
       markSlotRecalcStart(2);
       extractF0Only(result.wav, pitchAlgorithm)
         .then(frames => setRvcF0(frames))
-        .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e));
+        .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e))
         .finally(() => markSlotRecalcDone(2));
 
       if (resultBlobUrl) URL.revokeObjectURL(resultBlobUrl);
