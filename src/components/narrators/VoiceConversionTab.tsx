@@ -103,18 +103,22 @@ export function VoiceConversionTab({
     getAvailableBackend().then(setActiveBackend);
   }, [backendChoice]);
 
+  // Load reference blob + F0 only when spectrograms are first opened or reference changes.
+  // pitchAlgorithm is NOT a dependency — F0 re-extraction happens only on explicit test runs.
   useEffect(() => {
     let cancelled = false;
 
     if (!showSpectrograms || !vcReferenceId) {
       return;
     }
+    // Skip if we already have F0 data for the current reference
+    if (refF0 && refF0.length > 0) return;
 
     const loadReferenceDiagnostics = async () => {
-      const blob = refBlob ?? await readVcReferenceBlob(vcReferenceId);
-      if (!blob || cancelled) return;
-
-      if (!refBlob) {
+      let blob = refBlob;
+      if (!blob) {
+        blob = await readVcReferenceBlob(vcReferenceId);
+        if (!blob || cancelled) return;
         setRefBlob(blob);
       }
 
@@ -133,7 +137,8 @@ export function VoiceConversionTab({
     return () => {
       cancelled = true;
     };
-  }, [showSpectrograms, vcReferenceId, refBlob, pitchAlgorithm, vcEncoder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSpectrograms, vcReferenceId]);
 
   // Handle backend switch — release existing sessions first
   const handleBackendChange = useCallback(async (val: string) => {
