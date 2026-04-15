@@ -20,6 +20,7 @@
 
 import * as ort from "onnxruntime-web";
 import { createVcSession, validateInferenceOutput } from "./vcInferenceSession";
+import { disposeOrtResults, disposeOrtTensor } from "./ortCleanup";
 import { alignPitchToEmbeddings } from "./vcPipeline";
 import { applyFeatureRetrieval } from "./vcIndexSearch";
 import type { VcFeatures } from "./vcPipeline";
@@ -402,56 +403,62 @@ export async function synthesizeVoice(
   );
 
   const startMs = performance.now();
-  const results = await session.run(feeds);
-  const inferenceMs = Math.round(performance.now() - startMs);
+  let results: Record<string, ort.Tensor> | undefined;
+  try {
+    results = await session.run(feeds);
+    const inferenceMs = Math.round(performance.now() - startMs);
 
-  // Extract output audio
-  const outputName = session.outputNames[0] ?? "audio";
-  const output = results[outputName];
-  if (!output) {
-    throw new Error(
-      `[vcSynthesis] No output tensor. Available: ${Object.keys(results).join(", ")}`
-    );
-  }
-
-  const rawAudio = new Float32Array(output.data as Float32Array);
-
-  // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
-  validateInferenceOutput(rawAudio, modelId, "RVC audio output");
-
-  // Diagnostic: output tensor statistics
-  {
-    let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
-    for (let i = 0; i < rawAudio.length; i++) {
-      const v = rawAudio[i];
-      if (v < min) min = v;
-      if (v > max) max = v;
-      sum += v;
-      sumSq += v * v;
+    // Extract output audio
+    const outputName = session.outputNames[0] ?? "audio";
+    const output = results[outputName];
+    if (!output) {
+      throw new Error(
+        `[vcSynthesis] No output tensor. Available: ${Object.keys(results).join(", ")}`
+      );
     }
-    const mean = sum / rawAudio.length;
-    const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
+
+    const rawAudio = new Float32Array(output.data as Float32Array);
+
+    // Validate output — detect WebGPU corruption (all zeros, NaN, etc.)
+    validateInferenceOutput(rawAudio, modelId, "RVC audio output");
+
+    // Diagnostic: output tensor statistics
+    {
+      let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+      for (let i = 0; i < rawAudio.length; i++) {
+        const v = rawAudio[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+        sum += v;
+        sumSq += v * v;
+      }
+      const mean = sum / rawAudio.length;
+      const std = Math.sqrt(sumSq / rawAudio.length - mean * mean);
+      console.info(
+        `[vcSynthesis] OUTPUT "${outputName}": shape=[${output.dims}], ` +
+        `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
+        `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
+      );
+    }
+
+    // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility.
+    const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
+    const finalSR = PROJECT_OUTPUT_SR;
+    const durationSec = finalAudio.length / finalSR;
+
     console.info(
-      `[vcSynthesis] OUTPUT "${outputName}": shape=[${output.dims}], ` +
-      `samples=${rawAudio.length}, min=${min.toFixed(4)}, max=${max.toFixed(4)}, ` +
-      `mean=${mean.toFixed(6)}, std=${std.toFixed(4)}`
+      `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
+      `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
+      `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
     );
+
+    return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected, resampleMetrics };
+  } finally {
+    // Dispose all input tensors
+    for (const t of Object.values(feeds)) disposeOrtTensor(t);
+    // Dispose output tensors
+    disposeOrtResults(results);
   }
-
-
-  // Resample RVC output → 44.1 kHz (project standard) for Studio timeline compatibility.
-  // Output SR is the model's native rate (e.g. 40kHz) — NOT derived dynamically.
-  const { resampled: finalAudio, metrics: resampleMetrics } = await resampleToProjectSR(rawAudio, outputSR);
-  const finalSR = PROJECT_OUTPUT_SR;
-  const durationSec = finalAudio.length / finalSR;
-
-  console.info(
-    `[vcSynthesis] Done: ${rawAudio.length} samples @ ${outputSR}Hz → ` +
-    `${finalAudio.length} samples @ ${finalSR}Hz (${durationSec.toFixed(2)}s), ` +
-    `resample ${resampleMetrics.resampleMs}ms, inference ${inferenceMs}ms`
-  );
-
-  return { audio: finalAudio, sampleRate: finalSR, durationSec, inferenceMs, srAutoDetected, resampleMetrics };
 }
 
 /**
