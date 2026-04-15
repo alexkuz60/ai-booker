@@ -365,18 +365,17 @@ export default function VoiceLab() {
       const buf = await file.arrayBuffer();
       const parsed = parseIndexFile(buf, file.name);
       const id = crypto.randomUUID();
-      const npyBlob = parsed.format === "npy" ? new Blob([buf]) : buildNpyBlob(parsed.vectors, parsed.dim);
+      const npyBlob = buildNpyBlob(parsed.data, parsed.rows, parsed.cols);
       const entry: VcIndexEntry = {
         id, name: file.name.replace(/\.[^.]+$/, ""),
-        format: parsed.format,
-        vectorCount: parsed.vectorCount,
-        dim: parsed.dim,
+        vectorCount: parsed.rows,
+        dim: parsed.cols,
         sizeBytes: npyBlob.size,
         addedAt: new Date().toISOString(),
       };
       await saveVcIndex(id, npyBlob, entry);
       setLocalIndexes(await listVcIndexes());
-      toast.success(isRu ? `Индекс "${entry.name}" загружен (${parsed.vectorCount} векторов)` : `Index "${entry.name}" uploaded (${parsed.vectorCount} vectors)`);
+      toast.success(isRu ? `Индекс "${entry.name}" загружен (${parsed.rows} векторов)` : `Index "${entry.name}" uploaded (${parsed.rows} vectors)`);
     } catch (err: any) {
       toast.error(err.message || (isRu ? "Ошибка загрузки индекса" : "Index upload error"));
     } finally {
