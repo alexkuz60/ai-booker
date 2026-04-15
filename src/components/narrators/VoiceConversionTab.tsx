@@ -91,6 +91,7 @@ export function VoiceConversionTab({
   const [ttsF0, setTtsF0] = useState<PitchFrame[] | undefined>();
   const [refF0, setRefF0] = useState<PitchFrame[] | undefined>();
   const [rvcF0, setRvcF0] = useState<PitchFrame[] | undefined>();
+  const [recalcingSlots, setRecalcingSlots] = useState<Set<number>>(new Set());
 
   // Backend selection: "auto" | "webgpu" | "wasm"
   const [backendChoice, setBackendChoice] = useState<"auto" | VcBackend>(
@@ -812,6 +813,27 @@ export function VoiceConversionTab({
             { label: isRu ? "Выход: RVC" : "Output: RVC", blob: rvcBlob, f0Frames: rvcF0, f0Color: "rgba(40, 40, 80, 0.95)" },
           ]}
           onClose={() => setShowSpectrograms(false)}
+          recalcingSlots={recalcingSlots}
+          onRecalcF0={async (slotIndex) => {
+            const blobs = [ttsBlob, refBlob, rvcBlob];
+            const setters = [setTtsF0, setRefF0, setRvcF0];
+            const blob = blobs[slotIndex];
+            if (!blob) return;
+            setRecalcingSlots(prev => new Set(prev).add(slotIndex));
+            try {
+              const frames = await extractF0Only(blob, pitchAlgorithm);
+              setters[slotIndex](frames);
+            } catch (e) {
+              console.warn("[SpectrogramPanel] F0 recalc error:", e);
+              toast.error(isRu ? "Ошибка пересчёта F0" : "F0 recalculation error");
+            } finally {
+              setRecalcingSlots(prev => {
+                const next = new Set(prev);
+                next.delete(slotIndex);
+                return next;
+              });
+            }
+          }}
         />
       )}
     </div>
