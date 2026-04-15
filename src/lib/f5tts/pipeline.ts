@@ -22,7 +22,8 @@ import { F5_SAMPLE_RATE } from "./types";
 export async function ensureF5Sessions(): Promise<void> {
   const modelIds: F5ModelId[] = ["f5tts-encoder", "f5tts-transformer", "f5tts-decoder"];
   for (const id of modelIds) {
-    await ensureVcSession(id);
+    // Force WASM backend — F5-TTS ONNX models have WebGPU shader compilation issues
+    await ensureVcSession(id, { preferredBackend: "wasm" });
   }
 }
 
