@@ -14,7 +14,7 @@ import { extractPitch, type CrepeResult, type PitchFrame } from "./vcCrepe";
 import { extractPitchRmvpe } from "./vcRmvpe";
 import { extractPitchSwiftF0 } from "./vcSwiftF0";
 import { synthesizeVoice, vcAudioToWav, type VcSynthesisResult, type VcSynthesisOptions } from "./vcSynthesis";
-import { getSessionBackend } from "./vcInferenceSession";
+import { getSessionBackend, releaseVcSession } from "./vcInferenceSession";
 import type { PitchAlgorithm, SpeechEncoder } from "./vcModelCache";
 
 export interface VcFeatures {
@@ -54,6 +54,8 @@ export interface VcPipelineOptions {
   synthesis?: VcSynthesisOptions;
   /** Dry/Wet mix ratio: 0.0 = pure TTS (dry), 1.0 = pure RVC (wet). Default 1.0 */
   dryWet?: number;
+  /** Release ONNX sessions after pipeline completes to free VRAM. Default true. */
+  releaseSessions?: boolean;
 }
 
 /**
