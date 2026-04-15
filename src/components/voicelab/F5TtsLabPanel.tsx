@@ -11,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SliderField } from "@/components/ui/SliderField";
-import {
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
@@ -21,8 +21,9 @@ import {
 import {
   F5_MODEL_REGISTRY, F5_MODEL_CACHE_EVENT,
   getF5ModelStatus, downloadF5Model, areF5ModelsReady, deleteF5Model,
-  type F5DownloadProgress, type F5ModelId,
+  type F5DownloadProgress,
 } from "@/lib/f5tts/modelRegistry";
+import type { F5ModelId } from "@/lib/f5tts/types";
 import { ensureF5Sessions, releaseF5Sessions, synthesizeF5, f5AudioToWav } from "@/lib/f5tts/pipeline";
 import { getVocabCoverage } from "@/lib/f5tts/tokenizer";
 import { F5_SAMPLE_RATE } from "@/lib/f5tts/types";
@@ -372,22 +373,14 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <SliderField
-                  label={isRu ? "NFE шагов" : "NFE Steps"}
-                  value={nfeSteps}
-                  onValueChange={setNfeSteps}
-                  min={4}
-                  max={64}
-                  step={1}
-                />
-                <SliderField
-                  label={isRu ? "Скорость" : "Speed"}
-                  value={speed}
-                  onValueChange={setSpeed}
-                  min={0.5}
-                  max={2.0}
-                  step={0.05}
-                />
+                <div className="space-y-1">
+                  <Label className="text-xs">{isRu ? "NFE шагов" : "NFE Steps"}: {nfeSteps}</Label>
+                  <Slider value={[nfeSteps]} onValueChange={([v]) => setNfeSteps(v)} min={4} max={64} step={1} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{isRu ? "Скорость" : "Speed"}: {speed.toFixed(2)}</Label>
+                  <Slider value={[speed]} onValueChange={([v]) => setSpeed(v)} min={0.5} max={2.0} step={0.05} />
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
