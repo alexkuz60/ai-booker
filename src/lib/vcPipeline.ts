@@ -253,59 +253,70 @@ async function _convertVoiceFullImpl(
 ): Promise<VcFullResult> {
   const t0 = performance.now();
   const dryWet = Math.max(0, Math.min(1, options?.dryWet ?? 1.0));
-
-  // Extract features (resample + ContentVec + CREPE)
-  const features = await extractVcFeatures(audio, options);
-
-  // Synthesize with RVC
-  options?.onProgress?.("synthesis", 0);
-  const synthesis = await synthesizeVoice(features, options?.synthesis);
-  options?.onProgress?.("synthesis", 1);
-
-  // ── Dry/Wet mixing ──
-  let finalAudio = synthesis.audio;
-  if (dryWet < 0.999) {
-    const dryResampled = await resampleForMix(audio, synthesis.sampleRate);
-    const minLen = Math.min(dryResampled.length, synthesis.audio.length);
-    const mixed = new Float32Array(minLen);
-    for (let i = 0; i < minLen; i++) {
-      mixed[i] = dryResampled[i] * (1 - dryWet) + synthesis.audio[i] * dryWet;
-    }
-    finalAudio = mixed;
-    console.info(`[vcPipeline] Dry/Wet mix: ${((1 - dryWet) * 100).toFixed(0)}% TTS + ${(dryWet * 100).toFixed(0)}% RVC`);
-  }
-
-  // Encode to WAV
-  const wav = vcAudioToWav(finalAudio, synthesis.sampleRate);
-  const totalMs = Math.round(performance.now() - t0);
-
-  const resample: VcResampleInfo = {
-    inputSamples: synthesis.resampleMetrics.inputSamples,
-    outputSamples: synthesis.resampleMetrics.outputSamples,
-    inputSR: synthesis.resampleMetrics.inputSR,
-    outputSR: synthesis.resampleMetrics.outputSR,
-    durationSec: synthesis.resampleMetrics.durationSec,
-    resampleMs: synthesis.resampleMetrics.resampleMs,
-  };
-
-  console.info(
-    `[vcPipeline] Full VC complete: ${features.durationSec.toFixed(2)}s input → ` +
-    `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
-  );
-
-  // ── Release ONNX sessions to free VRAM ──
   const shouldRelease = options?.releaseSessions !== false; // default true
-  if (shouldRelease) {
-    const encoder = options?.encoder ?? "contentvec";
-    const pitchAlgo = options?.pitchAlgorithm ?? "crepe-tiny";
-    const modelsToRelease = [encoder, pitchAlgo, options?.synthesis?.modelId ?? "rvc-v2"];
-    for (const modelId of modelsToRelease) {
-      await releaseVcSession(modelId).catch(() => {});
-    }
-    console.info(`[vcPipeline] Released sessions: [${modelsToRelease.join(", ")}]`);
-  }
+  const encoder = options?.encoder ?? "contentvec";
+  const pitchAlgo = options?.pitchAlgorithm ?? "crepe-tiny";
+  const modelsToRelease = [encoder, pitchAlgo, options?.synthesis?.modelId ?? "rvc-v2"];
 
-  return { wav, features, synthesis, resample, totalMs };
+  try {
+    // Extract features (resample + ContentVec + CREPE)
+    const features = await extractVcFeatures(audio, options);
+
+    // Synthesize with RVC
+    options?.onProgress?.("synthesis", 0);
+    const synthesis = await synthesizeVoice(features, options?.synthesis);
+    options?.onProgress?.("synthesis", 1);
+
+    // ── Dry/Wet mixing ──
+    let finalAudio = synthesis.audio;
+    if (dryWet < 0.999) {
+      const dryResampled = await resampleForMix(audio, synthesis.sampleRate);
+      const minLen = Math.min(dryResampled.length, synthesis.audio.length);
+      const mixed = new Float32Array(minLen);
+      for (let i = 0; i < minLen; i++) {
+        mixed[i] = dryResampled[i] * (1 - dryWet) + synthesis.audio[i] * dryWet;
+      }
+      finalAudio = mixed;
+      console.info(`[vcPipeline] Dry/Wet mix: ${((1 - dryWet) * 100).toFixed(0)}% TTS + ${(dryWet * 100).toFixed(0)}% RVC`);
+    }
+
+    // Encode to WAV
+    const wav = vcAudioToWav(finalAudio, synthesis.sampleRate);
+    const totalMs = Math.round(performance.now() - t0);
+
+    const resample: VcResampleInfo = {
+      inputSamples: synthesis.resampleMetrics.inputSamples,
+      outputSamples: synthesis.resampleMetrics.outputSamples,
+      inputSR: synthesis.resampleMetrics.inputSR,
+      outputSR: synthesis.resampleMetrics.outputSR,
+      durationSec: synthesis.resampleMetrics.durationSec,
+      resampleMs: synthesis.resampleMetrics.resampleMs,
+    };
+
+    console.info(
+      `[vcPipeline] Full VC complete: ${features.durationSec.toFixed(2)}s input → ` +
+      `${synthesis.durationSec.toFixed(2)}s output, ${totalMs}ms total`
+    );
+
+    // ── Release ONNX sessions to free VRAM ──
+    if (shouldRelease) {
+      for (const modelId of modelsToRelease) {
+        await releaseVcSession(modelId).catch(() => {});
+      }
+      console.info(`[vcPipeline] Released sessions: [${modelsToRelease.join(", ")}]`);
+    }
+
+    return { wav, features, synthesis, resample, totalMs };
+  } catch (err) {
+    // Always release sessions on failure to prevent VRAM leak
+    if (shouldRelease) {
+      for (const modelId of modelsToRelease) {
+        await releaseVcSession(modelId).catch(() => {});
+      }
+      console.info(`[vcPipeline] Released sessions after error: [${modelsToRelease.join(", ")}]`);
+    }
+    throw err;
+  }
 }
 
 /**
