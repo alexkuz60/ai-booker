@@ -236,6 +236,26 @@ export async function convertVoiceFull(
   audio: ArrayBuffer | Blob,
   options?: VcPipelineOptions,
 ): Promise<VcFullResult> {
+  try {
+    return await _convertVoiceFullImpl(audio, options);
+  } catch (err) {
+    if (err instanceof WebGPUCorruptError) {
+      console.warn(`[vcPipeline] WebGPU corruption detected, retrying with WASM...`, err.message);
+      const switched = await forceWasmFallback();
+      if (switched) {
+        options?.onProgress?.("resample", 0);
+        return await _convertVoiceFullImpl(audio, options);
+      }
+    }
+    throw err;
+  }
+}
+
+/** Internal implementation of the full VC pipeline */
+async function _convertVoiceFullImpl(
+  audio: ArrayBuffer | Blob,
+  options?: VcPipelineOptions,
+): Promise<VcFullResult> {
   const t0 = performance.now();
   const dryWet = Math.max(0, Math.min(1, options?.dryWet ?? 1.0));
 
@@ -248,7 +268,6 @@ export async function convertVoiceFull(
   options?.onProgress?.("synthesis", 1);
 
   // ── Dry/Wet mixing ──
-  // If dryWet < 1.0, blend original TTS (resampled to output SR) with RVC output
   let finalAudio = synthesis.audio;
   if (dryWet < 0.999) {
     const dryResampled = await resampleForMix(audio, synthesis.sampleRate);
