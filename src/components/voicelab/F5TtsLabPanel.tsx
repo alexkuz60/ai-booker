@@ -15,11 +15,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Download, Play, Square, Loader2, CheckCircle2, AlertTriangle, Upload, Trash2, Zap,
+  Download, Play, Square, Loader2, CheckCircle2, AlertTriangle, Upload, Trash2, Zap, RotateCcw,
 } from "lucide-react";
 import {
   F5_MODEL_REGISTRY, F5_MODEL_CACHE_EVENT,
-  getF5ModelStatus, downloadF5Model, areF5ModelsReady, deleteF5Model,
+  getF5ModelStatus, downloadF5Model, deleteF5Model,
   type F5DownloadProgress,
 } from "@/lib/f5tts/modelRegistry";
 import type { F5ModelId } from "@/lib/f5tts/types";
@@ -27,6 +27,7 @@ import { ensureF5Sessions, releaseF5Sessions, synthesizeF5, f5AudioToWav } from 
 import { getVocabCoverage } from "@/lib/f5tts/tokenizer";
 import { F5_SAMPLE_RATE } from "@/lib/f5tts/types";
 import type { F5Reference } from "@/lib/f5tts/types";
+import { releaseAllVcSessions } from "@/lib/vcInferenceSession";
 import { toast } from "sonner";
 
 interface F5TtsLabPanelProps {
@@ -57,7 +58,9 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
   const [timing, setTiming] = useState<{ encoderMs: number; transformerMs: number; decoderMs: number; totalMs: number } | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const synthRunIdRef = useRef(0);
   const [playing, setPlaying] = useState(false);
 
   // Load model status
@@ -110,6 +113,40 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
     setRefAudioName(file.name);
   }, []);
 
+  const cleanupSynthesisSessions = useCallback(async (forceTerminate = false) => {
+    if (forceTerminate) {
+      await releaseAllVcSessions().catch(() => {});
+      return;
+    }
+
+    try {
+      await Promise.race([
+        releaseF5Sessions(),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("release_timeout")), 1500);
+        }),
+      ]);
+    } catch {
+      await releaseAllVcSessions().catch(() => {});
+    }
+  }, []);
+
+  const handleResetSynthesis = useCallback(async () => {
+    synthRunIdRef.current += 1;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlaying(false);
+    setStage("idle");
+    setNfeProgress(0);
+    setTiming(null);
+    setErrorMessage(null);
+    setResultBlob(null);
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    setResultUrl(null);
+    await cleanupSynthesisSessions(true);
+    toast.success(isRu ? "Синтез сброшен" : "Synthesis reset");
+  }, [cleanupSynthesisSessions, isRu, resultUrl]);
+
   // ── Vocab coverage check ──
   const coverageInfo = synthText ? getVocabCoverage(synthText) : null;
 
@@ -120,7 +157,11 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
       return;
     }
 
+    const runId = synthRunIdRef.current + 1;
+    synthRunIdRef.current = runId;
+
     setStage("loading");
+    setErrorMessage(null);
     setTiming(null);
     setResultBlob(null);
     if (resultUrl) URL.revokeObjectURL(resultUrl);
@@ -138,6 +179,8 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
         await ctx.close();
       }
 
+      if (synthRunIdRef.current !== runId) return;
+
       // Resample to 24kHz mono if needed
       let samples: Float32Array;
       if (decoded.sampleRate !== F5_SAMPLE_RATE) {
@@ -151,6 +194,8 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
       } else {
         samples = decoded.getChannelData(0);
       }
+
+      if (synthRunIdRef.current !== runId) return;
 
       // Float32 → Int16
       const int16 = new Int16Array(samples.length);
@@ -168,14 +213,20 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
       // Load sessions
       setStage("loading");
       await ensureF5Sessions();
+      if (synthRunIdRef.current !== runId) return;
 
       // Synthesize
       setStage("transforming");
       const result = await synthesizeF5(reference, synthText.trim(), {
         nfeSteps,
         speed,
-        onStep: (step, total) => setNfeProgress(Math.round((step / total) * 100)),
+        onStep: (step, total) => {
+          if (synthRunIdRef.current !== runId) return;
+          setNfeProgress(Math.round((step / total) * 100));
+        },
       });
+
+      if (synthRunIdRef.current !== runId) return;
 
       setTiming(result.timing);
       setStage("done");
@@ -192,13 +243,17 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
           : `Synthesis complete: ${result.durationSec.toFixed(1)}s in ${(result.timing.totalMs / 1000).toFixed(1)}s`
       );
     } catch (err: any) {
+      if (synthRunIdRef.current !== runId) return;
       console.error("[f5tts] Synthesis error:", err);
+      setErrorMessage(err?.message ?? String(err));
       setStage("error");
-      toast.error(err.message ?? String(err));
+      toast.error(err?.message ?? String(err));
     } finally {
-      await releaseF5Sessions();
+      if (synthRunIdRef.current === runId) {
+        await cleanupSynthesisSessions(false);
+      }
     }
-  }, [refAudioBlob, refTranscript, synthText, nfeSteps, speed, isRu, resultUrl]);
+  }, [refAudioBlob, refTranscript, synthText, nfeSteps, speed, isRu, resultUrl, cleanupSynthesisSessions]);
 
   // ── Playback ──
   const handlePlay = useCallback(() => {
@@ -217,6 +272,7 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
 
   // Cleanup
   useEffect(() => () => {
+    synthRunIdRef.current += 1;
     if (resultUrl) URL.revokeObjectURL(resultUrl);
     audioRef.current?.pause();
   }, [resultUrl]);
@@ -384,15 +440,14 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
 
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={handleSynthesize}
-                  disabled={busy || !refAudioBlob || !refTranscript.trim() || !synthText.trim()}
+                  onClick={busy ? handleResetSynthesis : handleSynthesize}
+                  variant={busy ? "secondary" : "default"}
+                  disabled={!busy && (!refAudioBlob || !refTranscript.trim() || !synthText.trim())}
                 >
                   {busy ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                      {stage === "loading"
-                        ? (isRu ? "Загрузка моделей..." : "Loading models...")
-                        : (isRu ? `NFE ${nfeProgress}%` : `NFE ${nfeProgress}%`)}
+                      <RotateCcw className="w-4 h-4 mr-1" />
+                      {isRu ? "Сбросить" : "Reset"}
                     </>
                   ) : (
                     <>
@@ -401,6 +456,17 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
                     </>
                   )}
                 </Button>
+
+                {busy && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>
+                      {stage === "loading"
+                        ? (isRu ? "Загрузка моделей..." : "Loading models...")
+                        : (isRu ? `NFE ${nfeProgress}%` : `NFE ${nfeProgress}%`)}
+                    </span>
+                  </div>
+                )}
 
                 {resultUrl && (
                   <Button size="sm" variant="outline" onClick={handlePlay}>
@@ -427,7 +493,7 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
                 <Alert variant="destructive">
                   <AlertTriangle className="w-4 h-4" />
                   <AlertDescription>
-                    {isRu ? "Ошибка синтеза. Проверьте консоль." : "Synthesis error. Check console."}
+                    {errorMessage ?? (isRu ? "Ошибка синтеза. Проверьте консоль." : "Synthesis error. Check console.")}
                   </AlertDescription>
                 </Alert>
               )}
