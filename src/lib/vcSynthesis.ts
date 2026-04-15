@@ -181,6 +181,18 @@ function logTensorStats(label: string, desc: TensorDesc): void {
       `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
       `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
     );
+  } else if (desc.dtype === "int32") {
+    const d = desc.data as Int32Array;
+    let min = d[0], max = d[0];
+    for (let i = 1; i < d.length; i++) {
+      if (d[i] < min) min = d[i];
+      if (d[i] > max) max = d[i];
+    }
+    const zeros = Array.from(d).filter(v => v === 0).length;
+    console.info(
+      `[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}, ` +
+      `min=${min}, max=${max}, zeros=${zeros}/${d.length}`
+    );
   } else {
     console.info(`[vcSynthesis] feed "${label}": shape=${dims}, type=${desc.dtype}`);
   }
