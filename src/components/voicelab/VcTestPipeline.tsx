@@ -264,7 +264,8 @@ export function VcTestPipeline({
         onF0Extracted(result.features.pitchFrames, currentRefF0);
       }
 
-      // Extract F0 from RVC output for spectrogram
+      // Extract F0 from RVC output for spectrogram — uses lightweight F0-only path
+      // which creates a fresh session that gets released by the pipeline
       extractF0Only(result.wav, pitchAlgorithm)
         .then(frames => setRvcF0(frames))
         .catch(e => console.warn("[VcTest] Failed to extract F0 from RVC output:", e));
