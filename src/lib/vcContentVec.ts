@@ -46,6 +46,20 @@ export async function extractContentVec(
     throw new Error(`ContentVec requires ${EXPECTED_SR}Hz input, got ${sampleRate}Hz`);
   }
 
+  try {
+    return await _runContentVec(samples);
+  } catch (err) {
+    if (err instanceof WebGPUCorruptError && getSessionBackend("contentvec") === "webgpu") {
+      console.warn(`[ContentVec] WebGPU corruption detected — falling back to WASM`);
+      await releaseVcSession("contentvec");
+      setForcedBackend("wasm");
+      return await _runContentVec(samples);
+    }
+    throw err;
+  }
+}
+
+async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> {
   const session = await createVcSession("contentvec");
 
   // ContentVec768 (vec-768-layer-12) expects [batch, channels, sequence] = [1, 1, T]
