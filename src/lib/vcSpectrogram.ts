@@ -147,10 +147,21 @@ function fftInPlace(real: Float32Array, imag: Float32Array): void {
 type ColorFn = (t: number) => [number, number, number];
 
 const magmaColors: ColorFn = (t) => {
-  const r = Math.round(255 * Math.min(1, t * 3.5 - 0.15));
-  const g = Math.round(255 * Math.max(0, Math.min(1, t * 2.5 - 0.6)));
-  const b = Math.round(255 * Math.min(1, Math.max(0, 0.5 + 0.5 * Math.sin(Math.PI * (t * 0.8 + 0.3)))));
-  return [Math.max(0, r), Math.max(0, g), Math.max(0, b)];
+  // Approximation of matplotlib's "magma": black → deep purple → hot magenta → warm yellow
+  if (t < 0.25) {
+    const s = t / 0.25;
+    return [Math.round(s * 30), Math.round(s * 5), Math.round(s * 60)];
+  }
+  if (t < 0.5) {
+    const s = (t - 0.25) / 0.25;
+    return [Math.round(30 + s * 150), Math.round(5 + s * 15), Math.round(60 + s * 80)];
+  }
+  if (t < 0.75) {
+    const s = (t - 0.5) / 0.25;
+    return [Math.round(180 + s * 60), Math.round(20 + s * 80), Math.round(140 - s * 80)];
+  }
+  const s = (t - 0.75) / 0.25;
+  return [Math.round(240 + s * 15), Math.round(100 + s * 130), Math.round(60 - s * 30)];
 };
 
 const viridisColors: ColorFn = (t) => {
