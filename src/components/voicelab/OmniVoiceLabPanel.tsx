@@ -79,8 +79,15 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const checkServer = useCallback(async () => {
     setCheckingServer(true);
     try {
+      // Try /health first; if 404, fall back to root — any HTTP response means server is up
       const res = await fetch(`${serverUrl}/health`, { signal: AbortSignal.timeout(3000) });
-      setServerOnline(res.ok);
+      if (res.ok) {
+        setServerOnline(true);
+      } else {
+        // Server responded but /health not found — try root or just accept it's online
+        const res2 = await fetch(`${serverUrl}/`, { signal: AbortSignal.timeout(3000) });
+        setServerOnline(true); // any response = server is running
+      }
     } catch {
       setServerOnline(false);
     } finally {
