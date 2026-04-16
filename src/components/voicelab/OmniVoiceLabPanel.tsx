@@ -469,7 +469,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             )}
 
             {stage === "done" && (
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <CheckCircle2 className="w-4 h-4 text-primary" />
             )}
           </div>
 
