@@ -495,7 +495,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             <Button
               onClick={busy ? handleReset : handleSynthesize}
               variant={busy ? "secondary" : "default"}
-              disabled={!busy && (!synthText.trim() || serverOnline !== true)}
+              disabled={!busy && !synthText.trim()}
+              title={serverOnline === false ? (isRu ? "Сервер недоступен (health-check не прошёл). Можно попробовать всё равно." : "Server unreachable (health-check failed). You can try anyway.") : undefined}
             >
               {busy ? (
                 <>
