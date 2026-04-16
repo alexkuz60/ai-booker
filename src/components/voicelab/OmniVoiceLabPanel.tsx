@@ -91,6 +91,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   }, [serverUrl]);
 
   const usingLocalDevProxy = requestBaseUrl === LOCAL_DEV_PROXY_PATH;
+  const isLocalOrigin = typeof window !== "undefined" && LOCAL_DEV_HOSTS.has(window.location.hostname);
 
   const showPreviewWarning = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -259,6 +260,10 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Badge variant={isLocalOrigin ? "secondary" : "outline"} className="gap-1 text-[10px]">
+            <Globe className="w-3 h-3" />
+            {isLocalOrigin ? "Local" : "Cloud Preview"}
+          </Badge>
           {serverOnline === true && (
             <Badge variant="default" className="gap-1">
               <Wifi className="w-3 h-3" />
