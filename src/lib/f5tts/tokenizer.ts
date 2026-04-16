@@ -70,5 +70,5 @@ export function getVocabCoverage(text: string): { total: number; covered: number
     if (map.has(ch)) covered++;
     else missing.add(ch);
   }
-  return { total: lower.length, covered, missing: [...missing] };
+  return { total: lower.length, covered, missing: Array.from(missing) };
 }
