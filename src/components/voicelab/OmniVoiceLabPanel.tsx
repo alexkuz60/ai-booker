@@ -91,6 +91,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   }, [serverUrl]);
 
   const usingLocalDevProxy = requestBaseUrl === LOCAL_DEV_PROXY_PATH;
+  const isLocalOrigin = typeof window !== "undefined" && LOCAL_DEV_HOSTS.has(window.location.hostname);
 
   const showPreviewWarning = useMemo(() => {
     if (typeof window === "undefined") return false;
