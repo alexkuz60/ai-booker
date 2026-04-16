@@ -3,7 +3,7 @@
  * Connects to a local OmniVoice server (OpenAI-compatible /v1/audio/speech API).
  * Supports: Voice Design (instructions), Voice Cloning (ref audio + ref text), and Auto Voice.
  */
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -40,6 +40,11 @@ const NON_VERBAL_TAGS = [
 ];
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:8880";
+const LOCAL_DEV_PROXY_PATH = "/api/omnivoice";
+const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+const normalizeServerUrl = (value: string) => value.trim().replace(/\/$/, "");
+const isDefaultLocalOmniVoiceServer = (value: string) => /^https?:\/\/(?:127\.0\.0\.1|localhost):8880$/i.test(normalizeServerUrl(value));
 
 /* ─── Component ─────────────────────────────────── */
 
@@ -75,25 +80,41 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const requestBaseUrl = useMemo(() => {
+    const normalized = normalizeServerUrl(serverUrl);
+    if (typeof window === "undefined") return normalized;
+
+    const runningLocally = LOCAL_DEV_HOSTS.has(window.location.hostname);
+    const canUseDevProxy = import.meta.env.DEV && runningLocally && isDefaultLocalOmniVoiceServer(normalized);
+
+    return canUseDevProxy ? LOCAL_DEV_PROXY_PATH : normalized;
+  }, [serverUrl]);
+
+  const usingLocalDevProxy = requestBaseUrl === LOCAL_DEV_PROXY_PATH;
+
+  const showPreviewWarning = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const runningLocally = LOCAL_DEV_HOSTS.has(window.location.hostname);
+    return !runningLocally && /^https?:\/\/(?:127\.0\.0\.1|localhost)/i.test(normalizeServerUrl(serverUrl));
+  }, [serverUrl]);
+
   // ── Server health check ──
   const checkServer = useCallback(async () => {
     setCheckingServer(true);
     try {
-      // Try /health first; if 404, fall back to root — any HTTP response means server is up
-      const res = await fetch(`${serverUrl}/health`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${requestBaseUrl}/health`, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         setServerOnline(true);
       } else {
-        // Server responded but /health not found — try root or just accept it's online
-        const res2 = await fetch(`${serverUrl}/`, { signal: AbortSignal.timeout(3000) });
-        setServerOnline(true); // any response = server is running
+        await fetch(`${requestBaseUrl}/`, { signal: AbortSignal.timeout(3000) });
+        setServerOnline(true);
       }
     } catch {
       setServerOnline(false);
     } finally {
       setCheckingServer(false);
     }
-  }, [serverUrl]);
+  }, [requestBaseUrl]);
 
   useEffect(() => {
     checkServer();
@@ -131,18 +152,16 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
       let response: Response;
 
       if (mode === "clone") {
-        // One-shot cloning via multipart form
         const form = new FormData();
         form.append("text", synthText.trim());
         form.append("ref_text", refTranscript.trim());
         form.append("ref_audio", refAudioBlob!, refAudioName || "reference.wav");
 
-        response = await fetch(`${serverUrl}/v1/audio/speech/clone`, {
+        response = await fetch(`${requestBaseUrl}/v1/audio/speech/clone`, {
           method: "POST",
           body: form,
         });
       } else {
-        // Design or Auto via JSON
         const body: Record<string, unknown> = {
           model: "omnivoice",
           input: synthText.trim(),
@@ -157,9 +176,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             body.voice = preset;
           }
         }
-        // Auto mode: no voice/instructions — model picks automatically
 
-        response = await fetch(`${serverUrl}/v1/audio/speech`, {
+        response = await fetch(`${requestBaseUrl}/v1/audio/speech`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -190,7 +208,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
       setStage("error");
       toast.error(err?.message ?? String(err));
     }
-  }, [synthText, mode, refAudioBlob, refAudioName, refTranscript, instructions, preset, speed, serverUrl, isRu, resultUrl]);
+  }, [synthText, mode, refAudioBlob, refAudioName, refTranscript, instructions, preset, speed, requestBaseUrl, isRu, resultUrl]);
 
   // ── Playback ──
   const handlePlay = useCallback(() => {
@@ -244,13 +262,13 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           {serverOnline === true && (
             <Badge variant="default" className="gap-1">
               <Wifi className="w-3 h-3" />
-              Online
+              {isRu ? "Онлайн" : "Online"}
             </Badge>
           )}
           {serverOnline === false && (
             <Badge variant="destructive" className="gap-1">
               <WifiOff className="w-3 h-3" />
-              Offline
+              {isRu ? "Оффлайн" : "Offline"}
             </Badge>
           )}
           {serverOnline === null && checkingServer && (
@@ -282,6 +300,31 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               {checkingServer ? <Loader2 className="w-3 h-3 animate-spin" /> : (isRu ? "Проверить" : "Check")}
             </Button>
           </div>
+          {usingLocalDevProxy && (
+            <p className="text-xs text-muted-foreground">
+              {isRu
+                ? "В локальном Booker запросы к OmniVoice идут через встроенный dev-прокси на 127.0.0.1:8880."
+                : "When Booker runs locally, OmniVoice requests go through the built-in dev proxy on 127.0.0.1:8880."}
+            </p>
+          )}
+          {showPreviewWarning && (
+            <Alert variant="destructive">
+              <AlertTriangle className="w-4 h-4" />
+              <AlertDescription className="text-xs">
+                {isRu ? (
+                  <>
+                    Cloud preview не может достучаться до локального OmniVoice на <code className="rounded bg-muted px-1 text-[10px]">127.0.0.1:8880</code>.
+                    Откройте Booker локально через <code className="rounded bg-muted px-1 text-[10px]">npm run dev</code> и используйте <code className="rounded bg-muted px-1 text-[10px]">http://localhost:8080/voice-lab</code>.
+                  </>
+                ) : (
+                  <>
+                    The cloud preview cannot reach a local OmniVoice server at <code className="rounded bg-muted px-1 text-[10px]">127.0.0.1:8880</code>.
+                    Run Booker locally with <code className="rounded bg-muted px-1 text-[10px]">npm run dev</code> and use <code className="rounded bg-muted px-1 text-[10px]">http://localhost:8080/voice-lab</code>.
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           <p className="text-xs text-muted-foreground">
             {isRu
               ? "Запустите: pip install omnivoice-server && omnivoice-server --device cuda"
