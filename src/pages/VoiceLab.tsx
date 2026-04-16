@@ -538,8 +538,8 @@ export default function VoiceLab() {
             />
           )}
 
-          {effectiveTab === "f5tts" && (
-            <F5TtsLabPanel isRu={isRu} />
+          {effectiveTab === "omnivoice" && (
+            <OmniVoiceLabPanel isRu={isRu} />
           )}
         </div>
       </ScrollArea>
