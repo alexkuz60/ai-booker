@@ -313,10 +313,18 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
   return (
     <Card className="border-dashed">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
           <Wand2 className="w-4 h-4" />
           {isRu ? "Авто-заполнение из профиля персонажа" : "Auto-fill from character profile"}
           <Badge variant="outline" className="text-[10px] ml-1">EN</Badge>
+          <Badge
+            variant="secondary"
+            className="text-[10px] font-normal"
+            title={isRu ? "Модель роли «Переводчик»" : "Translator role model"}
+          >
+            <Languages className="w-3 h-3 mr-1" />
+            {translatorModel.replace(/^(openrouter|proxyapi|dotpoint|lovable)\//, "")}
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
