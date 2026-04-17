@@ -27,6 +27,8 @@ export interface VcReferenceEntry {
   sizeBytes: number;
   /** When added */
   addedAt: string;
+  /** Recognized speech text in the reference (used by OmniVoice cloning as ref_text) */
+  transcript?: string;
 }
 
 const VC_REF_DIR = "vc-references";
@@ -155,4 +157,42 @@ export async function deleteVcReference(id: string): Promise<boolean> {
 export async function getVcReferencesTotalSize(): Promise<number> {
   const refs = await listVcReferences();
   return refs.reduce((sum, r) => sum + r.sizeBytes, 0);
+}
+
+/** Read metadata for a single reference */
+export async function readVcReferenceMeta(id: string): Promise<VcReferenceEntry | null> {
+  const dir = await getRefDir();
+  if (!dir) return null;
+  try {
+    const fh = await dir.getFileHandle(`${id}.json`);
+    const file = await fh.getFile();
+    return JSON.parse(await file.text()) as VcReferenceEntry;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Patch metadata fields (e.g. transcript) without touching the audio file.
+ * Returns updated entry or null on failure.
+ */
+export async function updateVcReferenceMeta(
+  id: string,
+  patch: Partial<Omit<VcReferenceEntry, "id">>,
+): Promise<VcReferenceEntry | null> {
+  const dir = await getRefDir();
+  if (!dir) return null;
+  const current = await readVcReferenceMeta(id);
+  if (!current) return null;
+  const next: VcReferenceEntry = { ...current, ...patch, id: current.id };
+  try {
+    const metaFh = await dir.getFileHandle(`${id}.json`, { create: true });
+    const w = await metaFh.createWritable();
+    await w.write(JSON.stringify(next, null, 2));
+    await w.close();
+    return next;
+  } catch (e) {
+    console.error("[vcRefCache] updateMeta error:", e);
+    return null;
+  }
 }
