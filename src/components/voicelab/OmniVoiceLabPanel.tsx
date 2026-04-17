@@ -523,13 +523,27 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           {/* Voice Cloning controls */}
           {mode === "clone" && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => refInputRef.current?.click()}>
                   <Upload className="w-3 h-3 mr-1" />
                   {isRu ? "Загрузить аудио" : "Upload audio"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTranscribeRef}
+                  disabled={!refAudioBlob || transcribing}
+                  title={isRu ? "Распознать речь в референсе (STT)" : "Transcribe reference audio (STT)"}
+                >
+                  {transcribing ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Mic className="w-3 h-3 mr-1" />
+                  )}
+                  {isRu ? "Распознать" : "Transcribe"}
+                </Button>
                 {refAudioName && (
-                  <span className="text-xs text-muted-foreground">{refAudioName}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">{refAudioName}</span>
                 )}
                 <input
                   ref={refInputRef}
@@ -550,6 +564,11 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
                   rows={2}
                   className="mt-1 text-sm"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isRu
+                    ? "Используйте «Распознать» для авто-заполнения через STT-эндпоинт сервера."
+                    : "Use «Transcribe» to auto-fill via the server's STT endpoint."}
+                </p>
               </div>
             </div>
           )}
