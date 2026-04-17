@@ -69,6 +69,19 @@ const NONE = "__none__";
 export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSectionProps) {
   const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
 
+  // Translator role: respect user's configured model + API key
+  const userApiKeys = useUserApiKeys();
+  const { getModelForRole } = useAiRoles(userApiKeys);
+  const translatorModel = getModelForRole("translator");
+  const translatorKeyInfo = useMemo(() => {
+    const entry = getModelRegistryEntry(translatorModel);
+    if (!entry) return { apiKey: null as string | null, openrouterKey: null as string | null };
+    if (entry.provider === "lovable") return { apiKey: null, openrouterKey: null };
+    const apiKey = entry.apiKeyField ? userApiKeys[entry.apiKeyField] ?? null : null;
+    const openrouterKey = userApiKeys.openrouter ?? null;
+    return { apiKey, openrouterKey };
+  }, [translatorModel, userApiKeys]);
+
   // ── Book + character pickers ──
   const [books, setBooks] = useState<BookOption[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string>("");
