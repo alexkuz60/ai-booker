@@ -13,11 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Play, Square, Loader2, AlertTriangle, CheckCircle2, Upload, Zap, RotateCcw, Wifi, WifiOff, Globe,
+  Sparkles, Tags, Mic, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { recoverYo, YO_DICT_SIZE } from "@/lib/ruYoRecovery";
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -33,10 +36,29 @@ const OPENAI_PRESETS = [
   "fable", "marin", "nova", "onyx", "sage", "shimmer", "verse",
 ] as const;
 
-const NON_VERBAL_TAGS = [
-  "[laughter]", "[sigh]", "[confirmation-en]", "[question-en]",
-  "[question-ah]", "[question-oh]", "[surprise-ah]", "[surprise-oh]",
-  "[surprise-wa]", "[surprise-yo]", "[dissatisfaction-hnn]",
+// Полный набор управляющих тегов OmniVoice (https://github.com/k2-fsa/OmniVoice).
+// Группируем по смыслу для удобной вставки.
+const NON_VERBAL_TAG_GROUPS: { label_ru: string; label_en: string; tags: string[] }[] = [
+  {
+    label_ru: "Эмоции", label_en: "Emotions",
+    tags: ["[laughter]", "[sigh]", "[cry]", "[gasp]"],
+  },
+  {
+    label_ru: "Подтверждения", label_en: "Confirmations",
+    tags: ["[confirmation-en]", "[confirmation-mm]", "[confirmation-uhhuh]"],
+  },
+  {
+    label_ru: "Вопросы", label_en: "Questions",
+    tags: ["[question-en]", "[question-ah]", "[question-oh]", "[question-hmm]"],
+  },
+  {
+    label_ru: "Удивление", label_en: "Surprise",
+    tags: ["[surprise-ah]", "[surprise-oh]", "[surprise-wa]", "[surprise-yo]"],
+  },
+  {
+    label_ru: "Прочее", label_en: "Other",
+    tags: ["[dissatisfaction-hnn]", "[thinking-hmm]", "[breath]", "[cough]"],
+  },
 ];
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:8880";
@@ -65,6 +87,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [refAudioBlob, setRefAudioBlob] = useState<Blob | null>(null);
   const [refAudioName, setRefAudioName] = useState("");
   const [refTranscript, setRefTranscript] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
   const refInputRef = useRef<HTMLInputElement>(null);
 
   // ── Synthesis ──
@@ -74,6 +97,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [stage, setStage] = useState<SynthStage>("idle");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const synthTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Playback ──
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -127,7 +151,103 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     if (!file) return;
     setRefAudioBlob(file);
     setRefAudioName(file.name);
+    setRefTranscript("");           // сбрасываем — старый транскрипт уже не валиден
   }, []);
+
+  // ── Reference transcription (STT через OmniVoice / Whisper) ──
+  const handleTranscribeRef = useCallback(async () => {
+    if (!refAudioBlob) {
+      toast.error(isRu ? "Сначала загрузите референсное аудио" : "Upload reference audio first");
+      return;
+    }
+    setTranscribing(true);
+    try {
+      const form = new FormData();
+      form.append("file", refAudioBlob, refAudioName || "reference.wav");
+      form.append("model", "whisper-1");          // OmniVoice/OpenAI-совместимое имя
+      form.append("response_format", "json");
+
+      const res = await fetch(`${requestBaseUrl}/v1/audio/transcriptions`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${errText || "STT error"}`);
+      }
+      const data = await res.json().catch(() => null) as { text?: string } | null;
+      const recognized = data?.text?.trim() ?? "";
+      if (!recognized) {
+        throw new Error(isRu ? "Сервер вернул пустой транскрипт" : "Server returned empty transcript");
+      }
+      setRefTranscript(recognized);
+      toast.success(isRu ? `Распознано (${recognized.length} симв.)` : `Recognized (${recognized.length} chars)`);
+    } catch (err: any) {
+      console.error("[omnivoice] STT error:", err);
+      toast.error(err?.message ?? String(err));
+    } finally {
+      setTranscribing(false);
+    }
+  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu]);
+
+  // ── Восстановление «ё» ──
+  const handleRecoverYo = useCallback(() => {
+    const { text, replacements } = recoverYo(synthText);
+    if (replacements === 0) {
+      toast.info(isRu ? "Нечего заменять" : "Nothing to replace");
+      return;
+    }
+    setSynthText(text);
+    toast.success(isRu ? `Восстановлено ё: ${replacements}` : `Restored ё: ${replacements}`);
+  }, [synthText, isRu]);
+
+  // ── Вставка тега в позицию курсора ──
+  const insertTagAtCursor = useCallback((tag: string) => {
+    const ta = synthTextareaRef.current;
+    if (!ta) {
+      // Фоллбек — добавляем в конец
+      setSynthText((prev) => prev + (prev.endsWith(" ") || prev.length === 0 ? "" : " ") + tag + " ");
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    // Аккуратно расставляем пробелы вокруг тега
+    const needLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needTrailingSpace = after.length > 0 && !/^\s/.test(after);
+    const inserted = (needLeadingSpace ? " " : "") + tag + (needTrailingSpace ? " " : "");
+    const next = before + inserted + after;
+    setSynthText(next);
+    // Возвращаем фокус и позицию каретки за вставленным тегом
+    queueMicrotask(() => {
+      ta.focus();
+      const caret = before.length + inserted.length;
+      ta.setSelectionRange(caret, caret);
+    });
+  }, []);
+
+  // ── Скачивание результата как WAV ──
+  const handleDownload = useCallback(async () => {
+    if (!resultUrl) return;
+    try {
+      const res = await fetch(resultUrl);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = URL.createObjectURL(blob);
+      a.download = `omnivoice_${mode}_${ts}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Освобождаем объектный URL копии (оригинал остаётся для плеера)
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (err: any) {
+      console.error("[omnivoice] Download error:", err);
+      toast.error(err?.message ?? String(err));
+    }
+  }, [resultUrl, mode]);
+
 
   // ── Synthesis ──
   const handleSynthesize = useCallback(async () => {
@@ -403,13 +523,27 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           {/* Voice Cloning controls */}
           {mode === "clone" && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => refInputRef.current?.click()}>
                   <Upload className="w-3 h-3 mr-1" />
                   {isRu ? "Загрузить аудио" : "Upload audio"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTranscribeRef}
+                  disabled={!refAudioBlob || transcribing}
+                  title={isRu ? "Распознать речь в референсе (STT)" : "Transcribe reference audio (STT)"}
+                >
+                  {transcribing ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Mic className="w-3 h-3 mr-1" />
+                  )}
+                  {isRu ? "Распознать" : "Transcribe"}
+                </Button>
                 {refAudioName && (
-                  <span className="text-xs text-muted-foreground">{refAudioName}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">{refAudioName}</span>
                 )}
                 <input
                   ref={refInputRef}
@@ -430,6 +564,11 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
                   rows={2}
                   className="mt-1 text-sm"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isRu
+                    ? "Используйте «Распознать» для авто-заполнения через STT-эндпоинт сервера."
+                    : "Use «Transcribe» to auto-fill via the server's STT endpoint."}
+                </p>
               </div>
             </div>
           )}
@@ -454,8 +593,66 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <Label className="text-xs">{isRu ? "Текст для синтеза" : "Text to synthesize"}</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-xs">{isRu ? "Текст для синтеза" : "Text to synthesize"}</Label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={handleRecoverYo}
+                  disabled={!synthText.trim()}
+                  title={isRu
+                    ? `Восстановить «ё» по словарю (${YO_DICT_SIZE} слов)`
+                    : `Restore «ё» using dictionary (${YO_DICT_SIZE} words)`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {isRu ? "Восстановить ё" : "Restore ё"}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[10px] gap-1"
+                      title={isRu ? "Вставить тег в позицию курсора" : "Insert tag at cursor"}
+                    >
+                      <Tags className="w-3 h-3" />
+                      {isRu ? "Теги" : "Tags"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 p-2 space-y-2">
+                    <p className="text-[10px] text-muted-foreground px-1">
+                      {isRu
+                        ? "Клик — вставка в позицию курсора"
+                        : "Click to insert at cursor position"}
+                    </p>
+                    {NON_VERBAL_TAG_GROUPS.map((group) => (
+                      <div key={group.label_en} className="space-y-1">
+                        <div className="text-[10px] font-medium text-muted-foreground px-1">
+                          {isRu ? group.label_ru : group.label_en}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {group.tags.map((tag) => (
+                            <Button
+                              key={tag}
+                              variant="secondary"
+                              size="sm"
+                              className="h-6 px-2 text-[10px] font-mono"
+                              onClick={() => insertTagAtCursor(tag)}
+                            >
+                              {tag}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
             <Textarea
+              ref={synthTextareaRef}
               value={synthText}
               onChange={(e) => setSynthText(e.target.value)}
               placeholder={isRu
@@ -464,20 +661,6 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               rows={4}
               className="mt-1 text-sm"
             />
-            {/* Non-verbal tags helper */}
-            <div className="flex flex-wrap gap-1 mt-1">
-              {NON_VERBAL_TAGS.slice(0, 5).map((tag) => (
-                <Button
-                  key={tag}
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 px-1.5 text-[10px] text-muted-foreground"
-                  onClick={() => setSynthText((prev) => prev + " " + tag)}
-                >
-                  {tag}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -519,9 +702,19 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             )}
 
             {resultUrl && (
-              <Button size="sm" variant="outline" onClick={handlePlay}>
-                {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={handlePlay} title={isRu ? "Воспроизвести" : "Play"}>
+                  {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownload}
+                  title={isRu ? "Скачать как WAV" : "Download as WAV"}
+                >
+                  <Download className="w-3 h-3" />
+                </Button>
+              </>
             )}
 
             {stage === "done" && (
