@@ -22,6 +22,9 @@ import { toast } from "sonner";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { recoverYo, YO_DICT_SIZE } from "@/lib/ruYoRecovery";
 import { CharacterAutoFillSection } from "@/components/voicelab/CharacterAutoFillSection";
+import { OmniVoiceRefPicker, type OmniVoicePickedRef } from "@/components/voicelab/OmniVoiceRefPicker";
+import { updateVcReferenceMeta } from "@/lib/vcReferenceCache";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -88,6 +91,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [refAudioBlob, setRefAudioBlob] = useState<Blob | null>(null);
   const [refAudioName, setRefAudioName] = useState("");
   const [refTranscript, setRefTranscript] = useState("");
+  const [refPickedId, setRefPickedId] = useState<string | null>(null);
+  const [refSource, setRefSource] = useState<"upload" | "opfs" | "collection" | null>(null);
   const [transcribing, setTranscribing] = useState(false);
   const refInputRef = useRef<HTMLInputElement>(null);
 
