@@ -151,19 +151,19 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     checkServer();
   }, [checkServer]);
 
-  // ── Reference upload ──
-  const handleRefUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setRefAudioBlob(file);
-    setRefAudioName(file.name);
-    setRefTranscript("");           // сбрасываем — старый транскрипт уже не валиден
+  // ── Reference picked from picker (upload / OPFS / collection) ──
+  const handleRefPicked = useCallback((picked: OmniVoicePickedRef) => {
+    setRefAudioBlob(picked.blob);
+    setRefAudioName(picked.fileName);
+    setRefTranscript(picked.transcript ?? "");
+    setRefPickedId(picked.refId ?? null);
+    setRefSource(picked.source);
   }, []);
 
   // ── Reference transcription (STT через OmniVoice / Whisper) ──
   const handleTranscribeRef = useCallback(async () => {
     if (!refAudioBlob) {
-      toast.error(isRu ? "Сначала загрузите референсное аудио" : "Upload reference audio first");
+      toast.error(isRu ? "Сначала выберите референсное аудио" : "Pick reference audio first");
       return;
     }
     setTranscribing(true);
@@ -187,6 +187,12 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
         throw new Error(isRu ? "Сервер вернул пустой транскрипт" : "Server returned empty transcript");
       }
       setRefTranscript(recognized);
+
+      // Persist back to OPFS for any saved reference (both 'opfs' and 'collection' sources).
+      if (refPickedId && (refSource === "opfs" || refSource === "collection")) {
+        await updateVcReferenceMeta(refPickedId, { transcript: recognized });
+      }
+
       toast.success(isRu ? `Распознано (${recognized.length} симв.)` : `Recognized (${recognized.length} chars)`);
     } catch (err: any) {
       console.error("[omnivoice] STT error:", err);
@@ -194,7 +200,16 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     } finally {
       setTranscribing(false);
     }
-  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu]);
+  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu, refPickedId, refSource]);
+
+  // ── Save edited transcript back to OPFS (and optionally DB) ──
+  const persistTranscriptEdit = useCallback(async () => {
+    if (!refPickedId || !refTranscript.trim()) return;
+    if (refSource === "opfs" || refSource === "collection") {
+      await updateVcReferenceMeta(refPickedId, { transcript: refTranscript.trim() });
+      toast.success(isRu ? "Транскрипт сохранён" : "Transcript saved");
+    }
+  }, [refPickedId, refTranscript, refSource, isRu]);
 
   // ── Восстановление «ё» ──
   const handleRecoverYo = useCallback(() => {
