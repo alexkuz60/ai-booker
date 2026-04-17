@@ -33,6 +33,9 @@ import {
   hashFreeTextFields,
   needsFreeTextTranslation,
 } from "@/lib/omniVoiceInstructions";
+import { useAiRoles } from "@/hooks/useAiRoles";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { getModelRegistryEntry } from "@/config/modelRegistry";
 import type { CharacterIndex } from "@/pages/parser/types";
 
 interface BookOption {
