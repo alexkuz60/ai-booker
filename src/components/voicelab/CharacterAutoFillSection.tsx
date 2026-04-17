@@ -303,7 +303,7 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
               <SelectContent>
                 {books.length === 0 && (
                   <SelectItem value="__empty" disabled>
-                    {isRu ? "Нет книг" : "No books"}
+                    {isRu ? "Откройте проект в Библиотеке" : "Open a project in Library"}
                   </SelectItem>
                 )}
                 {books.map(b => (
