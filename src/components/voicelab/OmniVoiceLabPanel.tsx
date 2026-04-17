@@ -702,9 +702,19 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             )}
 
             {resultUrl && (
-              <Button size="sm" variant="outline" onClick={handlePlay}>
-                {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={handlePlay} title={isRu ? "Воспроизвести" : "Play"}>
+                  {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownload}
+                  title={isRu ? "Скачать как WAV" : "Download as WAV"}
+                >
+                  <Download className="w-3 h-3" />
+                </Button>
+              </>
             )}
 
             {stage === "done" && (
