@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { SynthMode, SynthStage } from "./constants";
+import type { OmniVoiceAdvancedParams, SynthMode, SynthStage } from "./constants";
 
 export interface UseOmniVoiceSynthesisArgs {
   isRu: boolean;
@@ -23,6 +23,8 @@ export interface UseOmniVoiceSynthesisArgs {
   refAudioName: string;
   refTranscript: string;
   speed: number;
+  /** Advanced generation knobs (Phase 1 experimentation). */
+  advanced: OmniVoiceAdvancedParams;
 }
 
 export interface UseOmniVoiceSynthesisResult {
@@ -41,7 +43,7 @@ export interface UseOmniVoiceSynthesisResult {
 export function useOmniVoiceSynthesis(args: UseOmniVoiceSynthesisArgs): UseOmniVoiceSynthesisResult {
   const {
     isRu, requestBaseUrl, mode, synthText, preset, instructions,
-    refAudioBlob, refAudioName, refTranscript, speed,
+    refAudioBlob, refAudioName, refTranscript, speed, advanced,
   } = args;
 
   const [stage, setStage] = useState<SynthStage>("idle");
@@ -78,6 +80,14 @@ export function useOmniVoiceSynthesis(args: UseOmniVoiceSynthesisArgs): UseOmniV
         form.append("text", synthText.trim());
         form.append("ref_text", refTranscript.trim());
         form.append("ref_audio", refAudioBlob!, refAudioName || "reference.wav");
+        // Advanced params travel as form fields on the clone endpoint
+        form.append("speed", String(speed));
+        form.append("guidance_scale", String(advanced.guidance_scale));
+        form.append("num_step", String(Math.round(advanced.num_step)));
+        form.append("t_shift", String(advanced.t_shift));
+        form.append("position_temperature", String(advanced.position_temperature));
+        form.append("class_temperature", String(advanced.class_temperature));
+        form.append("denoise", advanced.denoise ? "true" : "false");
         response = await fetch(`${requestBaseUrl}/v1/audio/speech/clone`, { method: "POST", body: form });
       } else {
         const body: Record<string, unknown> = {
@@ -85,6 +95,13 @@ export function useOmniVoiceSynthesis(args: UseOmniVoiceSynthesisArgs): UseOmniV
           input: synthText.trim(),
           response_format: "wav",
           speed,
+          // Advanced generation knobs (server ignores unknown fields safely)
+          guidance_scale: advanced.guidance_scale,
+          num_step: Math.round(advanced.num_step),
+          t_shift: advanced.t_shift,
+          position_temperature: advanced.position_temperature,
+          class_temperature: advanced.class_temperature,
+          denoise: advanced.denoise,
         };
         if (mode === "design") {
           if (instructions.trim()) body.instructions = instructions.trim();
@@ -123,7 +140,7 @@ export function useOmniVoiceSynthesis(args: UseOmniVoiceSynthesisArgs): UseOmniV
     }
   }, [
     synthText, mode, refAudioBlob, refAudioName, refTranscript,
-    instructions, preset, speed, requestBaseUrl, isRu, resultUrl,
+    instructions, preset, speed, advanced, requestBaseUrl, isRu, resultUrl,
   ]);
 
   const handlePlay = useCallback(() => {
