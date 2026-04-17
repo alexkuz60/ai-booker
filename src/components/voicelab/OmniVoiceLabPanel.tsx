@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Play, Square, Loader2, AlertTriangle, CheckCircle2, Upload, Zap, RotateCcw, Wifi, WifiOff, Globe,
-  Sparkles, Tags, Mic, Download,
+  Sparkles, Tags, Mic, Download, Eraser,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
@@ -199,6 +199,70 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     }
     setSynthText(text);
     toast.success(isRu ? `Восстановлено ё: ${replacements}` : `Restored ё: ${replacements}`);
+  }, [synthText, isRu]);
+
+  // ── Ударение: вставка combining acute (◌́, U+0301) после выделенной/предыдущей гласной ──
+  const RU_VOWELS_RE = /[аеёиоуыэюяАЕЁИОУЫЭЮЯ]/;
+  const COMBINING_ACUTE = "\u0301";
+
+  const insertStressMark = useCallback(() => {
+    const ta = synthTextareaRef.current;
+    if (!ta) return;
+    const val = ta.value;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+
+    // Стратегия 1: если выделен ровно один символ-гласная — ставим акут после него.
+    // Стратегия 2: если ничего не выделено — ставим акут после ближайшей гласной слева от каретки.
+    let insertAt = -1;
+
+    if (end - start === 1 && RU_VOWELS_RE.test(val[start])) {
+      insertAt = start + 1;
+    } else if (start === end) {
+      // ищем ближайшую гласную слева
+      for (let i = start - 1; i >= 0 && i > start - 12; i--) {
+        if (val[i] === COMBINING_ACUTE) continue;
+        if (/\s/.test(val[i])) break;
+        if (RU_VOWELS_RE.test(val[i])) { insertAt = i + 1; break; }
+      }
+    }
+
+    if (insertAt < 0) {
+      toast.error(isRu
+        ? "Выделите гласную или поставьте курсор после неё"
+        : "Select a vowel or place cursor right after it");
+      return;
+    }
+
+    // Если уже есть акут на этой позиции — снимаем (toggle).
+    if (val[insertAt] === COMBINING_ACUTE) {
+      const next = val.slice(0, insertAt) + val.slice(insertAt + 1);
+      setSynthText(next);
+      queueMicrotask(() => {
+        ta.focus();
+        const caret = Math.min(insertAt, next.length);
+        ta.setSelectionRange(caret, caret);
+      });
+      return;
+    }
+
+    const next = val.slice(0, insertAt) + COMBINING_ACUTE + val.slice(insertAt);
+    setSynthText(next);
+    queueMicrotask(() => {
+      ta.focus();
+      const caret = insertAt + 1;
+      ta.setSelectionRange(caret, caret);
+    });
+  }, [isRu]);
+
+  const clearAllStress = useCallback(() => {
+    if (!synthText.includes(COMBINING_ACUTE)) {
+      toast.info(isRu ? "Ударений нет" : "No stress marks");
+      return;
+    }
+    const cleaned = synthText.replace(new RegExp(COMBINING_ACUTE, "g"), "");
+    setSynthText(cleaned);
+    toast.success(isRu ? "Все ударения сняты" : "All stress marks removed");
   }, [synthText, isRu]);
 
   // ── Вставка тега в позицию курсора ──
@@ -596,6 +660,28 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             <div className="flex items-center justify-between mb-1">
               <Label className="text-xs">{isRu ? "Текст для синтеза" : "Text to synthesize"}</Label>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={insertStressMark}
+                  title={isRu
+                    ? "Поставить ударение (◌́) после гласной. Выделите гласную или поставьте курсор сразу после неё. Повторное нажатие снимает."
+                    : "Add stress (◌́) after a vowel. Select a vowel or place cursor right after it. Click again to remove."}
+                >
+                  <span className="font-mono font-bold leading-none">а́</span>
+                  {isRu ? "Ударение" : "Stress"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={clearAllStress}
+                  disabled={!synthText.includes(COMBINING_ACUTE)}
+                  title={isRu ? "Снять все ударения" : "Remove all stress marks"}
+                >
+                  <Eraser className="w-3 h-3" />
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
