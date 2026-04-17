@@ -151,7 +151,103 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     if (!file) return;
     setRefAudioBlob(file);
     setRefAudioName(file.name);
+    setRefTranscript("");           // сбрасываем — старый транскрипт уже не валиден
   }, []);
+
+  // ── Reference transcription (STT через OmniVoice / Whisper) ──
+  const handleTranscribeRef = useCallback(async () => {
+    if (!refAudioBlob) {
+      toast.error(isRu ? "Сначала загрузите референсное аудио" : "Upload reference audio first");
+      return;
+    }
+    setTranscribing(true);
+    try {
+      const form = new FormData();
+      form.append("file", refAudioBlob, refAudioName || "reference.wav");
+      form.append("model", "whisper-1");          // OmniVoice/OpenAI-совместимое имя
+      form.append("response_format", "json");
+
+      const res = await fetch(`${requestBaseUrl}/v1/audio/transcriptions`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${errText || "STT error"}`);
+      }
+      const data = await res.json().catch(() => null) as { text?: string } | null;
+      const recognized = data?.text?.trim() ?? "";
+      if (!recognized) {
+        throw new Error(isRu ? "Сервер вернул пустой транскрипт" : "Server returned empty transcript");
+      }
+      setRefTranscript(recognized);
+      toast.success(isRu ? `Распознано (${recognized.length} симв.)` : `Recognized (${recognized.length} chars)`);
+    } catch (err: any) {
+      console.error("[omnivoice] STT error:", err);
+      toast.error(err?.message ?? String(err));
+    } finally {
+      setTranscribing(false);
+    }
+  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu]);
+
+  // ── Восстановление «ё» ──
+  const handleRecoverYo = useCallback(() => {
+    const { text, replacements } = recoverYo(synthText);
+    if (replacements === 0) {
+      toast.info(isRu ? "Нечего заменять" : "Nothing to replace");
+      return;
+    }
+    setSynthText(text);
+    toast.success(isRu ? `Восстановлено ё: ${replacements}` : `Restored ё: ${replacements}`);
+  }, [synthText, isRu]);
+
+  // ── Вставка тега в позицию курсора ──
+  const insertTagAtCursor = useCallback((tag: string) => {
+    const ta = synthTextareaRef.current;
+    if (!ta) {
+      // Фоллбек — добавляем в конец
+      setSynthText((prev) => prev + (prev.endsWith(" ") || prev.length === 0 ? "" : " ") + tag + " ");
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    // Аккуратно расставляем пробелы вокруг тега
+    const needLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needTrailingSpace = after.length > 0 && !/^\s/.test(after);
+    const inserted = (needLeadingSpace ? " " : "") + tag + (needTrailingSpace ? " " : "");
+    const next = before + inserted + after;
+    setSynthText(next);
+    // Возвращаем фокус и позицию каретки за вставленным тегом
+    queueMicrotask(() => {
+      ta.focus();
+      const caret = before.length + inserted.length;
+      ta.setSelectionRange(caret, caret);
+    });
+  }, []);
+
+  // ── Скачивание результата как WAV ──
+  const handleDownload = useCallback(async () => {
+    if (!resultUrl) return;
+    try {
+      const res = await fetch(resultUrl);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = URL.createObjectURL(blob);
+      a.download = `omnivoice_${mode}_${ts}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Освобождаем объектный URL копии (оригинал остаётся для плеера)
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (err: any) {
+      console.error("[omnivoice] Download error:", err);
+      toast.error(err?.message ?? String(err));
+    }
+  }, [resultUrl, mode]);
+
 
   // ── Synthesis ──
   const handleSynthesize = useCallback(async () => {
