@@ -13,11 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Play, Square, Loader2, AlertTriangle, CheckCircle2, Upload, Zap, RotateCcw, Wifi, WifiOff, Globe,
+  Sparkles, Tags, Mic, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { recoverYo, YO_DICT_SIZE } from "@/lib/ruYoRecovery";
 
 /* ─── Types ─────────────────────────────────────── */
 
