@@ -220,13 +220,17 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
         };
       }
 
-      // Cache miss → call edge function
+      // Cache miss → call edge function via translator role
       setTranslating(true);
       try {
         const { data, error } = await supabase.functions.invoke("translate-character-fields", {
           body: {
             description: char.description ?? "",
             speech_style: char.speech_style ?? "",
+            // Provider routing — translator role from useAiRoles
+            model: translatorModel,
+            apiKey: translatorKeyInfo.apiKey,
+            openrouter_api_key: translatorKeyInfo.openrouterKey,
           },
         });
         if (error) throw error;
@@ -249,7 +253,7 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
         setTranslating(false);
       }
     },
-    [persistCache],
+    [persistCache, translatorModel, translatorKeyInfo],
   );
 
   /** Refresh the Character Base text from the selected character + (cached) translations. */
