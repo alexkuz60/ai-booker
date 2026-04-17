@@ -593,8 +593,66 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <Label className="text-xs">{isRu ? "Текст для синтеза" : "Text to synthesize"}</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-xs">{isRu ? "Текст для синтеза" : "Text to synthesize"}</Label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={handleRecoverYo}
+                  disabled={!synthText.trim()}
+                  title={isRu
+                    ? `Восстановить «ё» по словарю (${YO_DICT_SIZE} слов)`
+                    : `Restore «ё» using dictionary (${YO_DICT_SIZE} words)`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {isRu ? "Восстановить ё" : "Restore ё"}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[10px] gap-1"
+                      title={isRu ? "Вставить тег в позицию курсора" : "Insert tag at cursor"}
+                    >
+                      <Tags className="w-3 h-3" />
+                      {isRu ? "Теги" : "Tags"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 p-2 space-y-2">
+                    <p className="text-[10px] text-muted-foreground px-1">
+                      {isRu
+                        ? "Клик — вставка в позицию курсора"
+                        : "Click to insert at cursor position"}
+                    </p>
+                    {NON_VERBAL_TAG_GROUPS.map((group) => (
+                      <div key={group.label_en} className="space-y-1">
+                        <div className="text-[10px] font-medium text-muted-foreground px-1">
+                          {isRu ? group.label_ru : group.label_en}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {group.tags.map((tag) => (
+                            <Button
+                              key={tag}
+                              variant="secondary"
+                              size="sm"
+                              className="h-6 px-2 text-[10px] font-mono"
+                              onClick={() => insertTagAtCursor(tag)}
+                            >
+                              {tag}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
             <Textarea
+              ref={synthTextareaRef}
               value={synthText}
               onChange={(e) => setSynthText(e.target.value)}
               placeholder={isRu
@@ -603,20 +661,6 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               rows={4}
               className="mt-1 text-sm"
             />
-            {/* Non-verbal tags helper */}
-            <div className="flex flex-wrap gap-1 mt-1">
-              {NON_VERBAL_TAGS.slice(0, 5).map((tag) => (
-                <Button
-                  key={tag}
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 px-1.5 text-[10px] text-muted-foreground"
-                  onClick={() => setSynthText((prev) => prev + " " + tag)}
-                >
-                  {tag}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
