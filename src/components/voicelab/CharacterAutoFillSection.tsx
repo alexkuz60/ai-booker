@@ -33,6 +33,9 @@ import {
   hashFreeTextFields,
   needsFreeTextTranslation,
 } from "@/lib/omniVoiceInstructions";
+import { useAiRoles } from "@/hooks/useAiRoles";
+import { useUserApiKeys } from "@/hooks/useUserApiKeys";
+import { getModelRegistryEntry } from "@/config/modelRegistry";
 import type { CharacterIndex } from "@/pages/parser/types";
 
 interface BookOption {
@@ -65,6 +68,19 @@ const NONE = "__none__";
 
 export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSectionProps) {
   const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
+
+  // Translator role: respect user's configured model + API key
+  const userApiKeys = useUserApiKeys();
+  const { getModelForRole } = useAiRoles(userApiKeys);
+  const translatorModel = getModelForRole("translator");
+  const translatorKeyInfo = useMemo(() => {
+    const entry = getModelRegistryEntry(translatorModel);
+    if (!entry) return { apiKey: null as string | null, openrouterKey: null as string | null };
+    if (entry.provider === "lovable") return { apiKey: null, openrouterKey: null };
+    const apiKey = entry.apiKeyField ? userApiKeys[entry.apiKeyField] ?? null : null;
+    const openrouterKey = userApiKeys.openrouter ?? null;
+    return { apiKey, openrouterKey };
+  }, [translatorModel, userApiKeys]);
 
   // ── Book + character pickers ──
   const [books, setBooks] = useState<BookOption[]>([]);
@@ -204,13 +220,17 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
         };
       }
 
-      // Cache miss → call edge function
+      // Cache miss → call edge function via translator role
       setTranslating(true);
       try {
         const { data, error } = await supabase.functions.invoke("translate-character-fields", {
           body: {
             description: char.description ?? "",
             speech_style: char.speech_style ?? "",
+            // Provider routing — translator role from useAiRoles
+            model: translatorModel,
+            apiKey: translatorKeyInfo.apiKey,
+            openrouter_api_key: translatorKeyInfo.openrouterKey,
           },
         });
         if (error) throw error;
@@ -233,7 +253,7 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
         setTranslating(false);
       }
     },
-    [persistCache],
+    [persistCache, translatorModel, translatorKeyInfo],
   );
 
   /** Refresh the Character Base text from the selected character + (cached) translations. */
@@ -293,10 +313,18 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
   return (
     <Card className="border-dashed">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
           <Wand2 className="w-4 h-4" />
           {isRu ? "Авто-заполнение из профиля персонажа" : "Auto-fill from character profile"}
           <Badge variant="outline" className="text-[10px] ml-1">EN</Badge>
+          <Badge
+            variant="secondary"
+            className="text-[10px] font-normal"
+            title={isRu ? "Модель роли «Переводчик»" : "Translator role model"}
+          >
+            <Languages className="w-3 h-3 mr-1" />
+            {translatorModel.replace(/^(openrouter|proxyapi|dotpoint|lovable)\//, "")}
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
