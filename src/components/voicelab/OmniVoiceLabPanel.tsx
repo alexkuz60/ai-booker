@@ -87,6 +87,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [refAudioBlob, setRefAudioBlob] = useState<Blob | null>(null);
   const [refAudioName, setRefAudioName] = useState("");
   const [refTranscript, setRefTranscript] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
   const refInputRef = useRef<HTMLInputElement>(null);
 
   // ── Synthesis ──
@@ -96,6 +97,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [stage, setStage] = useState<SynthStage>("idle");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const synthTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Playback ──
   const [resultUrl, setResultUrl] = useState<string | null>(null);
