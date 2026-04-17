@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { recoverYo, YO_DICT_SIZE } from "@/lib/ruYoRecovery";
+import { CharacterAutoFillSection } from "@/components/voicelab/CharacterAutoFillSection";
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -572,15 +573,21 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
                   placeholder={isRu
                     ? "female, young adult, high pitch, british accent"
                     : "female, young adult, high pitch, british accent"}
-                  rows={2}
+                  rows={3}
                   className="mt-1 text-sm font-mono"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   {isRu
-                    ? "Атрибуты: gender, age, pitch, style (whisper), accent (american, british, russian...)"
-                    : "Attrs: gender, age, pitch, style (whisper), accent (american, british, russian...)"}
+                    ? "Свободная форма на английском. Можно собрать автоматически из профиля персонажа ниже."
+                    : "Free-form English. Can be auto-filled from a character profile below."}
                 </p>
               </div>
+
+              {/* Auto-fill from character profile (deterministic + AI translation) */}
+              <CharacterAutoFillSection
+                isRu={isRu}
+                onApply={(prompt) => setInstructions(prompt)}
+              />
             </div>
           )}
 
