@@ -15,7 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Play, Square, Loader2, AlertTriangle, CheckCircle2, Upload, Zap, RotateCcw, Wifi, WifiOff, Globe,
+  Play, Square, Loader2, AlertTriangle, CheckCircle2, Zap, RotateCcw, Wifi, WifiOff, Globe,
   Sparkles, Tags, Mic, Download, Eraser,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +24,6 @@ import { recoverYo, YO_DICT_SIZE } from "@/lib/ruYoRecovery";
 import { CharacterAutoFillSection } from "@/components/voicelab/CharacterAutoFillSection";
 import { OmniVoiceRefPicker, type OmniVoicePickedRef } from "@/components/voicelab/OmniVoiceRefPicker";
 import { updateVcReferenceMeta } from "@/lib/vcReferenceCache";
-import { supabase } from "@/integrations/supabase/client";
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -94,7 +93,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [refPickedId, setRefPickedId] = useState<string | null>(null);
   const [refSource, setRefSource] = useState<"upload" | "opfs" | "collection" | null>(null);
   const [transcribing, setTranscribing] = useState(false);
-  const refInputRef = useRef<HTMLInputElement>(null);
+  // (refInputRef удалён — загрузку файлов теперь делает OmniVoiceRefPicker)
 
   // ── Synthesis ──
   const [synthText, setSynthText] = useState("");
