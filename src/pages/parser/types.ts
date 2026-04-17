@@ -164,6 +164,19 @@ export interface CharacterProfile {
 export type CharacterRole = "speaking" | "mentioned" | "crowd" | "system";
 
 // ─── Voice config stored alongside character ─────────────────
+export interface OmniVoiceCache {
+  /** AI-translated English description (≤80 chars) */
+  description_en?: string;
+  /** AI-translated English speech-style (≤80 chars) */
+  speech_style_en?: string;
+  /** FNV-1a hash of RU source fields — invalidates cache when source changes */
+  cached_from_hash?: string;
+  /** Last user-edited "Character Base" override (overrides auto-generated text) */
+  base_override?: string;
+  /** Last user-edited "Scene Context" override (overrides auto-generated text) */
+  scene_override?: string;
+}
+
 export interface CharacterVoiceConfig {
   provider?: string;
   voice_id?: string;
@@ -177,6 +190,8 @@ export interface CharacterVoiceConfig {
   stability?: number;
   similarity_boost?: number;
   style?: number;
+  /** OmniVoice / gpt-4o-mini-tts auto-fill cache (translations + user overrides) */
+  omnivoice_cache?: OmniVoiceCache;
 }
 
 /**
