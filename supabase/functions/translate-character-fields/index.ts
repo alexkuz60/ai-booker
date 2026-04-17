@@ -10,9 +10,15 @@
  * Why structured output via tool calling: guarantees we get exactly two
  * fields back, never a wrapping markdown explanation.
  *
+ * Provider routing: model + apiKey come from the client (translator role).
+ * Lovable AI gateway is used only as a fallback for admins.
+ *
  * Auth: manual JWT validation (see /useful-context/).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { resolveAiEndpoint, extractProviderFields } from "../_shared/providerRouting.ts";
+import { logAiUsage, getUserIdFromAuth } from "../_shared/logAiUsage.ts";
+import { modelParams } from "../_shared/modelParams.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +44,10 @@ Rules:
 interface TranslateRequest {
   description?: string | null;
   speech_style?: string | null;
+  // Provider routing fields (from translator role on the client)
+  model?: string;
+  apiKey?: string | null;
+  openrouter_api_key?: string | null;
 }
 
 interface TranslateResponse {
@@ -82,12 +92,25 @@ Deno.serve(async (req: Request) => {
       return json<TranslateResponse>({ description_en: "", speech_style_en: "" }, 200);
     }
 
-    // ── Call Lovable AI Gateway ──
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      return json({ error: "LOVABLE_API_KEY not configured" }, 500);
+    // ── Provider routing (translator role) ──
+    const { model, apiKey, openrouterApiKey } = extractProviderFields(
+      body as unknown as Record<string, unknown>,
+    );
+    if (!model) {
+      return json(
+        { error: "Missing 'model' in request — translator role not configured on client" },
+        400,
+      );
+    }
+    const resolved = resolveAiEndpoint(model, apiKey, openrouterApiKey);
+    if (!resolved.apiKey) {
+      return json(
+        { error: "No API key available for the selected translator model" },
+        400,
+      );
     }
 
+    // ── Build user prompt ──
     const userPrompt = [
       "Translate these Russian character fields into concise English voice-design instructions.",
       "",
@@ -95,14 +118,17 @@ Deno.serve(async (req: Request) => {
       `speech_style (RU): ${speech_style || "(empty)"}`,
     ].join("\n");
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const start = Date.now();
+
+    // ── Call resolved provider (Lovable AI / OpenRouter / ProxyAPI / DotPoint) ──
+    const aiRes = await fetch(resolved.endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${resolved.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: resolved.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
@@ -135,19 +161,33 @@ Deno.serve(async (req: Request) => {
           },
         ],
         tool_choice: { type: "function", function: { name: "emit_translation" } },
+        ...modelParams(resolved.model, { maxTokens: 512, temperature: 0.3 }),
       }),
     });
+
+    const latencyMs = Date.now() - start;
+    const userId = await getUserIdFromAuth(authHeader);
 
     if (aiRes.status === 429) {
       return json({ error: "Rate limited, please try again later." }, 429);
     }
     if (aiRes.status === 402) {
-      return json({ error: "Lovable AI credits exhausted. Add funds in Settings → Workspace → Usage." }, 402);
+      return json({ error: "AI credits exhausted. Add funds in Settings → Workspace → Usage or top up your provider account." }, 402);
     }
     if (!aiRes.ok) {
       const t = await aiRes.text().catch(() => "");
-      console.error("[translate-character-fields] AI gateway error:", aiRes.status, t);
-      return json({ error: `AI gateway error: ${aiRes.status}` }, 502);
+      console.error("[translate-character-fields] AI provider error:", aiRes.status, t);
+      if (userId) {
+        await logAiUsage({
+          userId,
+          modelId: model,
+          requestType: "translate_character_fields",
+          status: "error",
+          latencyMs,
+          errorMessage: t.slice(0, 500),
+        });
+      }
+      return json({ error: `AI provider error: ${aiRes.status}` }, 502);
     }
 
     const aiJson = await aiRes.json();
@@ -171,6 +211,19 @@ Deno.serve(async (req: Request) => {
       description_en: clamp((parsed.description_en ?? "").trim(), 80),
       speech_style_en: clamp((parsed.speech_style_en ?? "").trim(), 80),
     };
+
+    // Log success
+    if (userId) {
+      await logAiUsage({
+        userId,
+        modelId: model,
+        requestType: "translate_character_fields",
+        status: "success",
+        latencyMs,
+        tokensInput: aiJson?.usage?.prompt_tokens ?? null,
+        tokensOutput: aiJson?.usage?.completion_tokens ?? null,
+      });
+    }
 
     return json(out, 200);
   } catch (e) {
