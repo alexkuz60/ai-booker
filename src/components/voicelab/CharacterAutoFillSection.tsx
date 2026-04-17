@@ -99,31 +99,21 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
   const [sceneText, setSceneText] = useState("");
   const [translating, setTranslating] = useState(false);
 
-  // ── Load user books once ──
+  // ── Active OPFS project as the only book source (Contract K3: no DB fallback) ──
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase.rpc("get_user_books_with_counts");
-        if (cancelled) return;
-        const opts: BookOption[] = (data ?? []).map((b: any) => ({ id: b.id, title: b.title || b.file_name }));
-        setBooks(opts);
-        // Auto-select the currently open project book if possible.
-        if (projectMeta?.bookId && opts.some(b => b.id === projectMeta.bookId)) {
-          setSelectedBookId(projectMeta.bookId);
-        } else if (opts.length === 1) {
-          setSelectedBookId(opts[0].id);
-        }
-      } catch (err) {
-        console.warn("[CharacterAutoFill] Failed to load books:", err);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [projectMeta?.bookId]);
+    if (projectMeta?.bookId && projectMeta?.title) {
+      const opt: BookOption = { id: projectMeta.bookId, title: projectMeta.title };
+      setBooks([opt]);
+      setSelectedBookId(projectMeta.bookId);
+    } else {
+      setBooks([]);
+      setSelectedBookId("");
+    }
+  }, [projectMeta?.bookId, projectMeta?.title]);
 
-  // ── Load characters when book changes ──
+  // ── Load characters strictly from OPFS for the active project ──
   useEffect(() => {
-    if (!selectedBookId) {
+    if (!selectedBookId || !projectStorage || projectMeta?.bookId !== selectedBookId) {
       setCharacters([]);
       setSelectedCharId("");
       return;
@@ -132,37 +122,8 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
     (async () => {
       setLoadingChars(true);
       try {
-        const isLocal = projectStorage && projectMeta?.bookId === selectedBookId;
-        if (isLocal) {
-          const local = await readCharacterIndex(projectStorage);
-          if (!cancelled) setCharacters(local);
-        } else {
-          // DB fallback — partial CharacterIndex (no appearances/voice_config writes here).
-          const { data } = await supabase
-            .from("book_characters")
-            .select("id, name, gender, age_group, temperament, speech_style, description, speech_tags, psycho_tags, aliases, voice_config, sort_order")
-            .eq("book_id", selectedBookId)
-            .order("sort_order");
-          if (!cancelled) {
-            const mapped: CharacterIndex[] = (data ?? []).map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              aliases: c.aliases ?? [],
-              gender: c.gender,
-              age_group: c.age_group,
-              temperament: c.temperament,
-              speech_style: c.speech_style,
-              description: c.description,
-              speech_tags: c.speech_tags ?? [],
-              psycho_tags: c.psycho_tags ?? [],
-              sort_order: c.sort_order ?? 0,
-              appearances: [],
-              sceneCount: 0,
-              voice_config: (c.voice_config ?? {}) as CharacterIndex["voice_config"],
-            }));
-            setCharacters(mapped);
-          }
-        }
+        const local = await readCharacterIndex(projectStorage);
+        if (!cancelled) setCharacters(local);
       } catch (err) {
         console.warn("[CharacterAutoFill] Failed to load characters:", err);
         if (!cancelled) setCharacters([]);
@@ -342,7 +303,7 @@ export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSec
               <SelectContent>
                 {books.length === 0 && (
                   <SelectItem value="__empty" disabled>
-                    {isRu ? "Нет книг" : "No books"}
+                    {isRu ? "Откройте проект в Библиотеке" : "Open a project in Library"}
                   </SelectItem>
                 )}
                 {books.map(b => (
