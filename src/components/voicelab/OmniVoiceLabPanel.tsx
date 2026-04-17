@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 
 import type { OmniVoicePickedRef } from "@/components/voicelab/OmniVoiceRefPicker";
-import type { SynthMode } from "./omnivoice/constants";
+import {
+  DEFAULT_ADVANCED_PARAMS,
+  type OmniVoiceAdvancedParams,
+  type SynthMode,
+} from "./omnivoice/constants";
 import { useOmniVoiceServer } from "./omnivoice/useOmniVoiceServer";
 import { useOmniVoiceSynthesis } from "./omnivoice/useOmniVoiceSynthesis";
 import { OmniVoiceServerCard } from "./omnivoice/OmniVoiceServerCard";
@@ -27,6 +31,7 @@ import { OmniVoiceDesignControls } from "./omnivoice/OmniVoiceDesignControls";
 import { OmniVoiceCloningControls } from "./omnivoice/OmniVoiceCloningControls";
 import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
+import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
 
 interface OmniVoiceLabPanelProps {
   isRu: boolean;
@@ -61,7 +66,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   // ── Synthesis params ──
   const [synthText, setSynthText] = useState("");
   const [speed, setSpeed] = useState(1.0);
-  const [numSteps, setNumSteps] = useState(32);
+  const [advanced, setAdvanced] = useState<OmniVoiceAdvancedParams>({ ...DEFAULT_ADVANCED_PARAMS });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // ── Synthesis pipeline ──
   const synth = useOmniVoiceSynthesis({
@@ -75,6 +81,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     refAudioName,
     refTranscript,
     speed,
+    advanced,
   });
 
   return (
@@ -177,16 +184,18 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
         <CardContent className="space-y-3">
           <OmniVoiceTextEditor isRu={isRu} value={synthText} onChange={setSynthText} />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label className="text-xs">{isRu ? "Скорость" : "Speed"}: {speed.toFixed(2)}</Label>
-              <Slider value={[speed]} onValueChange={([v]) => setSpeed(v)} min={0.5} max={2.0} step={0.05} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{isRu ? "Шаги диффузии" : "Diffusion steps"}: {numSteps}</Label>
-              <Slider value={[numSteps]} onValueChange={([v]) => setNumSteps(v)} min={4} max={64} step={1} />
-            </div>
+          <div className="space-y-1 max-w-xs">
+            <Label className="text-xs">{isRu ? "Скорость" : "Speed"}: {speed.toFixed(2)}</Label>
+            <Slider value={[speed]} onValueChange={([v]) => setSpeed(v)} min={0.5} max={2.0} step={0.05} />
           </div>
+
+          <OmniVoiceAdvancedParamsPanel
+            isRu={isRu}
+            open={advancedOpen}
+            onOpenChange={setAdvancedOpen}
+            value={advanced}
+            onChange={setAdvanced}
+          />
 
           <OmniVoiceResultCard
             isRu={isRu}
