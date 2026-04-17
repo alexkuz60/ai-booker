@@ -36,10 +36,29 @@ const OPENAI_PRESETS = [
   "fable", "marin", "nova", "onyx", "sage", "shimmer", "verse",
 ] as const;
 
-const NON_VERBAL_TAGS = [
-  "[laughter]", "[sigh]", "[confirmation-en]", "[question-en]",
-  "[question-ah]", "[question-oh]", "[surprise-ah]", "[surprise-oh]",
-  "[surprise-wa]", "[surprise-yo]", "[dissatisfaction-hnn]",
+// Полный набор управляющих тегов OmniVoice (https://github.com/k2-fsa/OmniVoice).
+// Группируем по смыслу для удобной вставки.
+const NON_VERBAL_TAG_GROUPS: { label_ru: string; label_en: string; tags: string[] }[] = [
+  {
+    label_ru: "Эмоции", label_en: "Emotions",
+    tags: ["[laughter]", "[sigh]", "[cry]", "[gasp]"],
+  },
+  {
+    label_ru: "Подтверждения", label_en: "Confirmations",
+    tags: ["[confirmation-en]", "[confirmation-mm]", "[confirmation-uhhuh]"],
+  },
+  {
+    label_ru: "Вопросы", label_en: "Questions",
+    tags: ["[question-en]", "[question-ah]", "[question-oh]", "[question-hmm]"],
+  },
+  {
+    label_ru: "Удивление", label_en: "Surprise",
+    tags: ["[surprise-ah]", "[surprise-oh]", "[surprise-wa]", "[surprise-yo]"],
+  },
+  {
+    label_ru: "Прочее", label_en: "Other",
+    tags: ["[dissatisfaction-hnn]", "[thinking-hmm]", "[breath]", "[cough]"],
+  },
 ];
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:8880";
