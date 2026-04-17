@@ -614,11 +614,29 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           {/* Voice Cloning controls */}
           {mode === "clone" && (
             <div className="space-y-3">
+              {/* Reference picker: Upload / OPFS / Booker collection */}
+              <OmniVoiceRefPicker
+                isRu={isRu}
+                selectedId={refPickedId}
+                onPick={handleRefPicked}
+              />
+
+              {/* Active reference summary + transcribe action */}
               <div className="flex items-center gap-2 flex-wrap">
-                <Button size="sm" variant="outline" onClick={() => refInputRef.current?.click()}>
-                  <Upload className="w-3 h-3 mr-1" />
-                  {isRu ? "Загрузить аудио" : "Upload audio"}
-                </Button>
+                {refAudioName ? (
+                  <Badge variant="secondary" className="gap-1 text-[10px]">
+                    <Mic className="w-3 h-3" />
+                    {refSource === "upload" ? (isRu ? "Файл" : "File")
+                      : refSource === "opfs" ? (isRu ? "Моя" : "Mine")
+                      : refSource === "collection" ? (isRu ? "Букеровская" : "Booker")
+                      : ""}
+                    : {refAudioName}
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">
+                    {isRu ? "Референс не выбран" : "No reference selected"}
+                  </span>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -626,24 +644,23 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
                   disabled={!refAudioBlob || transcribing}
                   title={isRu ? "Распознать речь в референсе (STT)" : "Transcribe reference audio (STT)"}
                 >
-                  {transcribing ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <Mic className="w-3 h-3 mr-1" />
-                  )}
+                  {transcribing
+                    ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    : <Mic className="w-3 h-3 mr-1" />}
                   {isRu ? "Распознать" : "Transcribe"}
                 </Button>
-                {refAudioName && (
-                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">{refAudioName}</span>
+                {refPickedId && refTranscript.trim() && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={persistTranscriptEdit}
+                    title={isRu ? "Сохранить транскрипт в коллекцию" : "Save transcript to collection"}
+                  >
+                    {isRu ? "💾 Сохранить" : "💾 Save"}
+                  </Button>
                 )}
-                <input
-                  ref={refInputRef}
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={handleRefUpload}
-                />
               </div>
+
               <div>
                 <Label className="text-xs">
                   {isRu ? "Транскрипт референса" : "Reference transcript"}
@@ -657,8 +674,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   {isRu
-                    ? "Используйте «Распознать» для авто-заполнения через STT-эндпоинт сервера."
-                    : "Use «Transcribe» to auto-fill via the server's STT endpoint."}
+                    ? "Подтянется автоматически если у референса есть сохранённый транскрипт. Иначе — нажмите «Распознать»."
+                    : "Auto-filled when the reference has a saved transcript. Otherwise click «Transcribe»."}
                 </p>
               </div>
             </div>
