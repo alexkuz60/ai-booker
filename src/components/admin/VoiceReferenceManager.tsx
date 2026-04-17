@@ -64,6 +64,7 @@ export function VoiceReferenceManager({ isRu }: VoiceReferenceManagerProps) {
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [transcript, setTranscript] = useState("");
   const [category, setCategory] = useState<VoiceCategory>("male");
   const [voiceLang, setVoiceLang] = useState<string>("ru");
   const [tagsStr, setTagsStr] = useState("");
@@ -124,6 +125,7 @@ export function VoiceReferenceManager({ isRu }: VoiceReferenceManagerProps) {
         .insert({
           name: name.trim(),
           description: description.trim() || null,
+          transcript: transcript.trim() || null,
           category,
           language: voiceLang,
           file_path: filePath,
@@ -137,7 +139,7 @@ export function VoiceReferenceManager({ isRu }: VoiceReferenceManagerProps) {
       if (dbErr) throw dbErr;
 
       toast.success(isRu ? "Голосовой сэмпл загружен" : "Voice sample uploaded");
-      setName(""); setDescription(""); setFile(null); setCategory("male"); setTagsStr("");
+      setName(""); setDescription(""); setTranscript(""); setFile(null); setCategory("male"); setTagsStr("");
       const fileInput = document.getElementById("voice-ref-file-input") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
       await fetchVoices();
@@ -235,6 +237,20 @@ export function VoiceReferenceManager({ isRu }: VoiceReferenceManagerProps) {
             <div className="space-y-2 sm:col-span-2">
               <Label>{isRu ? "Описание" : "Description"}</Label>
               <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={isRu ? "Глубокий баритон, аналитичный тон..." : "Deep baritone, analytical tone..."} rows={2} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{isRu ? "Транскрипт (для OmniVoice Cloning)" : "Transcript (for OmniVoice Cloning)"}</Label>
+              <Textarea
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+                placeholder={isRu ? "Точный текст, произносимый в аудио-сэмпле..." : "Exact text spoken in the audio sample..."}
+                rows={2}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {isRu
+                  ? "Используется как ref_text при клонировании в OmniVoice. Если оставить пустым — пользователи смогут распознать через STT."
+                  : "Used as ref_text for OmniVoice cloning. If empty, users can transcribe via STT on demand."}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>{isRu ? "Аудио файл (15-30 сек, WAV/MP3)" : "Audio file (15-30 sec, WAV/MP3)"}</Label>
