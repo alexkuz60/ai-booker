@@ -914,6 +914,7 @@ export type Database = {
           name: string
           sample_rate: number
           tags: string[]
+          transcript: string | null
           uploaded_by: string
         }
         Insert: {
@@ -929,6 +930,7 @@ export type Database = {
           name?: string
           sample_rate?: number
           tags?: string[]
+          transcript?: string | null
           uploaded_by: string
         }
         Update: {
@@ -944,6 +946,7 @@ export type Database = {
           name?: string
           sample_rate?: number
           tags?: string[]
+          transcript?: string | null
           uploaded_by?: string
         }
         Relationships: []

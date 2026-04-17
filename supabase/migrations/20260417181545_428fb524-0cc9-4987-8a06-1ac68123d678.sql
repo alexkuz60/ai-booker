@@ -1,0 +1,1 @@
+ALTER TABLE public.voice_references ADD COLUMN IF NOT EXISTS transcript text;
