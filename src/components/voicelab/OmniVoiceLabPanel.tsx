@@ -9,7 +9,7 @@
  * Sub-UI is split across `./omnivoice/*` to keep this file small and stable
  * when we add Advanced Generation parameters in a later pass.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Wifi, WifiOff, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
