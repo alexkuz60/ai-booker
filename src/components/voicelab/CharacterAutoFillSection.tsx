@@ -258,6 +258,15 @@ export function CharacterAutoFillSection({ isRu, onApply, onCharacterPicked }: C
     setSceneText("");
   }, [selectedCharId]);
 
+  // Notify parent on character pick (Phase 2: drives Advanced params auto-apply)
+  useEffect(() => {
+    if (selectedChar && onCharacterPicked) {
+      onCharacterPicked(selectedChar);
+    }
+    // We intentionally depend on the id only — parent handler should be stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChar?.id]);
+
   // Auto-refresh scene when any picker changes
   useEffect(() => {
     refreshScene();
