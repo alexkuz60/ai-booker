@@ -8,15 +8,32 @@
 
 ## 1. Зачем мигрировать таймлайн на Bevy
 
-### Текущая боль
-`src/components/studio/StudioTimeline.tsx` и связанные (`TimelineTrack.tsx`, `TimelinePlayhead.tsx`,
-`TimelineRuler.tsx`, `TimelineMasterMeter.tsx`) рендерятся через React + Canvas2D.
+### Текущая боль (две независимых поверхности)
 
-Конкретные проблемы на сценах с 200+ клипами:
+**A. Studio Timeline** — `src/components/studio/StudioTimeline.tsx` и связанные
+(`TimelineTrack.tsx`, `TimelinePlayhead.tsx`, `TimelineRuler.tsx`, `TimelineMasterMeter.tsx`).
+
+Проблемы на сценах с 200+ клипами:
 - Перерисовка синхронна с React reconciliation — scrub плеера дёргается.
 - `useWaveformPeaks` пересчитывает пики на каждый ресайз клипа.
 - `peaksWorker.ts` помогает, но финальный рендер всё равно через Canvas2D в main thread.
 - Drag-and-drop клипа провоцирует layout thrashing.
+
+**B. Montage Waveform Editor** — `src/components/montage/WaveformEditor.tsx` (вызывается из
+`MontageTimeline.tsx`). Это butterfly-вейв-редактор отрендеренной сцены целиком.
+
+Проблемы при playback на длинных сценах (7-10+ минут):
+- Картинка дёргается во время playhead scroll, особенно при включённом авто-скролле.
+- Canvas перерисовывается в main thread на каждый `requestAnimationFrame` транспорта.
+- Пики L/R считаются один раз через `useWaveformPeaks`, но рисуются вручную через
+  `drawButterfly()` — на 7-минутной сцене это 18+ МБ PCM, тысячи столбиков на кадр.
+- Виртуальный скролл помогает, но при zoom-in (300-1000%) ширина canvas достигает
+  десятков тысяч пикселей — Canvas2D не справляется.
+- Конкуренция с другими React-обновлениями (мастер-метр, плагины) усугубляет дёрганье.
+
+**Вывод**: Bevy лечит ОБЕ поверхности одним движком. Логика рендера waveform
+(GPU-инстансинг столбиков с LOD) одинакова и для Studio (много клипов × короткие пики),
+и для Montage (один клип × длинные пики).
 
 ### Что даст Bevy
 - **ECS (Entity Component System)**: один клип = одна entity, рендеринг батчится через GPU инстансинг.
@@ -123,19 +140,31 @@ React держит state, Bevy только визуализирует и эми
 - [ ] Playhead ruler с временной шкалой
 - [ ] Scrub плеера через клик в ruler
 
-### Фаза 4 — Параллельные фичи (опционально)
+### Фаза 4 — Параллельные фичи Studio (опционально)
 - [ ] Fade in/out визуализация (градиенты на краях клипа)
 - [ ] Плагин-бейджи (иконки EQ/Comp/Reverb на клипе)
 - [ ] Snap-to-grid при drag
 - [ ] Multi-select + box-select
 
-### Фаза 5 — Замена в production (3 дня)
+### Фаза 5 — Замена Studio в production (3 дня)
 - [ ] Feature flag: `useBevyTimeline` в `useCloudSettings`
 - [ ] A/B-тест на реальных проектах с большим storyboard
 - [ ] Замер метрик: FPS, time-to-interactive, memory
 - [ ] Полная замена `TimelineTrack.tsx` на `BevyTimelineMount.tsx`
 
-**Итого**: ~5-6 недель для одного разработчика с базовым Rust.
+### Фаза 6 — Montage Waveform Editor (1.5 недели)
+Реюз того же Bevy-движка для `src/components/montage/WaveformEditor.tsx`:
+- [ ] Новый компонент `BevyWaveformMount.tsx` поверх того же WASM-модуля.
+- [ ] ECS-сцена «single-clip waveform»: одна entity = вся отрендеренная сцена.
+- [ ] Передача peaks через Transferable ArrayBuffer (избегаем копий 18+ МБ PCM).
+- [ ] LOD для зума: 95-200% — простой L/R butterfly, 300-1000% — детальные пики.
+- [ ] GPU-смещение playhead в каждом кадре через uniform buffer, без перерисовки пиков.
+- [ ] Авто-скролл playhead через GPU camera translation, не CSS `scrollLeft`.
+- [ ] Selection overlay (trim) как отдельный quad с alpha-blend.
+- [ ] Сохранить контракт: те же callback'и `onSeek`, `onTrim`, `onFadeIn/Out`, `onUndo/Redo`.
+- [ ] Бенчмарк: 10-минутная сцена @ 60 fps во время playback с авто-скроллом.
+
+**Итого**: ~6.5-7.5 недель для одного разработчика с базовым Rust (Studio + Montage).
 
 ---
 
@@ -174,6 +203,7 @@ Bevy и Tauri **ортогональны**, но синергичны:
 
 ## 7. Целевые метрики
 
+### Studio Timeline
 | Метрика | Текущее (Canvas2D) | Цель (Bevy) |
 |---------|---------------------|-------------|
 | FPS на 100 клипов | ~45 fps | 60 fps |
@@ -183,22 +213,35 @@ Bevy и Tauri **ортогональны**, но синергичны:
 | Memory (500 клипов) | ~200 МБ | ~50 МБ |
 | Time to interactive Studio | 800 ms | 1200 ms (+ загрузка WASM) |
 
+### Montage Waveform Editor
+| Метрика | Текущее (Canvas2D) | Цель (Bevy) |
+|---------|---------------------|-------------|
+| FPS playback на 3-мин сцене | ~50 fps | 60 fps |
+| FPS playback на 7-мин сцене | ~20 fps (дёргается) | 60 fps |
+| FPS playback на 15-мин сцене | ~8 fps (картинка прыгает) | 60 fps |
+| FPS при zoom 1000% + playback | ~5 fps | 60 fps |
+| Латентность авто-скролла | 100-200 ms | <16 ms |
+| Memory (10-мин 44.1 kHz stereo) | ~180 МБ (PCM + canvas) | ~60 МБ |
+
 Единственный регресс — TTI из-за загрузки WASM-бандла. Митигация: lazy-load + preload hint.
+WASM-модуль один на Studio + Montage — оплачиваем загрузку только раз.
 
 ---
 
 ## 8. Когда начинать
 
 **Триггеры для старта**:
-1. Жалобы пользователей на лаги таймлайна (≥3 жалобы или явный фидбек).
-2. Сцены с 200+ клипами становятся нормой (сейчас редкость).
-3. Готовность инвестировать 5-6 недель / 1 разработчика с Rust.
-4. Стабилизация текущего стека Студии (не менять Bevy-таргет каждую неделю).
+1. Жалобы пользователей на лаги таймлайна Studio (≥3 жалобы или явный фидбек).
+2. Жалобы на дёрганый плейбек в Montage на сценах 7+ минут (**уже подтверждено**).
+3. Сцены с 200+ клипами становятся нормой (сейчас редкость).
+4. Готовность инвестировать 6.5-7.5 недель / 1 разработчика с Rust.
+5. Стабилизация текущего стека Студии и Монтажа.
 
 **До этого момента**:
-- Документировать текущие узкие места `TimelineTrack.tsx` (FPS-замеры).
+- Документировать узкие места `TimelineTrack.tsx` и `WaveformEditor.tsx` (FPS-замеры).
 - Не наращивать сложность Canvas2D-рендера (каждая новая фича = больше работы при миграции).
-- Держать `useTimelineClips` чистым от рендер-логики (готовность к замене View-слоя).
+- Держать `useTimelineClips`, `useTimelinePlayer`, `useWaveformPeaks` чистыми от рендер-логики.
+- Развести буферы пиков так, чтобы их можно было отдать через Transferable без копирования.
 
 ---
 
