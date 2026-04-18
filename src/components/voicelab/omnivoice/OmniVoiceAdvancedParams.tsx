@@ -112,6 +112,7 @@ const NUMERIC_PARAMS: ParamMeta[] = [
 
 export function OmniVoiceAdvancedParams({
   isRu, open, onOpenChange, value, onChange, onPresetApply, onReset, sourceLabel,
+  currentSpeed, onUserPresetApply,
 }: OmniVoiceAdvancedParamsProps) {
   const setNumeric = (key: keyof OmniVoiceAdvancedParams, n: number) =>
     onChange({ ...value, [key]: n });
