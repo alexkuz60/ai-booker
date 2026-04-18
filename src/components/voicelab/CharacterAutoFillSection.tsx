@@ -47,6 +47,12 @@ interface CharacterAutoFillSectionProps {
   isRu: boolean;
   /** Called with the final concatenated EN prompt to apply into the Instructions textarea. */
   onApply: (prompt: string) => void;
+  /**
+   * Optional: called whenever the user picks a character. Receives the full
+   * CharacterIndex so the parent can derive Advanced params, voice candidates, etc.
+   * Phase 2: panel uses this to auto-apply OmniVoice generation knobs from psychotype.
+   */
+  onCharacterPicked?: (character: CharacterIndex) => void;
 }
 
 /** Mood/scene_type/segment_type options shown to user for the Scene Context block. */
@@ -66,7 +72,7 @@ const SCENE_TYPE_CHOICES = [
 
 const NONE = "__none__";
 
-export function CharacterAutoFillSection({ isRu, onApply }: CharacterAutoFillSectionProps) {
+export function CharacterAutoFillSection({ isRu, onApply, onCharacterPicked }: CharacterAutoFillSectionProps) {
   const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
 
   // Translator role: respect user's configured model + API key
