@@ -40,6 +40,8 @@ interface OmniVoiceAdvancedParamsProps {
   onPresetApply?: (presetId: "draft" | "standard" | "final", params: OmniVoiceAdvancedParams) => void;
   /** Reset button — caller marks source as "manual" with default values. */
   onReset?: () => void;
+  /** Optional short label shown in the header (e.g. "Auto · Hyperthymic + Hero"). */
+  sourceLabel?: string | null;
 }
 
 interface ParamMeta {
@@ -103,7 +105,7 @@ const NUMERIC_PARAMS: ParamMeta[] = [
 ];
 
 export function OmniVoiceAdvancedParams({
-  isRu, open, onOpenChange, value, onChange, onPresetApply, onReset,
+  isRu, open, onOpenChange, value, onChange, onPresetApply, onReset, sourceLabel,
 }: OmniVoiceAdvancedParamsProps) {
   const setNumeric = (key: keyof OmniVoiceAdvancedParams, n: number) =>
     onChange({ ...value, [key]: n });
@@ -126,6 +128,11 @@ export function OmniVoiceAdvancedParams({
               <span className="text-xs font-medium">
                 {isRu ? "Расширенные параметры (эксперимент)" : "Advanced parameters (experimental)"}
               </span>
+              {sourceLabel && (
+                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {sourceLabel}
+                </span>
+              )}
             </div>
             <span className="text-[10px] text-muted-foreground">
               {isRu ? "CFG / Steps / Temperatures" : "CFG / Steps / Temperatures"}
