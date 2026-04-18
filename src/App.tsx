@@ -30,6 +30,7 @@ const Translation = lazy(() => import("./pages/Translation"));
 const VoiceLab = lazy(() => import("./pages/VoiceLab"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
+const About = lazy(() => import("./pages/About"));
 
 const queryClient = new QueryClient();
 
@@ -98,6 +99,7 @@ function ProtectedRoutes() {
               <Route path="/voice-lab" element={<VoiceLab />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/about" element={<About />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
