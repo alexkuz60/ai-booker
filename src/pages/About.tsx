@@ -117,7 +117,7 @@ function BulletsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
     <SlideShell kicker={isRu ? slide.kicker.ru : slide.kicker.en}>
       <h2
         className="text-4xl md:text-5xl font-bold leading-tight mb-10 max-w-4xl"
-        style={{ fontFamily: fontDisplay, color: palette.ink }}
+        style={{ fontFamily: fontDisplay, color: palette.bg }}
       >
         {isRu ? slide.title.ru : slide.title.en}
       </h2>
@@ -133,8 +133,8 @@ function BulletsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
             <span
               className="flex-shrink-0 mt-1.5 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
               style={{
-                background: palette.accent,
-                color: palette.bg,
+                background: palette.gold,
+                color: palette.ink,
                 fontFamily: fontDisplay,
               }}
             >
@@ -158,7 +158,7 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
     <SlideShell kicker={isRu ? slide.kicker.ru : slide.kicker.en}>
       <h2
         className="text-3xl md:text-4xl font-bold leading-tight mb-10 max-w-4xl"
-        style={{ fontFamily: fontDisplay, color: palette.ink }}
+        style={{ fontFamily: fontDisplay, color: palette.bg }}
       >
         {isRu ? slide.title.ru : slide.title.en}
       </h2>
@@ -171,19 +171,19 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
             transition={{ delay: i * 0.08 }}
             className="p-5 rounded-lg border"
             style={{
-              borderColor: `${palette.accent}30`,
-              background: `${palette.accent}08`,
+              borderColor: `${palette.gold}40`,
+              background: `${palette.gold}10`,
             }}
           >
             <div
               className="text-4xl md:text-5xl font-bold mb-2"
-              style={{ fontFamily: fontDisplay, color: palette.accent }}
+              style={{ fontFamily: fontDisplay, color: palette.gold }}
             >
               {s.value}
             </div>
             <div
               className="text-sm font-semibold mb-1"
-              style={{ color: palette.ink }}
+              style={{ color: palette.bg }}
             >
               {isRu ? s.label.ru : s.label.en}
             </div>
@@ -199,7 +199,7 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
         <p
           className="max-w-4xl text-base md:text-lg italic leading-relaxed border-l-2 pl-5"
           style={{
-            borderColor: palette.accent,
+            borderColor: palette.gold,
             color: palette.inkSoft,
             fontFamily: fontDisplay,
           }}
