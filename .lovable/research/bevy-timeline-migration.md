@@ -140,19 +140,31 @@ React держит state, Bevy только визуализирует и эми
 - [ ] Playhead ruler с временной шкалой
 - [ ] Scrub плеера через клик в ruler
 
-### Фаза 4 — Параллельные фичи (опционально)
+### Фаза 4 — Параллельные фичи Studio (опционально)
 - [ ] Fade in/out визуализация (градиенты на краях клипа)
 - [ ] Плагин-бейджи (иконки EQ/Comp/Reverb на клипе)
 - [ ] Snap-to-grid при drag
 - [ ] Multi-select + box-select
 
-### Фаза 5 — Замена в production (3 дня)
+### Фаза 5 — Замена Studio в production (3 дня)
 - [ ] Feature flag: `useBevyTimeline` в `useCloudSettings`
 - [ ] A/B-тест на реальных проектах с большим storyboard
 - [ ] Замер метрик: FPS, time-to-interactive, memory
 - [ ] Полная замена `TimelineTrack.tsx` на `BevyTimelineMount.tsx`
 
-**Итого**: ~5-6 недель для одного разработчика с базовым Rust.
+### Фаза 6 — Montage Waveform Editor (1.5 недели)
+Реюз того же Bevy-движка для `src/components/montage/WaveformEditor.tsx`:
+- [ ] Новый компонент `BevyWaveformMount.tsx` поверх того же WASM-модуля.
+- [ ] ECS-сцена «single-clip waveform»: одна entity = вся отрендеренная сцена.
+- [ ] Передача peaks через Transferable ArrayBuffer (избегаем копий 18+ МБ PCM).
+- [ ] LOD для зума: 95-200% — простой L/R butterfly, 300-1000% — детальные пики.
+- [ ] GPU-смещение playhead в каждом кадре через uniform buffer, без перерисовки пиков.
+- [ ] Авто-скролл playhead через GPU camera translation, не CSS `scrollLeft`.
+- [ ] Selection overlay (trim) как отдельный quad с alpha-blend.
+- [ ] Сохранить контракт: те же callback'и `onSeek`, `onTrim`, `onFadeIn/Out`, `onUndo/Redo`.
+- [ ] Бенчмарк: 10-минутная сцена @ 60 fps во время playback с авто-скроллом.
+
+**Итого**: ~6.5-7.5 недель для одного разработчика с базовым Rust (Studio + Montage).
 
 ---
 
