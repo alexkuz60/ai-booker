@@ -29,6 +29,25 @@ export interface ContentVecResult {
   inferenceMs: number;
 }
 
+/**
+ * Cached input rank for the active ContentVec model.
+ * Different ContentVec ONNX exports expect different input ranks:
+ *   - rank 2: [batch, samples]              — most common
+ *   - rank 3: [batch, channels, samples]    — some exports (e.g. with explicit channel dim)
+ * We auto-detect on first failure and remember for subsequent calls.
+ */
+let contentVecInputRank: 2 | 3 | null = null;
+
+function isInvalidRankError(err: unknown): { expected: 2 | 3 } | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  // ORT message: "Invalid rank for input: source Got: 2 Expected: 3"
+  const m = /Invalid rank for input.*Got:\s*(\d+)\s*Expected:\s*(\d+)/i.exec(msg);
+  if (!m) return null;
+  const expected = Number(m[2]);
+  if (expected === 2 || expected === 3) return { expected };
+  return null;
+}
+
 export async function extractContentVec(
   samples: Float32Array,
   sampleRate = EXPECTED_SR,
@@ -40,6 +59,13 @@ export async function extractContentVec(
   try {
     return await _runContentVec(samples);
   } catch (err) {
+    // Auto-detect required input rank and retry once
+    const rankInfo = isInvalidRankError(err);
+    if (rankInfo && contentVecInputRank !== rankInfo.expected) {
+      console.warn(`[ContentVec] Model expects rank ${rankInfo.expected} input — switching and retrying`);
+      contentVecInputRank = rankInfo.expected;
+      return await _runContentVec(samples);
+    }
     if (err instanceof WebGPUCorruptError && getSessionBackend("contentvec") === "webgpu") {
       console.warn(`[ContentVec] WebGPU output corrupted — releasing session & retrying on GPU`);
       await releaseVcSession("contentvec");
