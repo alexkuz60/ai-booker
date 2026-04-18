@@ -375,6 +375,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             onPresetApply={handlePresetApply}
             onReset={handleReset}
             sourceLabel={advancedHint}
+            currentSpeed={speed}
+            onUserPresetApply={handleUserPresetApply}
           />
 
           <OmniVoiceResultCard
