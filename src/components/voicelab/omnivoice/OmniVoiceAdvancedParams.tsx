@@ -28,6 +28,8 @@ import {
   DEFAULT_ADVANCED_PARAMS,
   type OmniVoiceAdvancedParams,
 } from "./constants";
+import { OmniVoiceUserPresetsMenu } from "./OmniVoiceUserPresetsMenu";
+import type { OmniVoiceUserPreset } from "@/lib/omniVoiceUserPresets";
 
 interface OmniVoiceAdvancedParamsProps {
   isRu: boolean;
@@ -42,6 +44,10 @@ interface OmniVoiceAdvancedParamsProps {
   onReset?: () => void;
   /** Optional short label shown in the header (e.g. "Auto · Hyperthymic + Hero"). */
   sourceLabel?: string | null;
+  /** Current speed (bundled into a saved user preset for full reproducibility). */
+  currentSpeed?: number;
+  /** Apply a saved user preset — caller stamps source as `preset:user:<name>`. */
+  onUserPresetApply?: (preset: OmniVoiceUserPreset) => void;
 }
 
 interface ParamMeta {
