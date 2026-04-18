@@ -25,7 +25,7 @@ const fontBody = `'Inter', system-ui, sans-serif`;
 function SlideShell({
   children,
   kicker,
-  variant = "light",
+  variant = "dark",
 }: {
   children: React.ReactNode;
   kicker: string;
@@ -37,33 +37,35 @@ function SlideShell({
       className="relative w-full h-full overflow-hidden flex flex-col"
       style={{
         background: isDark
-          ? `linear-gradient(135deg, ${palette.navy} 0%, ${palette.ink} 100%)`
+          ? `linear-gradient(135deg, ${palette.ink} 0%, ${palette.navy} 100%)`
           : `linear-gradient(135deg, ${palette.bg} 0%, ${palette.bgAlt} 100%)`,
         color: isDark ? palette.bg : palette.ink,
         fontFamily: fontBody,
       }}
     >
-      {/* paper texture */}
+      {/* atmospheric glow */}
       <div
-        className="absolute inset-0 opacity-[0.07] pointer-events-none"
+        className="absolute inset-0 opacity-[0.12] pointer-events-none"
         style={{
-          backgroundImage: `radial-gradient(circle at 20% 30%, ${palette.accent} 0%, transparent 40%), radial-gradient(circle at 80% 70%, ${palette.accent2} 0%, transparent 40%)`,
+          backgroundImage: isDark
+            ? `radial-gradient(circle at 15% 20%, ${palette.gold} 0%, transparent 45%), radial-gradient(circle at 85% 85%, ${palette.accent2} 0%, transparent 45%)`
+            : `radial-gradient(circle at 20% 30%, ${palette.accent} 0%, transparent 40%), radial-gradient(circle at 80% 70%, ${palette.accent2} 0%, transparent 40%)`,
         }}
       />
       {/* decorative side bar */}
       <div
         className="absolute left-0 top-0 bottom-0 w-2"
-        style={{ background: palette.accent }}
+        style={{ background: palette.gold }}
       />
       {/* kicker */}
       <div className="relative px-16 pt-10 pb-2 flex items-center gap-3">
         <div
           className="h-px flex-grow-0 w-12"
-          style={{ background: palette.accent }}
+          style={{ background: palette.gold }}
         />
         <span
           className="text-[11px] font-bold tracking-[0.3em] uppercase"
-          style={{ color: palette.accent }}
+          style={{ color: palette.gold }}
         >
           {kicker}
         </span>
