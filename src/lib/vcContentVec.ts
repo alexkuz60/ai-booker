@@ -63,7 +63,8 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
   for (const name of info.inputNames) {
     const key = name.toLowerCase();
     if (key === "source" || key === "input" || key === "audio") {
-      feeds[name] = { data: new Float32Array(samples), dims: [1, 1, samples.length], dtype: "float32" };
+      // ContentVec expects [batch, samples] (rank 2), not [batch, channels, samples]
+      feeds[name] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
     } else if (key === "padding_mask" || key === "attention_mask") {
       const mask = new Uint8Array(samples.length);
       mask.fill(1); // 1 = attend to all positions; 0 = ignore
@@ -71,7 +72,7 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
     }
   }
   if (Object.keys(feeds).length === 0) {
-    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, 1, samples.length], dtype: "float32" };
+    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
   }
 
   const results = await runVcInference("contentvec", feeds);
