@@ -34,7 +34,12 @@ interface OmniVoiceAdvancedParamsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   value: OmniVoiceAdvancedParams;
+  /** Manual edit (slider/switch) — caller marks source as "manual". */
   onChange: (next: OmniVoiceAdvancedParams) => void;
+  /** Preset button click — caller marks source as `preset:<id>`. */
+  onPresetApply?: (presetId: "draft" | "standard" | "final", params: OmniVoiceAdvancedParams) => void;
+  /** Reset button — caller marks source as "manual" with default values. */
+  onReset?: () => void;
 }
 
 interface ParamMeta {
@@ -98,7 +103,7 @@ const NUMERIC_PARAMS: ParamMeta[] = [
 ];
 
 export function OmniVoiceAdvancedParams({
-  isRu, open, onOpenChange, value, onChange,
+  isRu, open, onOpenChange, value, onChange, onPresetApply, onReset,
 }: OmniVoiceAdvancedParamsProps) {
   const setNumeric = (key: keyof OmniVoiceAdvancedParams, n: number) =>
     onChange({ ...value, [key]: n });
@@ -142,7 +147,11 @@ export function OmniVoiceAdvancedParams({
                     size="sm"
                     variant="outline"
                     className="h-6 px-2 text-[10px]"
-                    onClick={() => onChange({ ...p.params })}
+                    onClick={() => {
+                      const next = { ...p.params };
+                      if (onPresetApply) onPresetApply(p.id, next);
+                      else onChange(next);
+                    }}
                   >
                     {isRu ? p.label_ru : p.label_en}
                   </Button>
@@ -157,7 +166,10 @@ export function OmniVoiceAdvancedParams({
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-[10px] gap-1 ml-auto"
-              onClick={() => onChange({ ...DEFAULT_ADVANCED_PARAMS })}
+              onClick={() => {
+                if (onReset) onReset();
+                else onChange({ ...DEFAULT_ADVANCED_PARAMS });
+              }}
             >
               <RotateCcw className="h-3 w-3" />
               {isRu ? "Сброс" : "Reset"}
