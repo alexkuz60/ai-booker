@@ -407,3 +407,132 @@ export function detectArchetype(tags: string[]): Archetype | null {
   }
   return null;
 }
+
+// ─── Accentuation/Archetype → OmniVoice Advanced Params (Phase 2) ─
+
+import {
+  DEFAULT_ADVANCED_PARAMS,
+  type OmniVoiceAdvancedParams,
+} from "@/components/voicelab/omnivoice/constants";
+
+/**
+ * Per-accentuation BASE for OmniVoice generation knobs.
+ *
+ * Driving idea (Phase 2 — to be tuned empirically):
+ *   • num_step           — accentuations that need crisp diction & control
+ *                          (epileptoid, schizoid, stuck) get more steps.
+ *                          Hyperthymic/histerionic accept fewer steps for
+ *                          spontaneity.
+ *   • guidance_scale     — accentuations with strong "tight" delivery
+ *                          (epileptoid, stuck, schizoid) get higher CFG.
+ *                          Emotive/cycloid keep CFG closer to default.
+ *   • t_shift            — kept neutral (1.0) — only modulated by archetype.
+ *   • position_temperature / class_temperature — kept at base 1.0 here;
+ *                          archetype layer modulates them for timbre.
+ *   • denoise            — off by default; only theatrical/dramatic
+ *                          accentuations request it for cleaner take.
+ */
+export const ACCENTUATION_OMNIVOICE_PARAMS: Record<Accentuation, OmniVoiceAdvancedParams> = {
+  hyperthymic:   { guidance_scale: 2.8, num_step: 28, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  schizoid:      { guidance_scale: 3.5, num_step: 40, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  histerionic:   { guidance_scale: 2.5, num_step: 28, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: true  },
+  epileptoid:    { guidance_scale: 3.8, num_step: 44, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  depressive:    { guidance_scale: 3.2, num_step: 36, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  anxious:       { guidance_scale: 2.7, num_step: 32, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  emotive:       { guidance_scale: 3.0, num_step: 36, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  cycloid:       { guidance_scale: 3.0, num_step: 32, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  stuck:         { guidance_scale: 3.6, num_step: 40, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: false },
+  demonstrative: { guidance_scale: 2.6, num_step: 32, t_shift: 1.0, position_temperature: 1.0, class_temperature: 1.0, denoise: true  },
+};
+
+/**
+ * Per-archetype timbral modulation applied ON TOP of accentuation base.
+ *
+ * We modulate position_temperature & class_temperature (the "liveliness"
+ * knobs) and very mildly t_shift, leaving num_step / guidance_scale to
+ * the accentuation layer which controls structural delivery.
+ *
+ * Multipliers are clamped against the slider ranges in the resolver below.
+ */
+type ArchetypeMod = {
+  positionTempMul: number;
+  classTempMul: number;
+  tShift: number; // absolute, not multiplier
+};
+
+export const ARCHETYPE_OMNIVOICE_MODIFIERS: Record<Archetype, ArchetypeMod> = {
+  sage:      { positionTempMul: 0.85, classTempMul: 0.85, tShift: 1.00 }, // measured, contemplative
+  hero:      { positionTempMul: 1.05, classTempMul: 1.00, tShift: 1.00 }, // confident, slightly assertive
+  caregiver: { positionTempMul: 0.95, classTempMul: 0.95, tShift: 1.00 }, // warm, gentle
+  trickster: { positionTempMul: 1.30, classTempMul: 1.25, tShift: 1.05 }, // playful, unpredictable
+  lover:     { positionTempMul: 1.10, classTempMul: 1.10, tShift: 1.05 }, // expressive, intimate
+  rebel:     { positionTempMul: 1.20, classTempMul: 1.15, tShift: 0.95 }, // edgy, defiant
+};
+
+const PARAM_RANGES: Record<keyof OmniVoiceAdvancedParams, { min: number; max: number }> = {
+  guidance_scale:       { min: 1.0, max: 7.0 },
+  num_step:             { min: 4,   max: 64  },
+  t_shift:              { min: 0.5, max: 2.0 },
+  position_temperature: { min: 0.1, max: 2.0 },
+  class_temperature:    { min: 0.1, max: 2.0 },
+  denoise:              { min: 0,   max: 1   }, // unused, kept for type-uniformity
+};
+
+const clamp = (v: number, k: keyof OmniVoiceAdvancedParams) => {
+  const r = PARAM_RANGES[k];
+  return Math.min(r.max, Math.max(r.min, v));
+};
+
+/**
+ * Compute OmniVoice Advanced params from psychotype:
+ *   1. Start from accentuation base (or DEFAULT if unknown).
+ *   2. Apply archetype modulation to temperature/t_shift.
+ *   3. Round to slider step (num_step → int; others → 2 decimals).
+ *
+ * Returns the FULL 6-field snapshot ready to write into
+ * `voice_config.omnivoice_advanced.params` (Snapshot+source storage).
+ */
+export function resolveOmniVoiceAdvanced(
+  accentuation: Accentuation | null,
+  archetype: Archetype | null,
+): OmniVoiceAdvancedParams {
+  const base: OmniVoiceAdvancedParams = accentuation
+    ? { ...ACCENTUATION_OMNIVOICE_PARAMS[accentuation] }
+    : { ...DEFAULT_ADVANCED_PARAMS };
+
+  const mod = archetype ? ARCHETYPE_OMNIVOICE_MODIFIERS[archetype] : null;
+  if (mod) {
+    base.position_temperature = clamp(base.position_temperature * mod.positionTempMul, "position_temperature");
+    base.class_temperature    = clamp(base.class_temperature    * mod.classTempMul,    "class_temperature");
+    base.t_shift              = clamp(mod.tShift,                                       "t_shift");
+  }
+
+  // Round for clean slider snapping
+  return {
+    guidance_scale:       Math.round(base.guidance_scale       * 10) / 10,
+    num_step:             Math.round(base.num_step),
+    t_shift:              Math.round(base.t_shift              * 100) / 100,
+    position_temperature: Math.round(base.position_temperature * 100) / 100,
+    class_temperature:    Math.round(base.class_temperature    * 100) / 100,
+    denoise:              base.denoise,
+  };
+}
+
+/**
+ * Convenience: resolve directly from a character's psycho_tags.
+ * Returns `null` if neither accentuation nor archetype could be detected
+ * (caller should keep current Advanced values untouched in that case).
+ */
+export function resolveOmniVoiceAdvancedFromTags(
+  psychoTags: string[] | null | undefined,
+): { params: OmniVoiceAdvancedParams; accentuation: Accentuation | null; archetype: Archetype | null } | null {
+  const tags = psychoTags ?? [];
+  const accentuation = detectAccentuation(tags);
+  const archetype    = detectArchetype(tags);
+  if (!accentuation && !archetype) return null;
+  return {
+    params: resolveOmniVoiceAdvanced(accentuation, archetype),
+    accentuation,
+    archetype,
+  };
+}

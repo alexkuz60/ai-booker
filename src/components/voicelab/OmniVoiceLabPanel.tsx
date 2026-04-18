@@ -9,7 +9,7 @@
  * Sub-UI is split across `./omnivoice/*` to keep this file small and stable
  * when we add Advanced Generation parameters in a later pass.
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2, Wifi, WifiOff, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +32,15 @@ import { OmniVoiceCloningControls } from "./omnivoice/OmniVoiceCloningControls";
 import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
+import {
+  resolveOmniVoiceAdvancedFromTags,
+  ACCENTUATION_LABELS,
+  ARCHETYPE_LABELS,
+} from "@/config/psychotypeVoicePresets";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
+import type { CharacterIndex, OmniVoiceAdvancedSnapshot } from "@/pages/parser/types";
+import { toast } from "sonner";
 
 interface OmniVoiceLabPanelProps {
   isRu: boolean;
@@ -68,6 +77,136 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const [speed, setSpeed] = useState(1.0);
   const [advanced, setAdvanced] = useState<OmniVoiceAdvancedParams>({ ...DEFAULT_ADVANCED_PARAMS });
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedSource, setAdvancedSource] =
+    useState<OmniVoiceAdvancedSnapshot["source"]>("manual");
+  const [advancedHint, setAdvancedHint] = useState<string | null>(null);
+  const [pickedCharId, setPickedCharId] = useState<string | null>(null);
+
+  // ── OPFS project context (Phase 2: persist Advanced snapshot per character) ──
+  const { storage: projectStorage, meta: projectMeta } = useProjectStorageContext();
+
+  /** Persist current Advanced snapshot into characters.json for `charId`. */
+  const persistAdvancedFor = useCallback(
+    async (
+      charId: string,
+      params: OmniVoiceAdvancedParams,
+      source: OmniVoiceAdvancedSnapshot["source"],
+    ) => {
+      if (!projectStorage || !projectMeta?.bookId) return;
+      try {
+        const all = await readCharacterIndex(projectStorage);
+        const updated = all.map((c) =>
+          c.id === charId
+            ? {
+                ...c,
+                voice_config: {
+                  ...c.voice_config,
+                  omnivoice_advanced: {
+                    params: { ...params },
+                    source,
+                    updatedAt: new Date().toISOString(),
+                  },
+                },
+              }
+            : c,
+        );
+        await saveCharacterIndex(projectStorage, updated);
+      } catch (err) {
+        console.warn("[OmniVoiceLabPanel] Failed to persist omnivoice_advanced:", err);
+      }
+    },
+    [projectStorage, projectMeta?.bookId],
+  );
+
+  /** Manual slider/switch edits — mark as "manual" + persist if a character is bound. */
+  const handleManualChange = useCallback(
+    (next: OmniVoiceAdvancedParams) => {
+      setAdvanced(next);
+      setAdvancedSource("manual");
+      setAdvancedHint(isRu ? "Ручная правка" : "Manual edit");
+      if (pickedCharId) void persistAdvancedFor(pickedCharId, next, "manual");
+    },
+    [isRu, pickedCharId, persistAdvancedFor],
+  );
+
+  /** Preset button — mark as `preset:<id>` + persist. */
+  const handlePresetApply = useCallback(
+    (presetId: "draft" | "standard" | "final", next: OmniVoiceAdvancedParams) => {
+      setAdvanced(next);
+      const src = `preset:${presetId}` as OmniVoiceAdvancedSnapshot["source"];
+      setAdvancedSource(src);
+      const labels: Record<string, { ru: string; en: string }> = {
+        draft:    { ru: "Пресет: Черновик", en: "Preset: Draft" },
+        standard: { ru: "Пресет: Стандарт", en: "Preset: Standard" },
+        final:    { ru: "Пресет: Финал",    en: "Preset: Final" },
+      };
+      setAdvancedHint(isRu ? labels[presetId].ru : labels[presetId].en);
+      if (pickedCharId) void persistAdvancedFor(pickedCharId, next, src);
+    },
+    [isRu, pickedCharId, persistAdvancedFor],
+  );
+
+  /** Reset → defaults, marked as "manual". */
+  const handleReset = useCallback(() => {
+    const next = { ...DEFAULT_ADVANCED_PARAMS };
+    setAdvanced(next);
+    setAdvancedSource("manual");
+    setAdvancedHint(isRu ? "Сброшено к дефолтам" : "Reset to defaults");
+    if (pickedCharId) void persistAdvancedFor(pickedCharId, next, "manual");
+  }, [isRu, pickedCharId, persistAdvancedFor]);
+
+  /**
+   * Character pick from CharacterAutoFillSection.
+   * Phase 2 contract: auto-apply Advanced params from psycho-tags if available.
+   * If a character already has `voice_config.omnivoice_advanced` saved — restore it
+   * (respect the user's last manual override).
+   */
+  const handleCharacterPicked = useCallback(
+    (char: CharacterIndex) => {
+      setPickedCharId(char.id);
+
+      const saved = char.voice_config?.omnivoice_advanced;
+      if (saved?.params) {
+        setAdvanced({ ...saved.params });
+        setAdvancedSource(saved.source);
+        const srcHints: Record<string, { ru: string; en: string }> = {
+          auto:                { ru: "Авто из профиля",  en: "Auto from profile" },
+          manual:              { ru: "Ручная правка",     en: "Manual edit" },
+          "preset:draft":      { ru: "Пресет: Черновик", en: "Preset: Draft" },
+          "preset:standard":   { ru: "Пресет: Стандарт", en: "Preset: Standard" },
+          "preset:final":      { ru: "Пресет: Финал",    en: "Preset: Final" },
+        };
+        const hint = srcHints[saved.source];
+        setAdvancedHint(hint ? (isRu ? hint.ru : hint.en) : null);
+        return;
+      }
+
+      const resolved = resolveOmniVoiceAdvancedFromTags(char.psycho_tags);
+      if (!resolved) {
+        // No psycho data — keep current values, just clear the hint.
+        setAdvancedHint(null);
+        return;
+      }
+
+      setAdvanced(resolved.params);
+      setAdvancedSource("auto");
+      const accLabel = resolved.accentuation
+        ? (isRu ? ACCENTUATION_LABELS[resolved.accentuation].ru : ACCENTUATION_LABELS[resolved.accentuation].en)
+        : null;
+      const archLabel = resolved.archetype
+        ? (isRu ? ARCHETYPE_LABELS[resolved.archetype].ru : ARCHETYPE_LABELS[resolved.archetype].en)
+        : null;
+      const tail = [accLabel, archLabel].filter(Boolean).join(" + ");
+      setAdvancedHint(`${isRu ? "Авто" : "Auto"} · ${tail}`);
+      void persistAdvancedFor(char.id, resolved.params, "auto");
+      toast.success(
+        isRu
+          ? `Параметры подобраны по психотипу: ${tail}`
+          : `Params auto-tuned from psychotype: ${tail}`,
+      );
+    },
+    [isRu, persistAdvancedFor],
+  );
 
   // ── Synthesis pipeline ──
   const synth = useOmniVoiceSynthesis({
@@ -147,6 +286,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               onPresetChange={setPreset}
               instructions={instructions}
               onInstructionsChange={setInstructions}
+              onCharacterPicked={handleCharacterPicked}
             />
           )}
 
@@ -194,7 +334,10 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             open={advancedOpen}
             onOpenChange={setAdvancedOpen}
             value={advanced}
-            onChange={setAdvanced}
+            onChange={handleManualChange}
+            onPresetApply={handlePresetApply}
+            onReset={handleReset}
+            sourceLabel={advancedHint}
           />
 
           <OmniVoiceResultCard

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { CharacterAutoFillSection } from "@/components/voicelab/CharacterAutoFillSection";
 import { OPENAI_PRESETS } from "./constants";
+import type { CharacterIndex } from "@/pages/parser/types";
 
 interface Props {
   isRu: boolean;
@@ -13,10 +14,12 @@ interface Props {
   onPresetChange: (p: string) => void;
   instructions: string;
   onInstructionsChange: (v: string) => void;
+  /** Phase 2: bubble up character pick so the panel can derive Advanced params. */
+  onCharacterPicked?: (character: CharacterIndex) => void;
 }
 
 export function OmniVoiceDesignControls({
-  isRu, preset, onPresetChange, instructions, onInstructionsChange,
+  isRu, preset, onPresetChange, instructions, onInstructionsChange, onCharacterPicked,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -50,7 +53,11 @@ export function OmniVoiceDesignControls({
             : "Free-form English. Can be auto-filled from a character profile below."}
         </p>
       </div>
-      <CharacterAutoFillSection isRu={isRu} onApply={onInstructionsChange} />
+      <CharacterAutoFillSection
+        isRu={isRu}
+        onApply={onInstructionsChange}
+        onCharacterPicked={onCharacterPicked}
+      />
     </div>
   );
 }
