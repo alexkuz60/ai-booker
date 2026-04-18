@@ -29,6 +29,25 @@ export interface ContentVecResult {
   inferenceMs: number;
 }
 
+/**
+ * Cached input rank for the active ContentVec model.
+ * Different ContentVec ONNX exports expect different input ranks:
+ *   - rank 2: [batch, samples]              — most common
+ *   - rank 3: [batch, channels, samples]    — some exports (e.g. with explicit channel dim)
+ * We auto-detect on first failure and remember for subsequent calls.
+ */
+let contentVecInputRank: 2 | 3 | null = null;
+
+function isInvalidRankError(err: unknown): { expected: 2 | 3 } | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  // ORT message: "Invalid rank for input: source Got: 2 Expected: 3"
+  const m = /Invalid rank for input.*Got:\s*(\d+)\s*Expected:\s*(\d+)/i.exec(msg);
+  if (!m) return null;
+  const expected = Number(m[2]);
+  if (expected === 2 || expected === 3) return { expected };
+  return null;
+}
+
 export async function extractContentVec(
   samples: Float32Array,
   sampleRate = EXPECTED_SR,
@@ -40,6 +59,13 @@ export async function extractContentVec(
   try {
     return await _runContentVec(samples);
   } catch (err) {
+    // Auto-detect required input rank and retry once
+    const rankInfo = isInvalidRankError(err);
+    if (rankInfo && contentVecInputRank !== rankInfo.expected) {
+      console.warn(`[ContentVec] Model expects rank ${rankInfo.expected} input — switching and retrying`);
+      contentVecInputRank = rankInfo.expected;
+      return await _runContentVec(samples);
+    }
     if (err instanceof WebGPUCorruptError && getSessionBackend("contentvec") === "webgpu") {
       console.warn(`[ContentVec] WebGPU output corrupted — releasing session & retrying on GPU`);
       await releaseVcSession("contentvec");
@@ -60,11 +86,16 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
   const startMs = performance.now();
   const feeds: Record<string, TensorDesc> = {};
 
+  // Build dims based on cached/auto-detected rank (default rank 2)
+  const buildAudioDims = (): number[] => {
+    if (contentVecInputRank === 3) return [1, 1, samples.length];
+    return [1, samples.length];
+  };
+
   for (const name of info.inputNames) {
     const key = name.toLowerCase();
     if (key === "source" || key === "input" || key === "audio") {
-      // ContentVec expects [batch, samples] (rank 2), not [batch, channels, samples]
-      feeds[name] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
+      feeds[name] = { data: new Float32Array(samples), dims: buildAudioDims(), dtype: "float32" };
     } else if (key === "padding_mask" || key === "attention_mask") {
       const mask = new Uint8Array(samples.length);
       mask.fill(1); // 1 = attend to all positions; 0 = ignore
@@ -72,7 +103,7 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
     }
   }
   if (Object.keys(feeds).length === 0) {
-    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
+    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: buildAudioDims(), dtype: "float32" };
   }
 
   const results = await runVcInference("contentvec", feeds);
