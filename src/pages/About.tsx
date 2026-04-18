@@ -6,16 +6,16 @@ import { ChevronLeft, ChevronRight, Globe, Maximize2, Minimize2, Download } from
 import { pitchDeck, type PitchSlide } from "./about/pitchData";
 import { cn } from "@/lib/utils";
 
-/* ---------- design tokens (creative book theme) ---------- */
+/* ---------- design tokens (dark premium book theme) ---------- */
 const palette = {
-  bg: "#F5EDE0",          // cream paper
-  bgAlt: "#EAE0CE",
-  ink: "#2A1A12",         // deep ink
-  inkSoft: "#5C453A",
-  accent: "#B85042",      // terracotta
-  accent2: "#7C9082",     // sage
-  navy: "#1F2D4A",
-  gold: "#C9A24A",
+  bg: "#F2E8D5",          // warm cream (for text on dark)
+  bgAlt: "#E8DCC4",
+  ink: "#0E1628",         // deep midnight (main bg)
+  inkSoft: "#C9B98F",     // muted gold-cream (soft text on dark)
+  accent: "#C9A24A",      // gold (primary accent)
+  accent2: "#8FA5B8",     // dusty blue (secondary)
+  navy: "#1A2845",        // navy (gradient partner)
+  gold: "#E5C46B",        // bright gold (highlights)
 };
 
 const fontDisplay = `'Playfair Display', Georgia, 'Times New Roman', serif`;
