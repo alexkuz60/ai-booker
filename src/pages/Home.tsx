@@ -36,7 +36,7 @@ const Home = () => {
           <Button asChild size="lg" variant="secondary" className="gap-2 shadow-deep backdrop-blur-sm">
             <Link to="/about">
               <BookOpen className="h-4 w-4" />
-              {isRu ? "О проекте · Питч для спонсоров" : "About · Sponsor pitch"}
+              {isRu ? "О проекте" : "About"}
             </Link>
           </Button>
         </div>
