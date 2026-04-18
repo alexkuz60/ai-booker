@@ -86,11 +86,16 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
   const startMs = performance.now();
   const feeds: Record<string, TensorDesc> = {};
 
+  // Build dims based on cached/auto-detected rank (default rank 2)
+  const buildAudioDims = (): number[] => {
+    if (contentVecInputRank === 3) return [1, 1, samples.length];
+    return [1, samples.length];
+  };
+
   for (const name of info.inputNames) {
     const key = name.toLowerCase();
     if (key === "source" || key === "input" || key === "audio") {
-      // ContentVec expects [batch, samples] (rank 2), not [batch, channels, samples]
-      feeds[name] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
+      feeds[name] = { data: new Float32Array(samples), dims: buildAudioDims(), dtype: "float32" };
     } else if (key === "padding_mask" || key === "attention_mask") {
       const mask = new Uint8Array(samples.length);
       mask.fill(1); // 1 = attend to all positions; 0 = ignore
@@ -98,7 +103,7 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
     }
   }
   if (Object.keys(feeds).length === 0) {
-    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
+    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: buildAudioDims(), dtype: "float32" };
   }
 
   const results = await runVcInference("contentvec", feeds);
