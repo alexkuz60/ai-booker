@@ -9,7 +9,7 @@
  * Sub-UI is split across `./omnivoice/*` to keep this file small and stable
  * when we add Advanced Generation parameters in a later pass.
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2, Wifi, WifiOff, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +32,15 @@ import { OmniVoiceCloningControls } from "./omnivoice/OmniVoiceCloningControls";
 import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
+import {
+  resolveOmniVoiceAdvancedFromTags,
+  ACCENTUATION_LABELS,
+  ARCHETYPE_LABELS,
+} from "@/config/psychotypeVoicePresets";
+import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
+import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
+import type { CharacterIndex, OmniVoiceAdvancedSnapshot } from "@/pages/parser/types";
+import { toast } from "sonner";
 
 interface OmniVoiceLabPanelProps {
   isRu: boolean;
