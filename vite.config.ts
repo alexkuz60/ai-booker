@@ -49,9 +49,15 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         // Нельзя кэшировать OAuth-редиректы и edge-functions
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/functions\//],
-        // Большие ассеты (модели, аудио) — не кэшируем сервис-воркером, OPFS делает это сам
+        // SW кэширует только лёгкий shell. Тяжёлые ассеты (WASM ORT, ONNX-модели,
+        // hero-картинки) грузятся on-demand и хранятся в OPFS — не дублируем их в SW-кэше.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        globIgnores: ["**/assets/booker_*.webp"],
+        globPatterns: ["**/*.{js,css,html,svg,ico,woff,woff2}"],
+        globIgnores: [
+          "**/assets/booker_*.webp",
+          "**/*.wasm",
+          "**/*.onnx",
+        ],
         cleanupOutdatedCaches: true,
       },
     }),
