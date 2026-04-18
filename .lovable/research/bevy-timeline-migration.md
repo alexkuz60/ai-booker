@@ -8,15 +8,32 @@
 
 ## 1. Зачем мигрировать таймлайн на Bevy
 
-### Текущая боль
-`src/components/studio/StudioTimeline.tsx` и связанные (`TimelineTrack.tsx`, `TimelinePlayhead.tsx`,
-`TimelineRuler.tsx`, `TimelineMasterMeter.tsx`) рендерятся через React + Canvas2D.
+### Текущая боль (две независимых поверхности)
 
-Конкретные проблемы на сценах с 200+ клипами:
+**A. Studio Timeline** — `src/components/studio/StudioTimeline.tsx` и связанные
+(`TimelineTrack.tsx`, `TimelinePlayhead.tsx`, `TimelineRuler.tsx`, `TimelineMasterMeter.tsx`).
+
+Проблемы на сценах с 200+ клипами:
 - Перерисовка синхронна с React reconciliation — scrub плеера дёргается.
 - `useWaveformPeaks` пересчитывает пики на каждый ресайз клипа.
 - `peaksWorker.ts` помогает, но финальный рендер всё равно через Canvas2D в main thread.
 - Drag-and-drop клипа провоцирует layout thrashing.
+
+**B. Montage Waveform Editor** — `src/components/montage/WaveformEditor.tsx` (вызывается из
+`MontageTimeline.tsx`). Это butterfly-вейв-редактор отрендеренной сцены целиком.
+
+Проблемы при playback на длинных сценах (7-10+ минут):
+- Картинка дёргается во время playhead scroll, особенно при включённом авто-скролле.
+- Canvas перерисовывается в main thread на каждый `requestAnimationFrame` транспорта.
+- Пики L/R считаются один раз через `useWaveformPeaks`, но рисуются вручную через
+  `drawButterfly()` — на 7-минутной сцене это 18+ МБ PCM, тысячи столбиков на кадр.
+- Виртуальный скролл помогает, но при zoom-in (300-1000%) ширина canvas достигает
+  десятков тысяч пикселей — Canvas2D не справляется.
+- Конкуренция с другими React-обновлениями (мастер-метр, плагины) усугубляет дёрганье.
+
+**Вывод**: Bevy лечит ОБЕ поверхности одним движком. Логика рендера waveform
+(GPU-инстансинг столбиков с LOD) одинакова и для Studio (много клипов × короткие пики),
+и для Montage (один клип × длинные пики).
 
 ### Что даст Bevy
 - **ECS (Entity Component System)**: один клип = одна entity, рендеринг батчится через GPU инстансинг.
