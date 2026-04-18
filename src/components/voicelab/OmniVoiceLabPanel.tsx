@@ -372,6 +372,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             errorMessage={synth.errorMessage}
             resultUrl={synth.resultUrl}
             playing={synth.playing}
+            usedRun={usedRun}
             onSynthesize={synth.handleSynthesize}
             onReset={synth.handleReset}
             onPlay={synth.handlePlay}
