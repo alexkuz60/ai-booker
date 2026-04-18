@@ -9,7 +9,7 @@
  * Sub-UI is split across `./omnivoice/*` to keep this file small and stable
  * when we add Advanced Generation parameters in a later pass.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Wifi, WifiOff, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -223,6 +223,28 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     advanced,
   });
 
+  // ── Capture params snapshot of the latest successful run (for chip display) ──
+  const [usedRun, setUsedRun] = useState<{
+    params: OmniVoiceAdvancedParams;
+    speed: number;
+    source: string | null;
+  } | null>(null);
+  const prevStageRef = useRef(synth.stage);
+  useEffect(() => {
+    const prev = prevStageRef.current;
+    if (prev !== "done" && synth.stage === "done") {
+      setUsedRun({
+        params: { ...advanced },
+        speed,
+        source: advancedHint ?? advancedSource,
+      });
+    }
+    if (synth.stage === "idle" && !synth.resultUrl) {
+      setUsedRun(null);
+    }
+    prevStageRef.current = synth.stage;
+  }, [synth.stage, synth.resultUrl, advanced, speed, advancedHint, advancedSource]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -350,6 +372,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             errorMessage={synth.errorMessage}
             resultUrl={synth.resultUrl}
             playing={synth.playing}
+            usedRun={usedRun}
             onSynthesize={synth.handleSynthesize}
             onReset={synth.handleReset}
             onPlay={synth.handlePlay}
