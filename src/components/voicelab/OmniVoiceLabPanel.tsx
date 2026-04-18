@@ -155,6 +155,21 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     if (pickedCharId) void persistAdvancedFor(pickedCharId, next, "manual");
   }, [isRu, pickedCharId, persistAdvancedFor]);
 
+  /** Apply a saved user preset — restore params + speed, surface name in hint. */
+  const handleUserPresetApply = useCallback(
+    (preset: { name: string; params: OmniVoiceAdvancedParams; speed?: number }) => {
+      setAdvanced({ ...preset.params });
+      if (typeof preset.speed === "number") setSpeed(preset.speed);
+      // Snapshot schema source enum is fixed → store as "manual"; hint shows the
+      // actual preset name so the badge in the Advanced header stays informative.
+      setAdvancedSource("manual");
+      setAdvancedHint(isRu ? `Мой пресет: ${preset.name}` : `My preset: ${preset.name}`);
+      if (pickedCharId) void persistAdvancedFor(pickedCharId, preset.params, "manual");
+      toast.success(isRu ? `Применён пресет: ${preset.name}` : `Preset applied: ${preset.name}`);
+    },
+    [isRu, pickedCharId, persistAdvancedFor],
+  );
+
   /**
    * Character pick from CharacterAutoFillSection.
    * Phase 2 contract: auto-apply Advanced params from psycho-tags if available.
@@ -360,6 +375,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             onPresetApply={handlePresetApply}
             onReset={handleReset}
             sourceLabel={advancedHint}
+            currentSpeed={speed}
+            onUserPresetApply={handleUserPresetApply}
           />
 
           <OmniVoiceResultCard

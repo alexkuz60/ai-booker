@@ -28,6 +28,8 @@ import {
   DEFAULT_ADVANCED_PARAMS,
   type OmniVoiceAdvancedParams,
 } from "./constants";
+import { OmniVoiceUserPresetsMenu } from "./OmniVoiceUserPresetsMenu";
+import type { OmniVoiceUserPreset } from "@/lib/omniVoiceUserPresets";
 
 interface OmniVoiceAdvancedParamsProps {
   isRu: boolean;
@@ -42,6 +44,10 @@ interface OmniVoiceAdvancedParamsProps {
   onReset?: () => void;
   /** Optional short label shown in the header (e.g. "Auto · Hyperthymic + Hero"). */
   sourceLabel?: string | null;
+  /** Current speed (bundled into a saved user preset for full reproducibility). */
+  currentSpeed?: number;
+  /** Apply a saved user preset — caller stamps source as `preset:user:<name>`. */
+  onUserPresetApply?: (preset: OmniVoiceUserPreset) => void;
 }
 
 interface ParamMeta {
@@ -106,6 +112,7 @@ const NUMERIC_PARAMS: ParamMeta[] = [
 
 export function OmniVoiceAdvancedParams({
   isRu, open, onOpenChange, value, onChange, onPresetApply, onReset, sourceLabel,
+  currentSpeed, onUserPresetApply,
 }: OmniVoiceAdvancedParamsProps) {
   const setNumeric = (key: keyof OmniVoiceAdvancedParams, n: number) =>
     onChange({ ...value, [key]: n });
@@ -168,19 +175,31 @@ export function OmniVoiceAdvancedParams({
                 </TooltipContent>
               </Tooltip>
             ))}
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px] gap-1 ml-auto"
-              onClick={() => {
-                if (onReset) onReset();
-                else onChange({ ...DEFAULT_ADVANCED_PARAMS });
-              }}
-            >
-              <RotateCcw className="h-3 w-3" />
-              {isRu ? "Сброс" : "Reset"}
-            </Button>
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <OmniVoiceUserPresetsMenu
+                isRu={isRu}
+                current={value}
+                currentSpeed={currentSpeed}
+                onApply={(p) => {
+                  if (onUserPresetApply) onUserPresetApply(p);
+                  else onChange({ ...p.params });
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => {
+                  if (onReset) onReset();
+                  else onChange({ ...DEFAULT_ADVANCED_PARAMS });
+                }}
+              >
+                <RotateCcw className="h-3 w-3" />
+                {isRu ? "Сброс" : "Reset"}
+              </Button>
+            </div>
           </div>
 
           {/* Numeric sliders */}
