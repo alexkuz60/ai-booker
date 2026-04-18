@@ -4,8 +4,15 @@
  */
 import { AlertTriangle, CheckCircle2, Download, Loader2, Play, RotateCcw, Square, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { SynthStage } from "./constants";
+import type { OmniVoiceAdvancedParams, SynthStage } from "./constants";
+
+interface UsedRunSnapshot {
+  params: OmniVoiceAdvancedParams;
+  speed: number;
+  source?: string | null;
+}
 
 interface Props {
   isRu: boolean;
@@ -17,6 +24,7 @@ interface Props {
   errorMessage: string | null;
   resultUrl: string | null;
   playing: boolean;
+  usedRun?: UsedRunSnapshot | null;
   onSynthesize: () => void;
   onReset: () => void;
   onPlay: () => void;
