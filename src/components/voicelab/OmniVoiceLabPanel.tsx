@@ -286,6 +286,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               onPresetChange={setPreset}
               instructions={instructions}
               onInstructionsChange={setInstructions}
+              onCharacterPicked={handleCharacterPicked}
             />
           )}
 
@@ -333,7 +334,10 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             open={advancedOpen}
             onOpenChange={setAdvancedOpen}
             value={advanced}
-            onChange={setAdvanced}
+            onChange={handleManualChange}
+            onPresetApply={handlePresetApply}
+            onReset={handleReset}
+            sourceLabel={advancedHint}
           />
 
           <OmniVoiceResultCard
