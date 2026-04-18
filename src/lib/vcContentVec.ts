@@ -72,7 +72,7 @@ async function _runContentVec(samples: Float32Array): Promise<ContentVecResult> 
     }
   }
   if (Object.keys(feeds).length === 0) {
-    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, 1, samples.length], dtype: "float32" };
+    feeds[info.inputNames[0] ?? "source"] = { data: new Float32Array(samples), dims: [1, samples.length], dtype: "float32" };
   }
 
   const results = await runVcInference("contentvec", feeds);
