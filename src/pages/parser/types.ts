@@ -164,6 +164,24 @@ export interface CharacterProfile {
 export type CharacterRole = "speaking" | "mentioned" | "crowd" | "system";
 
 // ─── Voice config stored alongside character ─────────────────
+
+/** Snapshot of OmniVoice generation knobs persisted per-character. */
+export interface OmniVoiceAdvancedSnapshot {
+  /** Full params snapshot (all 6 fields, never partial) */
+  params: {
+    guidance_scale: number;
+    num_step: number;
+    t_shift: number;
+    position_temperature: number;
+    class_temperature: number;
+    denoise: boolean;
+  };
+  /** Where the values came from — drives "Re-apply auto" UX hints */
+  source: "auto" | "manual" | "preset:draft" | "preset:standard" | "preset:final";
+  /** ISO timestamp of last write */
+  updatedAt: string;
+}
+
 export interface OmniVoiceCache {
   /** AI-translated English description (≤80 chars) */
   description_en?: string;
@@ -192,6 +210,8 @@ export interface CharacterVoiceConfig {
   style?: number;
   /** OmniVoice / gpt-4o-mini-tts auto-fill cache (translations + user overrides) */
   omnivoice_cache?: OmniVoiceCache;
+  /** OmniVoice generation parameters (Phase 2: psychotype → params mapping) */
+  omnivoice_advanced?: OmniVoiceAdvancedSnapshot;
 }
 
 /**
