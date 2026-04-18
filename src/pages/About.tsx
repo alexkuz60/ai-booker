@@ -6,16 +6,16 @@ import { ChevronLeft, ChevronRight, Globe, Maximize2, Minimize2, Download } from
 import { pitchDeck, type PitchSlide } from "./about/pitchData";
 import { cn } from "@/lib/utils";
 
-/* ---------- design tokens (creative book theme) ---------- */
+/* ---------- design tokens (dark premium book theme) ---------- */
 const palette = {
-  bg: "#F5EDE0",          // cream paper
-  bgAlt: "#EAE0CE",
-  ink: "#2A1A12",         // deep ink
-  inkSoft: "#5C453A",
-  accent: "#B85042",      // terracotta
-  accent2: "#7C9082",     // sage
-  navy: "#1F2D4A",
-  gold: "#C9A24A",
+  bg: "#F2E8D5",          // warm cream (for text on dark)
+  bgAlt: "#E8DCC4",
+  ink: "#0E1628",         // deep midnight (main bg)
+  inkSoft: "#C9B98F",     // muted gold-cream (soft text on dark)
+  accent: "#C9A24A",      // gold (primary accent)
+  accent2: "#8FA5B8",     // dusty blue (secondary)
+  navy: "#1A2845",        // navy (gradient partner)
+  gold: "#E5C46B",        // bright gold (highlights)
 };
 
 const fontDisplay = `'Playfair Display', Georgia, 'Times New Roman', serif`;
@@ -25,7 +25,7 @@ const fontBody = `'Inter', system-ui, sans-serif`;
 function SlideShell({
   children,
   kicker,
-  variant = "light",
+  variant = "dark",
 }: {
   children: React.ReactNode;
   kicker: string;
@@ -37,33 +37,35 @@ function SlideShell({
       className="relative w-full h-full overflow-hidden flex flex-col"
       style={{
         background: isDark
-          ? `linear-gradient(135deg, ${palette.navy} 0%, ${palette.ink} 100%)`
+          ? `linear-gradient(135deg, ${palette.ink} 0%, ${palette.navy} 100%)`
           : `linear-gradient(135deg, ${palette.bg} 0%, ${palette.bgAlt} 100%)`,
         color: isDark ? palette.bg : palette.ink,
         fontFamily: fontBody,
       }}
     >
-      {/* paper texture */}
+      {/* atmospheric glow */}
       <div
-        className="absolute inset-0 opacity-[0.07] pointer-events-none"
+        className="absolute inset-0 opacity-[0.12] pointer-events-none"
         style={{
-          backgroundImage: `radial-gradient(circle at 20% 30%, ${palette.accent} 0%, transparent 40%), radial-gradient(circle at 80% 70%, ${palette.accent2} 0%, transparent 40%)`,
+          backgroundImage: isDark
+            ? `radial-gradient(circle at 15% 20%, ${palette.gold} 0%, transparent 45%), radial-gradient(circle at 85% 85%, ${palette.accent2} 0%, transparent 45%)`
+            : `radial-gradient(circle at 20% 30%, ${palette.accent} 0%, transparent 40%), radial-gradient(circle at 80% 70%, ${palette.accent2} 0%, transparent 40%)`,
         }}
       />
       {/* decorative side bar */}
       <div
         className="absolute left-0 top-0 bottom-0 w-2"
-        style={{ background: palette.accent }}
+        style={{ background: palette.gold }}
       />
       {/* kicker */}
       <div className="relative px-16 pt-10 pb-2 flex items-center gap-3">
         <div
           className="h-px flex-grow-0 w-12"
-          style={{ background: palette.accent }}
+          style={{ background: palette.gold }}
         />
         <span
           className="text-[11px] font-bold tracking-[0.3em] uppercase"
-          style={{ color: palette.accent }}
+          style={{ color: palette.gold }}
         >
           {kicker}
         </span>
@@ -115,7 +117,7 @@ function BulletsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
     <SlideShell kicker={isRu ? slide.kicker.ru : slide.kicker.en}>
       <h2
         className="text-4xl md:text-5xl font-bold leading-tight mb-10 max-w-4xl"
-        style={{ fontFamily: fontDisplay, color: palette.ink }}
+        style={{ fontFamily: fontDisplay, color: palette.bg }}
       >
         {isRu ? slide.title.ru : slide.title.en}
       </h2>
@@ -131,8 +133,8 @@ function BulletsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
             <span
               className="flex-shrink-0 mt-1.5 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
               style={{
-                background: palette.accent,
-                color: palette.bg,
+                background: palette.gold,
+                color: palette.ink,
                 fontFamily: fontDisplay,
               }}
             >
@@ -156,7 +158,7 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
     <SlideShell kicker={isRu ? slide.kicker.ru : slide.kicker.en}>
       <h2
         className="text-3xl md:text-4xl font-bold leading-tight mb-10 max-w-4xl"
-        style={{ fontFamily: fontDisplay, color: palette.ink }}
+        style={{ fontFamily: fontDisplay, color: palette.bg }}
       >
         {isRu ? slide.title.ru : slide.title.en}
       </h2>
@@ -169,19 +171,19 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
             transition={{ delay: i * 0.08 }}
             className="p-5 rounded-lg border"
             style={{
-              borderColor: `${palette.accent}30`,
-              background: `${palette.accent}08`,
+              borderColor: `${palette.gold}40`,
+              background: `${palette.gold}10`,
             }}
           >
             <div
               className="text-4xl md:text-5xl font-bold mb-2"
-              style={{ fontFamily: fontDisplay, color: palette.accent }}
+              style={{ fontFamily: fontDisplay, color: palette.gold }}
             >
               {s.value}
             </div>
             <div
               className="text-sm font-semibold mb-1"
-              style={{ color: palette.ink }}
+              style={{ color: palette.bg }}
             >
               {isRu ? s.label.ru : s.label.en}
             </div>
@@ -197,7 +199,7 @@ function StatsLayout({ slide, isRu }: { slide: PitchSlide; isRu: boolean }) {
         <p
           className="max-w-4xl text-base md:text-lg italic leading-relaxed border-l-2 pl-5"
           style={{
-            borderColor: palette.accent,
+            borderColor: palette.gold,
             color: palette.inkSoft,
             fontFamily: fontDisplay,
           }}
