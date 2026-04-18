@@ -33,7 +33,33 @@
 4. **Голосовой клонинг** — как OmniVoice кодирует ref-audio (speaker embedding отдельно или в общий encoder). Сопоставить с `omniVoiceAudioPrep.ts` и кэшем транскриптов в `voice_references`.
 5. **Дельта vs текущий omnivoice-server** — список фич сервера: `/v1/audio/speech`, `/v1/audio/speech/clone`, `/v1/audio/transcriptions`, non-verbal tags, multi-language. Что требует отдельной модели (Whisper).
 
-**Артефакт**: `.lovable/research/vocoloco-feasibility.md` с таблицей моделей, шейпов, VRAM-бюджетом и решением Go/No-Go.
+**Артефакт**: ✅ `.lovable/research/vocoloco-feasibility.md` готов. Решение: **Conditional Go**. Memory: `mem://tech/audio/vocoloco-architecture-research`.
+
+**Ключевые находки Phase 1** (полностью корректируют изначальный план):
+- OmniVoice — **single-stage discrete masked diffusion на Qwen3-0.6B**, а не «encoder + flow-matching transformer + vocoder».
+- Веса: 2.45 GB FP32 в одном `model.safetensors` + Higgs-audio-v2 tokenizer отдельно.
+- **Официального ONNX нет** (issue #3 закрыт «may not be done quickly»). Нужен self-export.
+- VRAM-минимум: 6 GB (RTX 3060+ / M-series 16+ GB). 4 GB — только при INT8 + staged release.
+- Альтернатива параллельно: **Kokoro-js** (80 MB, готовый ONNX, без cloning) для лёгких машин.
+
+---
+
+## Фаза 1.5 — ONNX Export Sprint (НОВАЯ, обязательная перед Phase 2)
+
+Без неё Phase 2-3 невозможны. Не браузерная, а Python/PyTorch работа.
+
+1. **Стенд**: Linux + Python 3.11 + PyTorch 2.8 + CUDA + 16 GB GPU.
+2. **Audio tokenizer (Higgs-audio-v2)** — экспортировать encoder и decoder отдельно через `torch.onnx.export`. Reference: MOSS-Audio-Tokenizer-ONNX.
+3. **Main LLM (OmniVoice)** — `optimum-cli export onnx --task text-generation` с кастомным wrapper, либо ручной trace одного diffusion-step.
+4. **INT8 квантизация** через `onnxruntime.quantization.quantize_dynamic`.
+5. **Validate vs PyTorch** на CPU: cosine similarity ≥ 0.95 на 10 эталонных промптах.
+6. **WebGPU op-coverage** — проверить, что RotaryEmbedding / GroupQueryAttention / SimplifiedLayerNormalization есть в `onnxruntime-web`. Иначе — fallback на WASM EP per-op.
+7. **Diffusion loop strategy** — решить: unroll N шагов в граф vs JS-loop с N вызовами `session.run()` (с переиспользованием KV-cache).
+
+**Артефакты Phase 1.5**:
+- 3 ONNX-файла (audio_encoder, llm_main, audio_decoder) FP16 + INT8 варианты.
+- JSON-манифест с input/output names, dims, dtypes, sha256, sizeBytes.
+- Скрипт-валидатор, который сверяет ONNX-выход с PyTorch-эталоном.
 
 ---
 
