@@ -223,6 +223,28 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     advanced,
   });
 
+  // ── Capture params snapshot of the latest successful run (for chip display) ──
+  const [usedRun, setUsedRun] = useState<{
+    params: OmniVoiceAdvancedParams;
+    speed: number;
+    source: string | null;
+  } | null>(null);
+  const prevStageRef = useRef(synth.stage);
+  useEffect(() => {
+    const prev = prevStageRef.current;
+    if (prev !== "done" && synth.stage === "done") {
+      setUsedRun({
+        params: { ...advanced },
+        speed,
+        source: advancedHint ?? advancedSource,
+      });
+    }
+    if (synth.stage === "idle" && !synth.resultUrl) {
+      setUsedRun(null);
+    }
+    prevStageRef.current = synth.stage;
+  }, [synth.stage, synth.resultUrl, advanced, speed, advancedHint, advancedSource]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
