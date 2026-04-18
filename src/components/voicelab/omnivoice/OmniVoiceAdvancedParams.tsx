@@ -175,19 +175,31 @@ export function OmniVoiceAdvancedParams({
                 </TooltipContent>
               </Tooltip>
             ))}
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px] gap-1 ml-auto"
-              onClick={() => {
-                if (onReset) onReset();
-                else onChange({ ...DEFAULT_ADVANCED_PARAMS });
-              }}
-            >
-              <RotateCcw className="h-3 w-3" />
-              {isRu ? "Сброс" : "Reset"}
-            </Button>
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <OmniVoiceUserPresetsMenu
+                isRu={isRu}
+                current={value}
+                currentSpeed={currentSpeed}
+                onApply={(p) => {
+                  if (onUserPresetApply) onUserPresetApply(p);
+                  else onChange({ ...p.params });
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => {
+                  if (onReset) onReset();
+                  else onChange({ ...DEFAULT_ADVANCED_PARAMS });
+                }}
+              >
+                <RotateCcw className="h-3 w-3" />
+                {isRu ? "Сброс" : "Reset"}
+              </Button>
+            </div>
           </div>
 
           {/* Numeric sliders */}
