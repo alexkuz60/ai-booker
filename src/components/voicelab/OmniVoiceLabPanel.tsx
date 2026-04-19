@@ -33,7 +33,7 @@ import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
 import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
-import { VocoLocoModelManager } from "./omnivoice/VocoLocoModelManager";
+// VocoLocoModelManager moved to VoiceLab "Models" tab — kept import-less here.
 import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
 import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
@@ -258,13 +258,6 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
 
   // ── Whisper STT (auxiliary, browser-cached, used by both engines) ──
   const whisper = useWhisperStt();
-  const { value: whisperPersistedSize, update: setWhisperPersistedSize } =
-    useCloudSettings<"tiny" | "base" | "small">("vocoloco-whisper-size", "base");
-  // Apply persisted size on mount (or whenever cloud value changes)
-  useEffect(() => {
-    if (whisperPersistedSize !== whisper.size) whisper.setSize(whisperPersistedSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [whisperPersistedSize]);
 
   /** Engine-aware accessors so the result card / synth button stay one set of props. */
   const isLocal = engine === "local";
@@ -375,24 +368,18 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
       </div>
 
       {isLocal ? (
-        <VocoLocoModelManager
-          isRu={isRu}
-          statuses={local.statuses}
-          llmModelId={llmModelId}
-          onLlmModelChange={setLlmModelId}
-          downloading={local.downloading}
-          downloadProgress={local.downloadProgress}
-          onDownload={local.downloadModel}
-          onDelete={local.deleteModel}
-          onCancel={local.cancelDownload}
-          whisperSize={whisper.size}
-          onWhisperSizeChange={(s) => { whisper.setSize(s); void setWhisperPersistedSize(s); }}
-          whisperCached={whisper.cached}
-          whisperDownloading={whisper.downloading}
-          whisperProgress={whisper.progress}
-          onWhisperDownload={() => void whisper.load()}
-          onWhisperDelete={() => void whisper.clear()}
-        />
+        <Alert className="border-primary/30 bg-primary/5">
+          <AlertDescription className="text-xs flex items-center justify-between gap-3">
+            <span>
+              {isRu
+                ? `Модели VocoLoco: ${cachedLocalCount}/${VOCOLOCO_ALL_MODELS.length} в кэше. Загрузка и удаление — во вкладке «Модели».`
+                : `VocoLoco models: ${cachedLocalCount}/${VOCOLOCO_ALL_MODELS.length} cached. Download / delete from the “Models” tab.`}
+            </span>
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              LLM: {llmModelId.replace(/^vocoloco-llm-/, "")}
+            </Badge>
+          </AlertDescription>
+        </Alert>
       ) : (
         <OmniVoiceServerCard
           isRu={isRu}
