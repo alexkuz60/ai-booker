@@ -41,9 +41,9 @@ export const VOCOLOCO_ENCODER: VocoLocoModelEntry = {
   id: "vocoloco-encoder",
   role: "encoder",
   label: "Higgs Audio Encoder",
-  url: "https://huggingface.co/gluschenko/higgs-audio-v2-tokenizer-onnx/resolve/main/higgs_audio_v2_tokenizer_encoder.onnx",
-  sizeBytes: 654_000_000,
-  revision: "2026-04-19",
+  url: "https://huggingface.co/gluschenko/higgs-audio-v2-tokenizer-onnx/resolve/main/onnx/higgs_audio_v2_tokenizer_encoder.onnx",
+  sizeBytes: 654_396_774,
+  revision: "2026-04-19b",
   description: "Reference audio → 8-codebook tokens (24 kHz mono input)",
 };
 
@@ -55,9 +55,9 @@ export const VOCOLOCO_DECODER: VocoLocoModelEntry = {
   id: "vocoloco-decoder",
   role: "decoder",
   label: "Higgs Audio Decoder",
-  url: "https://huggingface.co/gluschenko/higgs-audio-v2-tokenizer-onnx/resolve/main/higgs_audio_v2_tokenizer_decoder.onnx",
-  sizeBytes: 86_000_000,
-  revision: "2026-04-19",
+  url: "https://huggingface.co/gluschenko/higgs-audio-v2-tokenizer-onnx/resolve/main/onnx/higgs_audio_v2_tokenizer_decoder.onnx",
+  sizeBytes: 86_346_947,
+  revision: "2026-04-19b",
   description: "Audio codes → 24 kHz mono waveform",
 };
 
