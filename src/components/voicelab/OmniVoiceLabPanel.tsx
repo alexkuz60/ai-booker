@@ -258,6 +258,13 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
 
   // ── Whisper STT (auxiliary, browser-cached, used by both engines) ──
   const whisper = useWhisperStt();
+  const { value: whisperPersistedSize, update: setWhisperPersistedSize } =
+    useCloudSettings<"tiny" | "base" | "small">("vocoloco-whisper-size", "base");
+  // Apply persisted size on mount (or whenever cloud value changes)
+  useEffect(() => {
+    if (whisperPersistedSize !== whisper.size) whisper.setSize(whisperPersistedSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whisperPersistedSize]);
 
   /** Engine-aware accessors so the result card / synth button stay one set of props. */
   const isLocal = engine === "local";
