@@ -378,6 +378,11 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           onDownload={local.downloadModel}
           onDelete={local.deleteModel}
           onCancel={local.cancelDownload}
+          whisperCached={whisper.cached}
+          whisperDownloading={whisper.downloading}
+          whisperProgress={whisper.progress}
+          onWhisperDownload={() => void whisper.load()}
+          onWhisperDelete={() => void whisper.clear()}
         />
       ) : (
         <OmniVoiceServerCard
