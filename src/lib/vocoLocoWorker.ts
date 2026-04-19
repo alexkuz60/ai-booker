@@ -131,6 +131,23 @@ self.onmessage = async (e: MessageEvent) => {
         const inputNames = [...session.inputNames];
         const outputNames = [...session.outputNames];
 
+        // Diagnostic: log expected input dtypes so we can match feed dtypes
+        try {
+          const meta = (session as any).inputMetadata ?? (session as any).handler?.inputMetadata;
+          if (meta) {
+            const dtypeMap: Record<string, string> = {};
+            for (const name of inputNames) {
+              const m = meta[name] ?? meta.get?.(name);
+              if (m) dtypeMap[name] = m.type ?? m.dataType ?? JSON.stringify(m);
+            }
+            console.log(`[VocoLoco worker] "${modelId}" input dtypes:`, dtypeMap);
+          } else {
+            console.log(`[VocoLoco worker] "${modelId}" inputMetadata unavailable`);
+          }
+        } catch (e) {
+          console.warn(`[VocoLoco worker] inputMetadata probe failed:`, e);
+        }
+
         // Contract validation — fail-fast if upstream broke I/O
         const contractErrors: string[] = [];
         if (Array.isArray(expectedInputs)) {
@@ -164,12 +181,20 @@ self.onmessage = async (e: MessageEvent) => {
         if (!session) throw new Error(`[VocoLoco] No session for "${modelId}". Call createSession first.`);
 
         const feeds: Record<string, ort.Tensor> = {};
+        const feedDiag: Record<string, string> = {};
         for (const inp of inputs) {
           const { data, ortDtype } = bufferToTypedArray(inp.buffer, inp.dtype);
           feeds[inp.name] = new ort.Tensor(ortDtype as any, data, inp.dims);
+          feedDiag[inp.name] = `${ortDtype}[${inp.dims.join(",")}]`;
         }
 
-        const results = await session.run(feeds);
+        let results: ort.InferenceSession.ReturnType;
+        try {
+          results = await session.run(feeds);
+        } catch (runErr: any) {
+          console.error(`[VocoLoco worker] run("${modelId}") failed. Feeds sent:`, feedDiag);
+          throw runErr;
+        }
 
         const outputs: { name: string; buffer: ArrayBuffer; dims: number[]; dtype: string }[] = [];
         const transferables: ArrayBuffer[] = [];
