@@ -131,18 +131,51 @@ self.onmessage = async (e: MessageEvent) => {
         const inputNames = [...session.inputNames];
         const outputNames = [...session.outputNames];
 
-        // Diagnostic: log expected input dtypes so we can match feed dtypes
+        // Diagnostic: probe input dtypes via every known ORT-Web internal API.
+        // ORT-Web hides metadata in different places per backend (jsep/wasm/webgpu).
         try {
-          const meta = (session as any).inputMetadata ?? (session as any).handler?.inputMetadata;
-          if (meta) {
-            const dtypeMap: Record<string, string> = {};
-            for (const name of inputNames) {
-              const m = meta[name] ?? meta.get?.(name);
-              if (m) dtypeMap[name] = m.type ?? m.dataType ?? JSON.stringify(m);
+          const s: any = session;
+          const candidates = [
+            s.inputMetadata,
+            s.handler?.inputMetadata,
+            s.handler?._inputMetadata,
+            s.handler?.session?.inputMetadata,
+            s._inputMetadata,
+          ];
+          let foundMeta: any = null;
+          for (const c of candidates) {
+            if (c && (Array.isArray(c) ? c.length : Object.keys(c).length)) {
+              foundMeta = c;
+              break;
             }
-            console.log(`[VocoLoco worker] "${modelId}" input dtypes:`, dtypeMap);
+          }
+          const dtypeMap: Record<string, any> = {};
+          if (foundMeta) {
+            if (Array.isArray(foundMeta)) {
+              // newer ORT: array aligned with inputNames
+              for (let i = 0; i < inputNames.length; i++) {
+                const m = foundMeta[i];
+                dtypeMap[inputNames[i]] = m?.type ?? m?.dataType ?? m;
+              }
+            } else if (typeof foundMeta.get === "function") {
+              for (const n of inputNames) {
+                const m = foundMeta.get(n);
+                dtypeMap[n] = m?.type ?? m?.dataType ?? m;
+              }
+            } else {
+              for (const n of inputNames) {
+                const m = foundMeta[n];
+                dtypeMap[n] = m?.type ?? m?.dataType ?? m;
+              }
+            }
+            console.log(`[VocoLoco worker] "${modelId}" input dtypes:`, JSON.stringify(dtypeMap));
           } else {
-            console.log(`[VocoLoco worker] "${modelId}" inputMetadata unavailable`);
+            const probedKeys = Object.keys(s).concat(s.handler ? Object.keys(s.handler).map((k: string) => `handler.${k}`) : []);
+            console.log(
+              `[VocoLoco worker] "${modelId}" no inputMetadata in any candidate. session keys=`,
+              probedKeys,
+              `inputNames=`, inputNames,
+            );
           }
         } catch (e) {
           console.warn(`[VocoLoco worker] inputMetadata probe failed:`, e);
