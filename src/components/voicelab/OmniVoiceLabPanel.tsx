@@ -445,6 +445,16 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             <Slider value={[speed]} onValueChange={([v]) => setSpeed(v)} min={0.5} max={2.0} step={0.05} />
           </div>
 
+          {isLocal && mode === "auto" && (
+            <Alert>
+              <AlertDescription className="text-xs">
+                {isRu
+                  ? "В локальном движке режим Auto эквивалентен Voice Design (без референса)."
+                  : "In the local engine, Auto mode falls back to Voice Design (no reference)."}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <OmniVoiceAdvancedParamsPanel
             isRu={isRu}
             open={advancedOpen}
@@ -458,21 +468,34 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             onUserPresetApply={handleUserPresetApply}
           />
 
+          {isLocal && local.busy && (
+            <p className="text-[11px] text-muted-foreground">
+              {isRu ? "Стадия" : "Stage"}: <span className="font-mono">{local.stage}</span>
+              {local.stageMessage ? ` — ${local.stageMessage}` : ""}
+              {" · "}
+              {(local.progressFraction * 100).toFixed(0)}%
+            </p>
+          )}
+
           <OmniVoiceResultCard
             isRu={isRu}
-            stage={synth.stage}
-            busy={synth.busy}
-            canSynthesize={!!synthText.trim()}
-            serverOnline={server.serverOnline}
-            latencyMs={synth.latencyMs}
-            errorMessage={synth.errorMessage}
-            resultUrl={synth.resultUrl}
-            playing={synth.playing}
+            stage={activeStage}
+            busy={activeBusy}
+            canSynthesize={!!synthText.trim() && (
+              isLocal
+                ? (mode === "clone" ? local.cloneReady : local.designReady)
+                : true
+            )}
+            serverOnline={isLocal ? true : server.serverOnline}
+            latencyMs={activeLatencyMs}
+            errorMessage={activeErrorMessage}
+            resultUrl={activeResultUrl}
+            playing={activePlaying}
             usedRun={usedRun}
-            onSynthesize={synth.handleSynthesize}
-            onReset={synth.handleReset}
-            onPlay={synth.handlePlay}
-            onDownload={synth.handleDownload}
+            onSynthesize={handleSynthesizeUnified}
+            onReset={handleResetUnified}
+            onPlay={handlePlayUnified}
+            onDownload={handleDownloadUnified}
           />
         </CardContent>
       </Card>
