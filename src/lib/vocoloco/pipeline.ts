@@ -338,19 +338,11 @@ async function runDiffusionLoop(opts: {
       audioMask[Lmax + prompt.uncondTargetStart + i] = 1;
     }
 
-  // Attention mask: 4D [B=2, 1, L, L] bool. Allow attention within each
-  // sample's REAL (non-padded) length; pad-rows attend only to themselves
-  // (diagonal only) — same trick upstream uses for batch padding.
-  const attnLen = Lmax * Lmax;
-  const attentionMask = new Uint8Array(2 * attnLen);
-  // cond branch real length = condCols (padded right to Lmax)
-  for (let q = 0; q < prompt.condCols; q++)
-    for (let k = 0; k < prompt.condCols; k++) attentionMask[q * Lmax + k] = 1;
-  for (let q = prompt.condCols; q < Lmax; q++) attentionMask[q * Lmax + q] = 1;
-  // uncond branch real length = uncondCols
-  for (let q = 0; q < prompt.uncondCols; q++)
-    for (let k = 0; k < prompt.uncondCols; k++) attentionMask[attnLen + q * Lmax + k] = 1;
-  for (let q = prompt.uncondCols; q < Lmax; q++) attentionMask[attnLen + q * Lmax + q] = 1;
+  // Attention mask: 2D [B=2, L] — standard HF padding mask. Causal masking
+  // is built inside the ONNX graph; we only signal real (1) vs padding (0).
+  const attentionMask = new Uint8Array(2 * Lmax);
+  for (let i = 0; i < prompt.condCols; i++) attentionMask[i] = 1;
+  for (let i = 0; i < prompt.uncondCols; i++) attentionMask[Lmax + i] = 1;
 
   // Standalone target-window state we drive separately, then mirror back
   // into both cond/uncond input_ids each step.
@@ -387,7 +379,7 @@ async function runDiffusionLoop(opts: {
           for (let i = 0; i < attentionMask.length; i++) i64[i] = BigInt(attentionMask[i]);
           return i64.buffer;
         })(),
-        dims: [2, 1, Lmax, Lmax],
+        dims: [2, Lmax],
         dtype: "int64",
       },
       {
