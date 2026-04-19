@@ -45,6 +45,12 @@ interface Props {
   onDownload: (entry: VocoLocoModelEntry) => void;
   onDelete: (entry: VocoLocoModelEntry) => void;
   onCancel: () => void;
+  // Whisper STT (optional sub-feature for reference transcription)
+  whisperCached: boolean;
+  whisperDownloading: boolean;
+  whisperProgress: WhisperLoadProgress | null;
+  onWhisperDownload: () => void;
+  onWhisperDelete: () => void;
 }
 
 function ModelRow({
