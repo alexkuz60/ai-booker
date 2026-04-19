@@ -8,8 +8,9 @@
  * The selected LLM variant is owned by the parent (so the rest of the panel
  * can show "ready / not ready" against the user's pick).
  */
-import { CheckCircle2, Cpu, Download, Loader2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Cpu, Download, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DeleteModelButton } from "@/components/voicelab/DeleteModelButton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,14 +89,7 @@ function ModelRow({
         {cached ? (
           <>
             <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-            <Button
-              size="sm" variant="ghost"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-              onClick={onDelete}
-              title={isRu ? "Удалить из кэша" : "Remove from cache"}
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
+            <DeleteModelButton isRu={isRu} modelName={entry.label} onConfirm={onDelete} />
           </>
         ) : isDownloading ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -242,14 +236,7 @@ export function VocoLocoModelManager({
               {whisperCached ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                  <Button
-                    size="sm" variant="ghost"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={onWhisperDelete}
-                    title={isRu ? "Удалить из кэша" : "Remove from cache"}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  <DeleteModelButton isRu={isRu} modelName="Whisper" onConfirm={onWhisperDelete} />
                 </>
               ) : whisperDownloading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />

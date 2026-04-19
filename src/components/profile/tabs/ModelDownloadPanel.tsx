@@ -6,7 +6,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Cpu, Download, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Cpu, Download, CheckCircle2, XCircle } from "lucide-react";
+import { DeleteModelButton } from "@/components/voicelab/DeleteModelButton";
 import {
   VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, VC_ALL_MODELS,
   downloadAllModels, getModelStatus, getTotalModelSize, clearAllModels,
@@ -149,14 +150,12 @@ export function ModelDownloadPanel({
               <CheckCircle2 className="h-3 w-3 mr-1" />
               {isRu ? "Готовы" : "Ready"}
             </Badge>
-            <Button
-              variant="ghost" size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-              onClick={handleClearModels}
-              title={isRu ? "Удалить модели" : "Clear models"}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+            <DeleteModelButton
+              isRu={isRu}
+              modelName={isRu ? "все ONNX модели Voice Conversion" : "all VC ONNX models"}
+              onConfirm={handleClearModels}
+              title={isRu ? "Удалить все модели" : "Clear all models"}
+            />
           </div>
         ) : (
           <Badge variant="outline" className="text-xs text-muted-foreground">
