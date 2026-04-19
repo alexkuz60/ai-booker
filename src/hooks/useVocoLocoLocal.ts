@@ -295,7 +295,7 @@ export function useVocoLocoLocal(args: UseVocoLocoLocalArgs) {
   }, [resultUrl]);
 
   const totalSize = useMemo(
-    () => VOCOLOCO_ALL_MODELS.reduce((s, m) => s + m.sizeBytes, 0),
+    () => VOCOLOCO_ALL_MODELS.reduce((s, m) => s + totalModelBytes(m), 0),
     [],
   );
 
