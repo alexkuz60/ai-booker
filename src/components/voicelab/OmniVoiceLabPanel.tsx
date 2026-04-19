@@ -236,7 +236,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     [isRu, persistAdvancedFor],
   );
 
-  // ── Synthesis pipeline ──
+  // ── Server-mode synthesis pipeline ──
   const synth = useOmniVoiceSynthesis({
     isRu,
     requestBaseUrl: server.requestBaseUrl,
@@ -251,27 +251,64 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     advanced,
   });
 
+  // ── Local-mode (VocoLoco ONNX) ──
+  const local = useVocoLocoLocal({ isRu, llmModelId });
+  const cachedLocalCount = VOCOLOCO_ALL_MODELS.filter((m) => local.statuses[m.id]).length;
+
+  /** Engine-aware accessors so the result card / synth button stay one set of props. */
+  const isLocal = engine === "local";
+  const activeStage = isLocal
+    ? (local.stage === "done" || local.stage === "idle" || local.stage === "error"
+        ? local.stage
+        : "synthesizing") as "idle" | "synthesizing" | "done" | "error"
+    : synth.stage;
+  const activeBusy = isLocal ? local.busy : synth.busy;
+  const activeLatencyMs = isLocal ? local.latencyMs : synth.latencyMs;
+  const activeErrorMessage = isLocal ? local.errorMessage : synth.errorMessage;
+  const activeResultUrl = isLocal ? local.resultUrl : synth.resultUrl;
+  const activePlaying = isLocal ? local.playing : synth.playing;
+
+  const handleSynthesizeUnified = () => {
+    if (isLocal) {
+      // VocoLoco: only design + clone supported. "auto" falls back to design.
+      const localMode: "design" | "clone" = mode === "clone" ? "clone" : "design";
+      void local.synthesize({
+        mode: localMode,
+        text: synthText,
+        refAudioBlob,
+        speed,
+        advanced,
+      });
+    } else {
+      void synth.handleSynthesize();
+    }
+  };
+
+  const handleResetUnified = () => (isLocal ? local.reset() : synth.handleReset());
+  const handlePlayUnified = () => (isLocal ? local.play() : synth.handlePlay());
+  const handleDownloadUnified = () => (isLocal ? void local.download() : void synth.handleDownload());
+
   // ── Capture params snapshot of the latest successful run (for chip display) ──
   const [usedRun, setUsedRun] = useState<{
     params: OmniVoiceAdvancedParams;
     speed: number;
     source: string | null;
   } | null>(null);
-  const prevStageRef = useRef(synth.stage);
+  const prevStageRef = useRef(activeStage);
   useEffect(() => {
     const prev = prevStageRef.current;
-    if (prev !== "done" && synth.stage === "done") {
+    if (prev !== "done" && activeStage === "done") {
       setUsedRun({
         params: { ...advanced },
         speed,
         source: advancedHint ?? advancedSource,
       });
     }
-    if (synth.stage === "idle" && !synth.resultUrl) {
+    if (activeStage === "idle" && !activeResultUrl) {
       setUsedRun(null);
     }
-    prevStageRef.current = synth.stage;
-  }, [synth.stage, synth.resultUrl, advanced, speed, advancedHint, advancedSource]);
+    prevStageRef.current = activeStage;
+  }, [activeStage, activeResultUrl, advanced, speed, advancedHint, advancedSource]);
 
   return (
     <div className="space-y-4">
