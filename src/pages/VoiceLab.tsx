@@ -523,6 +523,8 @@ export default function VoiceLab() {
             pitchBusy={pitchBusy}
             pitchDlPct={pitchDlPct}
             isRu={isRu}
+            persisted={persisted}
+            onRequestPersistence={handleRequestPersistence}
             onDownloadAll={handleDownloadModels}
             onDownloadPitch={handleDownloadPitch}
             onDeleteModel={handleDeletePitch}
