@@ -52,6 +52,14 @@ interface OmniVoiceLabPanelProps {
 }
 
 export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
+  // ── Engine: server (HTTP) vs local (in-browser ONNX VocoLoco) ──
+  const { value: engine, update: setEngine } = useCloudSettings<OmniVoiceEngine>(
+    "omnivoice-engine", "server",
+  );
+  const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
+    "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
+  );
+
   // ── Server ──
   const server = useOmniVoiceServer();
 
