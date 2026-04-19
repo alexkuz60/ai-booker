@@ -568,7 +568,11 @@ export default function VoiceLab() {
 // ═══════════════════════════════════════════════════════════
 
 // ── Models Panel ──
-function ModelsPanel({ modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu, onDownloadAll, onDownloadPitch, onDeleteModel }: {
+function ModelsPanel({
+  modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu,
+  onDownloadAll, onDownloadPitch, onDeleteModel,
+  vocoLoco, whisper, llmModelId, onLlmModelChange,
+}: {
   modelStatus: Record<string, boolean>;
   coreModelsReady: boolean;
   downloading: boolean;
@@ -579,181 +583,222 @@ function ModelsPanel({ modelStatus, coreModelsReady, downloading, dlProgress, pi
   onDownloadAll: () => void;
   onDownloadPitch: (entry: any) => void;
   onDeleteModel: (id: string, label: string) => void;
+  vocoLoco: ReturnType<typeof useVocoLocoLocal>;
+  whisper: ReturnType<typeof useWhisperStt>;
+  llmModelId: string;
+  onLlmModelChange: (id: string) => void;
 }) {
   return (
-    <div className="space-y-4 max-w-3xl">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <HardDrive className="h-4 w-4 text-primary" />
-            {isRu ? "ONNX модели для Voice Conversion" : "ONNX Models for Voice Conversion"}
-            {coreModelsReady && <Badge variant="outline" className="text-[10px] text-primary border-primary/50 ml-auto">Ready</Badge>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
-                <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
-                <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
-                <TableHead className="text-xs w-20"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {VC_MODEL_REGISTRY.map(m => {
-                const cached = !!modelStatus[m.id];
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell className="py-2">
-                      <p className="text-sm font-medium">{m.label}</p>
-                      <p className="text-xs text-muted-foreground">{m.description}</p>
-                    </TableCell>
-                    <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
-                      {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {cached && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          {!coreModelsReady && (
-            <Button onClick={onDownloadAll} disabled={downloading} className="w-full gap-2">
-              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {downloading && dlProgress
-                ? `${dlProgress.label}: ${Math.round(dlProgress.fraction * 100)}%`
-                : isRu ? "Скачать все модели" : "Download all models"}
-            </Button>
-          )}
-          {downloading && dlProgress && <Progress value={dlProgress.fraction * 100} className="h-1.5" />}
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-w-[1600px]">
+      {/* ═══ Column 1 — Voice Conversion (RVC) ═══ */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <Zap className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {isRu ? "ONNX модели для Voice Conversion" : "ONNX models for Voice Conversion"}
+          </h2>
+        </div>
 
-      {/* Pitch Models */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" />
-            {isRu ? "Модели определения тона (F0)" : "Pitch Detection Models (F0)"}
-            <Badge variant="outline" className="text-[10px] ml-auto">{isRu ? "опционально" : "optional"}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
-                <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
-                <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
-                <TableHead className="text-xs w-20"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {VC_PITCH_MODELS.map(m => {
-                const cached = !!modelStatus[m.id];
-                const busy = pitchBusy === m.id;
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell className="py-2">
-                      <p className="text-sm font-medium">{m.label}</p>
-                      <p className="text-xs text-muted-foreground">{m.description}</p>
-                    </TableCell>
-                    <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
-                      {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {cached ? (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onDownloadPitch(m)} disabled={!!pitchBusy}>
-                          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                          {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          {pitchBusy && <Progress value={pitchDlPct} className="h-1.5" />}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-primary" />
+              {isRu ? "Базовые модели" : "Core models"}
+              {coreModelsReady && <Badge variant="outline" className="text-[10px] text-primary border-primary/50 ml-auto">Ready</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
+                  <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
+                  <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                  <TableHead className="text-xs w-20"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {VC_MODEL_REGISTRY.map(m => {
+                  const cached = !!modelStatus[m.id];
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="py-2">
+                        <p className="text-sm font-medium">{m.label}</p>
+                        <p className="text-xs text-muted-foreground">{m.description}</p>
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                        {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {cached && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {!coreModelsReady && (
+              <Button onClick={onDownloadAll} disabled={downloading} className="w-full gap-2">
+                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {downloading && dlProgress
+                  ? `${dlProgress.label}: ${Math.round(dlProgress.fraction * 100)}%`
+                  : isRu ? "Скачать все модели" : "Download all models"}
+              </Button>
+            )}
+            {downloading && dlProgress && <Progress value={dlProgress.fraction * 100} className="h-1.5" />}
+          </CardContent>
+        </Card>
 
-      {/* Encoder Models */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Wand2 className="h-4 w-4 text-primary" />
-            {isRu ? "Альтернативные энкодеры речи" : "Alternative Speech Encoders"}
-            <Badge variant="outline" className="text-[10px] ml-auto border-primary/50 text-primary">{isRu ? "рекомендуемый" : "recommended"}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            {isRu
-              ? "WavLM лучше сохраняет интонации и эмоциональную окраску живого TTS."
-              : "WavLM better preserves intonation and emotional quality of live TTS."}
-          </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
-                <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
-                <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
-                <TableHead className="text-xs w-20"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {VC_ENCODER_MODELS.map(m => {
-                const cached = !!modelStatus[m.id];
-                const busy = pitchBusy === m.id;
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell className="py-2">
-                      <p className="text-sm font-medium">{m.label}</p>
-                      <p className="text-xs text-muted-foreground">{m.description}</p>
-                    </TableCell>
-                    <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
-                      {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {cached ? (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onDownloadPitch(m)} disabled={!!pitchBusy}>
-                          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                          {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        {/* Pitch Models */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              {isRu ? "Модели определения тона (F0)" : "Pitch detection models (F0)"}
+              <Badge variant="outline" className="text-[10px] ml-auto">{isRu ? "опционально" : "optional"}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
+                  <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
+                  <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                  <TableHead className="text-xs w-20"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {VC_PITCH_MODELS.map(m => {
+                  const cached = !!modelStatus[m.id];
+                  const busy = pitchBusy === m.id;
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="py-2">
+                        <p className="text-sm font-medium">{m.label}</p>
+                        <p className="text-xs text-muted-foreground">{m.description}</p>
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                        {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {cached ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onDownloadPitch(m)} disabled={!!pitchBusy}>
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                            {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {pitchBusy && <Progress value={pitchDlPct} className="h-1.5" />}
+          </CardContent>
+        </Card>
+
+        {/* Encoder Models */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Wand2 className="h-4 w-4 text-primary" />
+              {isRu ? "Альтернативные энкодеры речи" : "Alternative speech encoders"}
+              <Badge variant="outline" className="text-[10px] ml-auto border-primary/50 text-primary">{isRu ? "рекомендуемый" : "recommended"}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {isRu
+                ? "WavLM лучше сохраняет интонации и эмоциональную окраску живого TTS."
+                : "WavLM better preserves intonation and emotional quality of live TTS."}
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{isRu ? "Модель" : "Model"}</TableHead>
+                  <TableHead className="text-xs text-right">{isRu ? "Размер" : "Size"}</TableHead>
+                  <TableHead className="text-xs text-center">{isRu ? "Статус" : "Status"}</TableHead>
+                  <TableHead className="text-xs w-20"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {VC_ENCODER_MODELS.map(m => {
+                  const cached = !!modelStatus[m.id];
+                  const busy = pitchBusy === m.id;
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="py-2">
+                        <p className="text-sm font-medium">{m.label}</p>
+                        <p className="text-xs text-muted-foreground">{m.description}</p>
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                        {(m.sizeBytes / 1024 / 1024).toFixed(0)} MB
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {cached ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {cached ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteModel(m.id, m.label)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onDownloadPitch(m)} disabled={!!pitchBusy}>
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                            {busy ? `${pitchDlPct}%` : isRu ? "Скачать" : "Download"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ═══ Column 2 — OmniVoice (VocoLoco) ═══ */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <FlaskConical className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {isRu ? "ONNX модели для OmniVoice" : "ONNX models for OmniVoice"}
+          </h2>
+        </div>
+
+        <VocoLocoModelManager
+          isRu={isRu}
+          statuses={vocoLoco.statuses}
+          llmModelId={llmModelId}
+          onLlmModelChange={onLlmModelChange}
+          downloading={vocoLoco.downloading}
+          downloadProgress={vocoLoco.downloadProgress}
+          onDownload={vocoLoco.downloadModel}
+          onDelete={vocoLoco.deleteModel}
+          onCancel={vocoLoco.cancelDownload}
+          whisperCached={whisper.cached}
+          whisperDownloading={whisper.downloading}
+          whisperProgress={whisper.progress}
+          onWhisperDownload={() => void whisper.load()}
+          onWhisperDelete={() => void whisper.clear()}
+        />
+      </div>
     </div>
   );
 }
