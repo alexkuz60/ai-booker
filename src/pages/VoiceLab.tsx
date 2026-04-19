@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, requestPersistence, checkPersistence, type ModelDownloadProgress } from "@/lib/vcModelCache";
 import { VocoLocoModelManager } from "@/components/voicelab/omnivoice/VocoLocoModelManager";
 import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
 import { useWhisperStt } from "@/hooks/useWhisperStt";
@@ -98,6 +98,7 @@ export default function VoiceLab() {
   const [dlProgress, setDlProgress] = useState<ModelDownloadProgress | null>(null);
   const [pitchBusy, setPitchBusy] = useState<string | null>(null);
   const [pitchDlPct, setPitchDlPct] = useState(0);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
 
   // ── VocoLoco (OmniVoice local) models + Whisper STT ──
   const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
@@ -203,6 +204,7 @@ export default function VoiceLab() {
     };
 
     void refreshModelStatus();
+    void checkPersistence().then(setPersisted);
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
     window.addEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
@@ -216,10 +218,27 @@ export default function VoiceLab() {
     };
   }, [refreshModelStatus]);
 
+  const handleRequestPersistence = useCallback(async () => {
+    const granted = await requestPersistence();
+    setPersisted(granted);
+    if (granted) {
+      toast.success(isRu ? "Постоянное хранилище включено" : "Persistent storage enabled");
+    } else {
+      toast.warning(
+        isRu
+          ? "Браузер пока не выдал разрешение. Чаще пользуйтесь сайтом — Firefox решит вопрос автоматически."
+          : "Browser didn't grant permission. Visit the site more often — Firefox will grant it automatically.",
+      );
+    }
+  }, [isRu]);
+
   // ── Model download ──
   const handleDownloadModels = useCallback(async () => {
     setDownloading(true);
     try {
+      // Request persistence via user gesture before writing large files.
+      const granted = await requestPersistence();
+      setPersisted(granted);
       await downloadAllModels((p) => setDlProgress(p));
       await refreshModelStatus();
       toast.success(isRu ? "Все модели загружены" : "All models downloaded");
@@ -504,6 +523,8 @@ export default function VoiceLab() {
             pitchBusy={pitchBusy}
             pitchDlPct={pitchDlPct}
             isRu={isRu}
+            persisted={persisted}
+            onRequestPersistence={handleRequestPersistence}
             onDownloadAll={handleDownloadModels}
             onDownloadPitch={handleDownloadPitch}
             onDeleteModel={handleDeletePitch}
@@ -570,6 +591,7 @@ export default function VoiceLab() {
 // ── Models Panel ──
 function ModelsPanel({
   modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu,
+  persisted, onRequestPersistence,
   onDownloadAll, onDownloadPitch, onDeleteModel,
   vocoLoco, whisper, llmModelId, onLlmModelChange,
 }: {
@@ -580,6 +602,8 @@ function ModelsPanel({
   pitchBusy: string | null;
   pitchDlPct: number;
   isRu: boolean;
+  persisted: boolean | null;
+  onRequestPersistence: () => void;
   onDownloadAll: () => void;
   onDownloadPitch: (entry: any) => void;
   onDeleteModel: (id: string, label: string) => void;
@@ -589,7 +613,23 @@ function ModelsPanel({
   onLlmModelChange: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-w-[1600px]">
+    <div className="space-y-4 max-w-[1600px]">
+      {persisted === false && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="text-sm">
+              {isRu
+                ? "Браузер не предоставил «постоянное хранилище». В Firefox модели могут исчезать после перезагрузки. Нажмите кнопку и подтвердите запрос разрешения."
+                : "Browser didn't grant persistent storage. In Firefox models may disappear after reload. Click the button and accept the prompt."}
+            </span>
+            <Button size="sm" variant="outline" onClick={onRequestPersistence} className="shrink-0">
+              {isRu ? "Запросить разрешение" : "Request permission"}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
       {/* ═══ Column 1 — Voice Conversion (RVC) ═══ */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
@@ -798,6 +838,7 @@ function ModelsPanel({
           onWhisperDownload={() => void whisper.load()}
           onWhisperDelete={() => void whisper.clear()}
         />
+      </div>
       </div>
     </div>
   );
