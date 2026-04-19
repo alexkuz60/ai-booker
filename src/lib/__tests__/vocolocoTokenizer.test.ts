@@ -23,8 +23,8 @@ describe("VocoLoco — Stage B tokenizer", () => {
     resetVocoLocoTokenizer();
   });
 
-  it("uses Qwen3-0.6B repository", () => {
-    expect(VOCOLOCO_TOKENIZER_REPO).toBe("Qwen/Qwen3-0.6B");
+  it("uses Qwen3-0.6B ONNX-community repository", () => {
+    expect(VOCOLOCO_TOKENIZER_REPO).toBe("onnx-community/Qwen3-0.6B-ONNX");
   });
 
   (HAS_NETWORK ? it : it.skip)(
