@@ -46,11 +46,41 @@ import {
 import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import type { CharacterIndex, OmniVoiceAdvancedSnapshot } from "@/pages/parser/types";
+import { readVcReferenceBlob, updateVcReferenceMeta } from "@/lib/vcReferenceCache";
 import { toast } from "sonner";
 
 interface OmniVoiceLabPanelProps {
   isRu: boolean;
 }
+
+/**
+ * Persisted slice of the OmniVoice tab — survives reloads via useCloudSettings.
+ * `refAudioBlob` itself is NOT persisted; we re-resolve it from OPFS when
+ * `refSource` is "opfs" / "collection". Plain "upload" refs cannot be restored.
+ */
+interface OmniVoiceTabState {
+  mode: SynthMode;
+  preset: string;
+  instructions: string;
+  synthText: string;
+  speed: number;
+  refPickedId: string | null;
+  refSource: "upload" | "opfs" | "collection" | null;
+  refAudioName: string;
+  refTranscript: string;
+}
+
+const DEFAULT_TAB_STATE: OmniVoiceTabState = {
+  mode: "design",
+  preset: "alloy",
+  instructions: "",
+  synthText: "",
+  speed: 1.0,
+  refPickedId: null,
+  refSource: null,
+  refAudioName: "",
+  refTranscript: "",
+};
 
 export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   // ── Engine: server (HTTP) vs local (in-browser ONNX VocoLoco) ──
@@ -61,34 +91,84 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
   );
 
+  // ── Persisted tab state (mode/preset/text/speed/ref selection + transcript) ──
+  const { value: tabState, update: setTabState } = useCloudSettings<OmniVoiceTabState>(
+    "omnivoice-tab-state", DEFAULT_TAB_STATE,
+  );
+  const patchTabState = useCallback(
+    (patch: Partial<OmniVoiceTabState>) => setTabState({ ...tabState, ...patch }),
+    [tabState, setTabState],
+  );
+
   // ── Server ──
   const server = useOmniVoiceServer();
 
-  // ── Mode ──
-  const [mode, setMode] = useState<SynthMode>("design");
+  // ── Mode / Design / Cloning controls — backed by persisted tabState ──
+  const mode = tabState.mode;
+  const setMode = (m: SynthMode) => patchTabState({ mode: m });
+  const preset = tabState.preset;
+  const setPreset = (p: string) => patchTabState({ preset: p });
+  const instructions = tabState.instructions;
+  const setInstructions = (s: string) => patchTabState({ instructions: s });
 
-  // ── Voice Design ──
-  const [preset, setPreset] = useState("alloy");
-  const [instructions, setInstructions] = useState("");
-
-  // ── Voice Cloning ──
+  const refAudioName = tabState.refAudioName;
+  const refTranscript = tabState.refTranscript;
+  const refPickedId = tabState.refPickedId;
+  const refSource = tabState.refSource;
   const [refAudioBlob, setRefAudioBlob] = useState<Blob | null>(null);
-  const [refAudioName, setRefAudioName] = useState("");
-  const [refTranscript, setRefTranscript] = useState("");
-  const [refPickedId, setRefPickedId] = useState<string | null>(null);
-  const [refSource, setRefSource] = useState<"upload" | "opfs" | "collection" | null>(null);
+
+  /**
+   * Restore the actual ref Blob on mount when the user previously picked
+   * an OPFS / collection reference. Uploads can't be restored (no persisted file).
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!refPickedId || (refSource !== "opfs" && refSource !== "collection")) return;
+      if (refAudioBlob) return;
+      const blob = await readVcReferenceBlob(refPickedId);
+      if (!cancelled && blob) setRefAudioBlob(blob);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refPickedId, refSource]);
 
   const handleRefPicked = (picked: OmniVoicePickedRef) => {
     setRefAudioBlob(picked.blob);
-    setRefAudioName(picked.fileName);
-    setRefTranscript(picked.transcript ?? "");
-    setRefPickedId(picked.refId ?? null);
-    setRefSource(picked.source);
+    patchTabState({
+      refAudioName: picked.fileName,
+      refTranscript: picked.transcript ?? "",
+      refPickedId: picked.refId ?? null,
+      refSource: picked.source,
+    });
   };
 
+  const handleTranscriptChange = (value: string) => {
+    patchTabState({ refTranscript: value });
+  };
+
+  /**
+   * Auto-save edited transcript back to the OPFS reference metadata
+   * after the user pauses typing for ~600 ms. Only for opfs/collection refs.
+   */
+  const transcriptSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!refPickedId) return;
+    if (refSource !== "opfs" && refSource !== "collection") return;
+    if (transcriptSaveTimer.current) clearTimeout(transcriptSaveTimer.current);
+    transcriptSaveTimer.current = setTimeout(() => {
+      void updateVcReferenceMeta(refPickedId, { transcript: refTranscript });
+    }, 600);
+    return () => {
+      if (transcriptSaveTimer.current) clearTimeout(transcriptSaveTimer.current);
+    };
+  }, [refTranscript, refPickedId, refSource]);
+
   // ── Synthesis params ──
-  const [synthText, setSynthText] = useState("");
-  const [speed, setSpeed] = useState(1.0);
+  const synthText = tabState.synthText;
+  const setSynthText = (t: string) => patchTabState({ synthText: t });
+  const speed = tabState.speed;
+  const setSpeed = (s: number) => patchTabState({ speed: s });
   const [advanced, setAdvanced] = useState<OmniVoiceAdvancedParams>({ ...DEFAULT_ADVANCED_PARAMS });
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedSource, setAdvancedSource] =
