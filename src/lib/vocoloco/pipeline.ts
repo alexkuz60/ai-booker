@@ -277,12 +277,23 @@ export async function cloneVoice(input: VocoLocoCloningInput): Promise<VocoLocoS
   let refFrames: number;
   try {
     input.onProgress?.({ stage: "encode-ref", fraction: 0.05, message: "Encoding reference" });
+    // Encoder ONNX graph has a STATIC input length of 24 000 samples (1 s at 24 kHz).
+    // Crop from the center if longer, right-pad with zeros if shorter.
+    const ENCODER_INPUT_SAMPLES = 24_000;
+    const fixed = new Float32Array(ENCODER_INPUT_SAMPLES);
+    const src = input.refAudioPcm;
+    if (src.length >= ENCODER_INPUT_SAMPLES) {
+      const start = Math.floor((src.length - ENCODER_INPUT_SAMPLES) / 2);
+      fixed.set(src.subarray(start, start + ENCODER_INPUT_SAMPLES));
+    } else {
+      fixed.set(src, 0);
+    }
     const outputs = await runVocoLocoSession(VOCOLOCO_ENCODER.id, [
       {
         // Upstream input name (HF Transformers convention) — see VOCOLOCO_IO_CONTRACT.encoder.
         name: "input_values",
-        buffer: new Float32Array(input.refAudioPcm).buffer,
-        dims: [1, 1, input.refAudioPcm.length],
+        buffer: fixed.buffer,
+        dims: [1, 1, ENCODER_INPUT_SAMPLES],
         dtype: "float32",
       },
     ]);
