@@ -66,12 +66,20 @@ export interface CreateSessionOptions {
   backend?: VocoLocoBackend;
   expectedInputs?: readonly string[];
   expectedOutputs?: readonly string[];
+  /**
+   * Minimum WebGPU `maxStorageBuffersPerShaderStage` this model needs.
+   * Used by the worker to decide between WebGPU and a WASM fallback.
+   * Defaults: encoder/decoder = 10, llm = 14.
+   */
+  minStorageBuffers?: number;
 }
 
 export interface CreateSessionResult {
   inputNames: string[];
   outputNames: string[];
   contractErrors: string[];
+  actualBackend?: string;
+  backendDowngradeReason?: string;
 }
 
 /**
@@ -113,6 +121,12 @@ export async function createVocoLocoSession(
   const expectedInputs = options.expectedInputs ?? VOCOLOCO_IO_CONTRACT[entry.role].inputs;
   const expectedOutputs = options.expectedOutputs ?? VOCOLOCO_IO_CONTRACT[entry.role].outputs;
 
+  // Per-role binding budget. LLM is the only model that *requires* 14;
+  // encoder/decoder Concat kernels stay within 10 in practice, so on
+  // adapters with adapterMax=10 (some Intel iGPUs) they can still go GPU.
+  const defaultMin = entry.role === "llm" ? 14 : 10;
+  const minStorageBuffers = options.minStorageBuffers ?? defaultMin;
+
   const result = await send<CreateSessionResult>(
     {
       type: "createSession",
@@ -122,6 +136,7 @@ export async function createVocoLocoSession(
       executionProviders,
       expectedInputs,
       expectedOutputs,
+      minStorageBuffers,
     },
     transferables,
   );
@@ -134,6 +149,11 @@ export async function createVocoLocoSession(
       `Got inputs=[${result.inputNames.join(",")}] outputs=[${result.outputNames.join(",")}].`,
     );
   }
+
+  console.log(
+    `[VocoLoco] session "${modelId}" ready — backend=${result.actualBackend ?? "?"}` +
+    (result.backendDowngradeReason ? ` | downgrade: ${result.backendDowngradeReason}` : ""),
+  );
 
   activeSessions.add(modelId);
   return result;

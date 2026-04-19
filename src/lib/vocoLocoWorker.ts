@@ -20,37 +20,56 @@ ort.env.wasm.numThreads = navigator.hardwareConcurrency
 
 /**
  * Pre-request a WebGPU adapter with raised `maxStorageBuffersPerShaderStage`.
- * The OmniVoice LLM uses Concat kernels that bind 14 storage buffers per
- * dispatch — well above the WebGPU spec default of 8. Without this, ORT-Web
- * fails with `Too many bindings of type StorageBuffers in Stage ShaderStages(COMPUTE)`.
  *
- * Returns the maximum binding limit the adapter actually supports — callers
- * can use this to decide whether WebGPU is viable for the LLM (≥14 needed)
- * or whether to fall back to WASM. Idempotent.
+ * VocoLoco model bindings-per-stage budget (Concat / Reshape kernels):
+ *   - encoder (Whisper-ish):    typically ≤ 10
+ *   - decoder (NeMo audio):     typically ≤ 10
+ *   - LLM (Qwen3-based):        14 (hard requirement)
+ *
+ * Callers pass the per-role minimum; we compare against the actual adapter
+ * limit and downgrade to WASM only when the GPU truly can't satisfy it.
+ * Returns the adapter's maximum so each session can decide independently.
  */
-const LLM_MIN_STORAGE_BUFFERS = 14;
-let webgpuPrepared: Promise<{ adapterMax: number } | null> | null = null;
-function prepareWebGpuAdapter(): Promise<{ adapterMax: number } | null> {
+let webgpuPrepared: Promise<{ adapterMax: number; deviceLimit: number } | null> | null = null;
+function prepareWebGpuAdapter(): Promise<{ adapterMax: number; deviceLimit: number } | null> {
   if (webgpuPrepared) return webgpuPrepared;
   webgpuPrepared = (async () => {
-    if (typeof navigator === "undefined" || !(navigator as any).gpu) return null;
+    if (typeof navigator === "undefined" || !(navigator as any).gpu) {
+      console.warn("[VocoLoco worker] navigator.gpu unavailable — WebGPU disabled");
+      return null;
+    }
     try {
       const adapter = await (navigator as any).gpu.requestAdapter({
         powerPreference: "high-performance",
       });
-      if (!adapter) return null;
+      if (!adapter) {
+        console.warn("[VocoLoco worker] requestAdapter() returned null");
+        return null;
+      }
       const adapterMax = (adapter.limits as any).maxStorageBuffersPerShaderStage ?? 8;
-      const desiredLimit = Math.min(adapterMax, 16);
-      if (desiredLimit > 8) {
+      // Try to raise the device limit as high as the adapter allows (cap at 16
+      // — that's enough for everything VocoLoco runs).
+      const deviceLimit = Math.min(adapterMax, 16);
+      try {
         const device = await adapter.requestDevice({
-          requiredLimits: { maxStorageBuffersPerShaderStage: desiredLimit },
+          requiredLimits:
+            deviceLimit > 8
+              ? { maxStorageBuffersPerShaderStage: deviceLimit }
+              : undefined,
         });
         (ort.env.webgpu as any).adapter = adapter;
         (ort.env.webgpu as any).device = device;
-      } else {
+      } catch (devErr) {
+        console.warn("[VocoLoco worker] requestDevice with raised limits failed:", devErr);
         (ort.env.webgpu as any).adapter = adapter;
       }
-      return { adapterMax };
+      const adapterInfo = (adapter as any).info ?? {};
+      console.log(
+        `[VocoLoco worker] WebGPU adapter ready — vendor="${adapterInfo.vendor ?? "?"}" ` +
+        `architecture="${adapterInfo.architecture ?? "?"}" ` +
+        `maxStorageBuffersPerShaderStage adapter=${adapterMax} device=${deviceLimit}`,
+      );
+      return { adapterMax, deviceLimit };
     } catch (err) {
       console.warn("[VocoLoco worker] WebGPU adapter prep failed:", err);
       return null;
@@ -92,10 +111,17 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (type) {
       case "createSession": {
-        const { modelId, buffer, externalData, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
+        const {
+          modelId, buffer, externalData, executionProviders, graphOpt,
+          expectedInputs, expectedOutputs,
+          // Caller-supplied per-model minimum storage buffers per shader stage.
+          // Defaults to 14 (LLM worst-case) for safety if not provided.
+          minStorageBuffers,
+        } = payload;
+        const minBuffers: number = typeof minStorageBuffers === "number" ? minStorageBuffers : 14;
 
         // Effective EP list — may be downgraded to ["wasm"] if WebGPU adapter
-        // can't satisfy the storage-buffer limit needed by the LLM Concat kernels.
+        // can't satisfy the per-model storage-buffer requirement.
         let effectiveEPs: string[] = Array.isArray(executionProviders)
           ? [...(executionProviders as string[])]
           : ["wasm"];
@@ -103,17 +129,20 @@ self.onmessage = async (e: MessageEvent) => {
 
         if (effectiveEPs.includes("webgpu")) {
           const info = await prepareWebGpuAdapter();
-          // OmniVoice/VocoLoco models (encoder, LLM, decoder) all use Concat
-          // kernels with up to 14 storage buffer bindings — well above the
-          // WebGPU spec default of 8. If the adapter can't raise the limit,
-          // fall back to WASM for THIS session (other sessions on the same
-          // worker can still use whatever EP they were created with).
-          if (!info || info.adapterMax < LLM_MIN_STORAGE_BUFFERS) {
+          // The device limit (what we successfully requested) is what matters
+          // — adapter could theoretically allow more but device might not.
+          const available = info?.deviceLimit ?? 0;
+          if (!info || available < minBuffers) {
             backendDowngradeReason =
-              `WebGPU adapter supports only ${info?.adapterMax ?? 0} storage buffers/stage ` +
-              `(VocoLoco needs ≥${LLM_MIN_STORAGE_BUFFERS}); using WASM for "${modelId}".`;
+              `WebGPU device offers ${available} storage buffers/stage ` +
+              `(adapter max=${info?.adapterMax ?? 0}); "${modelId}" needs ≥${minBuffers}. ` +
+              `Falling back to WASM (CPU). On Firefox this limit is currently capped at 8.`;
             console.warn(`[VocoLoco worker] ${backendDowngradeReason}`);
             effectiveEPs = ["wasm"];
+          } else {
+            console.log(
+              `[VocoLoco worker] "${modelId}" using WebGPU (needs ${minBuffers}, have ${available})`,
+            );
           }
         }
 
