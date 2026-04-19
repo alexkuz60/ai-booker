@@ -839,6 +839,7 @@ function ModelsPanel({
           onWhisperDelete={() => void whisper.clear()}
         />
       </div>
+      </div>
     </div>
   );
 }
