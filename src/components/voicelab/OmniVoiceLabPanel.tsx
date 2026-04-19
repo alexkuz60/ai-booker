@@ -385,6 +385,8 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           onDownload={local.downloadModel}
           onDelete={local.deleteModel}
           onCancel={local.cancelDownload}
+          whisperSize={whisper.size}
+          onWhisperSizeChange={(s) => { whisper.setSize(s); void setWhisperPersistedSize(s); }}
           whisperCached={whisper.cached}
           whisperDownloading={whisper.downloading}
           whisperProgress={whisper.progress}
