@@ -28,13 +28,16 @@ interface Props {
   refSource: "upload" | "opfs" | "collection" | null;
   onPicked: (picked: OmniVoicePickedRef) => void;
   onTranscriptChange: (value: string) => void;
-  /** When true, transcribe locally via Whisper ONNX (no server needed). */
-  useLocalStt: boolean;
+  /**
+   * @deprecated Whisper всегда работает локально в браузере — STT и TTS-движок
+   * независимы. Параметр оставлен для совместимости и игнорируется.
+   */
+  useLocalStt?: boolean;
 }
 
 export function OmniVoiceCloningControls({
-  isRu, requestBaseUrl, refAudioBlob, refAudioName, refTranscript,
-  refPickedId, refSource, onPicked, onTranscriptChange, useLocalStt,
+  isRu, requestBaseUrl: _requestBaseUrl, refAudioBlob, refAudioName, refTranscript,
+  refPickedId, refSource, onPicked, onTranscriptChange,
 }: Props) {
   const [transcribing, setTranscribing] = useState(false);
 
