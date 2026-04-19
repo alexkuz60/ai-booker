@@ -13,3 +13,5 @@ export * from "./modelRegistry";
 export * from "./modelCache";
 export * from "./workerClient";
 export * from "./tokenizer";
+export * from "./diffusionSampler";
+export * from "./pipeline";
