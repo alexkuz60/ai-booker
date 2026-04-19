@@ -29,6 +29,7 @@ import { F5_SAMPLE_RATE } from "@/lib/f5tts/types";
 import type { F5Reference } from "@/lib/f5tts/types";
 import { releaseAllVcSessions } from "@/lib/vcInferenceSession";
 import { toast } from "sonner";
+import { DeleteModelButton } from "@/components/voicelab/DeleteModelButton";
 
 interface F5TtsLabPanelProps {
   isRu: boolean;
