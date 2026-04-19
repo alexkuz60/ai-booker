@@ -98,6 +98,7 @@ export default function VoiceLab() {
   const [dlProgress, setDlProgress] = useState<ModelDownloadProgress | null>(null);
   const [pitchBusy, setPitchBusy] = useState<string | null>(null);
   const [pitchDlPct, setPitchDlPct] = useState(0);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
 
   // ── VocoLoco (OmniVoice local) models + Whisper STT ──
   const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
