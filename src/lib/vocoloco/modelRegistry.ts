@@ -21,10 +21,19 @@ export interface VocoLocoModelEntry {
   role: VocoLocoModelRole;
   /** Display name shown in UI */
   label: string;
-  /** Remote source URL (HuggingFace) */
+  /** Remote source URL of the .onnx graph file */
   url: string;
-  /** Approximate size in bytes (for progress UI) */
+  /** Approximate size in bytes of the .onnx graph (for progress UI) */
   sizeBytes: number;
+  /**
+   * Optional companion ONNX external-data file URL (e.g. `*.onnx_data`).
+   * Required when the .onnx is just a graph and weights live separately.
+   * If provided, downloader fetches both, modelCache stores both,
+   * and the worker mounts the data file via `externalData` session option
+   * so ORT-Web can resolve `Module.MountedFiles` lookups.
+   */
+  externalDataUrl?: string;
+  externalDataSize?: number;
   /** Schema/version identifier — bump on upstream weight changes */
   revision: string;
   /** Quant variant (LLM only) */
