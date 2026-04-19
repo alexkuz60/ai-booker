@@ -91,6 +91,22 @@ export async function createVocoLocoSession(
     throw new Error(`[VocoLoco] Model "${modelId}" not in OPFS cache. Download it first.`);
   }
 
+  // Companion external-data file (e.g. *.onnx_data) — required for LLM models
+  // where weights are stored separately from the .onnx graph.
+  const externalData: Array<{ path: string; buffer: ArrayBuffer }> = [];
+  const transferables: Transferable[] = [buffer];
+  if (entry.externalDataUrl) {
+    const ext = await readVocoLocoExternalData(modelId);
+    if (!ext) {
+      throw new Error(
+        `[VocoLoco] External data file for "${modelId}" missing in OPFS. ` +
+        `Re-download the model — both .onnx graph and .onnx_data weights are required.`,
+      );
+    }
+    externalData.push({ path: ext.name, buffer: ext.buffer });
+    transferables.push(ext.buffer);
+  }
+
   const backend = options.backend ?? "webgpu";
   const executionProviders = backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
 
@@ -102,11 +118,12 @@ export async function createVocoLocoSession(
       type: "createSession",
       modelId,
       buffer,
+      externalData,
       executionProviders,
       expectedInputs,
       expectedOutputs,
     },
-    [buffer],
+    transferables,
   );
 
   if (result.contractErrors.length > 0) {
