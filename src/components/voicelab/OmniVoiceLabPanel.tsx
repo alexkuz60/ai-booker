@@ -501,7 +501,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               refPickedId={refPickedId}
               refSource={refSource}
               onPicked={handleRefPicked}
-              onTranscriptChange={setRefTranscript}
+              onTranscriptChange={handleTranscriptChange}
               useLocalStt={isLocal}
             />
           )}
