@@ -21,6 +21,7 @@ import {
   VOCOLOCO_DECODER,
   VOCOLOCO_ENCODER,
   VOCOLOCO_LLM_VARIANTS,
+  totalModelBytes,
   type VocoLocoModelEntry,
 } from "@/lib/vocoloco/modelRegistry";
 import type { VocoLocoDownloadProgress } from "@/lib/vocoloco/modelCache";
@@ -74,7 +75,7 @@ function ModelRow({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-[10px] text-muted-foreground tabular-nums">
-          {formatBytes(entry.sizeBytes)}
+          {formatBytes(totalModelBytes(entry))}
         </span>
         {cached ? (
           <>
@@ -162,7 +163,7 @@ export function VocoLocoModelManager({
             <SelectContent>
               {VOCOLOCO_LLM_VARIANTS.map((v) => (
                 <SelectItem key={v.id} value={v.id} className="text-xs">
-                  {v.label} — {formatBytes(v.sizeBytes)}
+                  {v.label} — {formatBytes(totalModelBytes(v))}
                 </SelectItem>
               ))}
             </SelectContent>

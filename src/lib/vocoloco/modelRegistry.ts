@@ -21,10 +21,19 @@ export interface VocoLocoModelEntry {
   role: VocoLocoModelRole;
   /** Display name shown in UI */
   label: string;
-  /** Remote source URL (HuggingFace) */
+  /** Remote source URL of the .onnx graph file */
   url: string;
-  /** Approximate size in bytes (for progress UI) */
+  /** Approximate size in bytes of the .onnx graph (for progress UI) */
   sizeBytes: number;
+  /**
+   * Optional companion ONNX external-data file URL (e.g. `*.onnx_data`).
+   * Required when the .onnx is just a graph and weights live separately.
+   * If provided, downloader fetches both, modelCache stores both,
+   * and the worker mounts the data file via `externalData` session option
+   * so ORT-Web can resolve `Module.MountedFiles` lookups.
+   */
+  externalDataUrl?: string;
+  externalDataSize?: number;
   /** Schema/version identifier — bump on upstream weight changes */
   revision: string;
   /** Quant variant (LLM only) */
@@ -72,8 +81,10 @@ export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
     quant: "qint8",
     label: "OmniVoice LLM (INT8 per-channel)",
     url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint8_per_channel.onnx",
-    sizeBytes: 613_000_000,
-    revision: "2026-04-19",
+    sizeBytes: 3_951_539,
+    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint8_per_channel.onnx_data",
+    externalDataSize: 612_773_952,
+    revision: "2026-04-19b",
     description: "Default — Qwen3-0.6B backbone, balanced quality/size",
   },
   {
@@ -82,8 +93,10 @@ export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
     quant: "qint16",
     label: "OmniVoice LLM (QInt16)",
     url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx",
-    sizeBytes: 1_060_000_000,
-    revision: "2026-04-19",
+    sizeBytes: 3_951_539,
+    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx_data",
+    externalDataSize: 1_061_572_672,
+    revision: "2026-04-19b",
     description: "Higher quality, +400 MB to OPFS and VRAM",
   },
   {
@@ -92,11 +105,18 @@ export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
     quant: "qdq-u8s8",
     label: "OmniVoice LLM (Static QDQ u8s8)",
     url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.static_qdq_u8s8.onnx",
-    sizeBytes: 613_000_000,
-    revision: "2026-04-19",
+    sizeBytes: 3_951_539,
+    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.static_qdq_u8s8.onnx_data",
+    externalDataSize: 612_577_344,
+    revision: "2026-04-19b",
     description: "Best CPU/WASM performance — recommended if WebGPU unstable",
   },
 ];
+
+/** Total bytes a model occupies on disk (graph + optional external data). */
+export function totalModelBytes(entry: VocoLocoModelEntry): number {
+  return entry.sizeBytes + (entry.externalDataSize ?? 0);
+}
 
 export const VOCOLOCO_LLM_DEFAULT_ID = "vocoloco-llm-int8";
 
