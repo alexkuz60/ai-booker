@@ -87,10 +87,13 @@ export function loadWhisper(
           // CPU (WASM) backend — WebGPU EP в ORT-Web падает на decoder Whisper
           // с "Invalid buffer" в Download() из buffer_manager.cc (известный баг
           // ORT-Web 1.x при mapAsync для динамических буферов decoder loop).
-          // dtype не указываем: q8-вариант whisper-base ломается в transformers.js
-          // на "Missing required scale … weight_transposed_DequantizeLinear"
-          // (qdq_actions.cc) — пусть библиотека сама выберет совместимый формат.
+          // dtype: "fp32" форсируем — на WASM по умолчанию transformers.js берёт
+          // q8 quantized whisper-base, который ломается на decoder с
+          // "Missing required scale model.decoder.embed_tokens.weight_merged_0_scale"
+          // (qdq_actions.cc:137 TransposeDQWeightsForMatMulNBits). FP32 = ~290MB,
+          // но это единственный вариант, который грузится без ошибок QDQ.
           device: "wasm" as any,
+          dtype: "fp32" as any,
           progress_callback: (p: any) => {
             if (!onProgress) return;
             const fraction =
