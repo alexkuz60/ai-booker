@@ -500,6 +500,10 @@ export default function VoiceLab() {
             onDownloadAll={handleDownloadModels}
             onDownloadPitch={handleDownloadPitch}
             onDeleteModel={handleDeletePitch}
+            vocoLoco={vocoLoco}
+            whisper={whisper}
+            llmModelId={llmModelId}
+            onLlmModelChange={setLlmModelId}
           />}
 
           {effectiveTab === "references" && <ReferencesPanel
