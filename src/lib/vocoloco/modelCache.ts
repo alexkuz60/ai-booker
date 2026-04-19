@@ -206,6 +206,7 @@ export async function downloadVocoLocoModel(
 
   try {
     // 1) graph .onnx
+    console.info(`[vocoloco/modelCache] ${entry.id}: fetching graph from ${entry.url}`);
     const graphLoaded = await fetchToOPFS(
       dir,
       entry.url,
@@ -215,9 +216,13 @@ export async function downloadVocoLocoModel(
       (loaded, totalLocal) => emit("downloading", "graph", loaded, totalLocal),
     );
     loadedAcc += graphLoaded;
+    console.info(`[vocoloco/modelCache] ${entry.id}: graph done (${(graphLoaded / 1e6).toFixed(2)} MB)`);
 
     // 2) optional .onnx_data
     if (dataName && entry.externalDataUrl) {
+      console.info(`[vocoloco/modelCache] ${entry.id}: fetching weights "${dataName}" from ${entry.externalDataUrl}`);
+      // Reset progress to weights phase explicitly so UI doesn't appear stuck.
+      emit("downloading", "weights", 0, entry.externalDataSize ?? 0);
       const dataLoaded = await fetchToOPFS(
         dir,
         entry.externalDataUrl,
@@ -227,6 +232,13 @@ export async function downloadVocoLocoModel(
         (loaded, totalLocal) => emit("downloading", "weights", loaded, totalLocal),
       );
       loadedAcc += dataLoaded;
+      console.info(`[vocoloco/modelCache] ${entry.id}: weights done (${(dataLoaded / 1e6).toFixed(2)} MB)`);
+      if (dataLoaded < (entry.externalDataSize ?? 0) * 0.9) {
+        throw new Error(
+          `External data file "${dataName}" downloaded only ${dataLoaded} bytes ` +
+          `(expected ~${entry.externalDataSize}). Network interrupted?`,
+        );
+      }
     }
 
     onProgress?.({
