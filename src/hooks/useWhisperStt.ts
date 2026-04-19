@@ -1,39 +1,48 @@
 /**
  * useWhisperStt — main-thread state holder around `whisperStt.ts`.
  *
- * Surfaces:
- *   - cached: whether Whisper files exist in browser cache (best-effort)
- *   - downloading / progress: live load progress
- *   - load(): explicit pre-warm trigger
- *   - clear(): wipes cache + drops in-memory pipeline
- *
- * Refreshes `cached` on the WHISPER_CACHE_EVENT so VocoLocoModelManager
- * stays in sync with one-off downloads.
+ * Surfaces the active size's cache + load progress. Switching size via
+ * `setSize` persists choice via useCloudSettings (handled in the panel)
+ * and refreshes `cached` from Cache Storage immediately.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
   hasWhisperCached,
   loadWhisper,
   clearWhisperCache,
+  setWhisperSize,
+  getWhisperSize,
   WHISPER_CACHE_EVENT,
+  WHISPER_SIZE_EVENT,
   type WhisperLoadProgress,
+  type WhisperSize,
 } from "@/lib/vocoloco/whisperStt";
 
 export function useWhisperStt() {
+  const [size, setSizeState] = useState<WhisperSize>(getWhisperSize());
   const [cached, setCached] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<WhisperLoadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setCached(await hasWhisperCached());
-  }, []);
+  const refresh = useCallback(async (s: WhisperSize = size) => {
+    setCached(await hasWhisperCached(s));
+  }, [size]);
 
   useEffect(() => {
     void refresh();
-    const onChange = () => void refresh();
-    window.addEventListener(WHISPER_CACHE_EVENT, onChange);
-    return () => window.removeEventListener(WHISPER_CACHE_EVENT, onChange);
+    const onCacheChange = () => void refresh();
+    const onSizeChange = (e: Event) => {
+      const next = (e as CustomEvent<WhisperSize>).detail;
+      setSizeState(next);
+      void refresh(next);
+    };
+    window.addEventListener(WHISPER_CACHE_EVENT, onCacheChange);
+    window.addEventListener(WHISPER_SIZE_EVENT, onSizeChange as EventListener);
+    return () => {
+      window.removeEventListener(WHISPER_CACHE_EVENT, onCacheChange);
+      window.removeEventListener(WHISPER_SIZE_EVENT, onSizeChange as EventListener);
+    };
   }, [refresh]);
 
   const load = useCallback(async (): Promise<boolean> => {
@@ -58,5 +67,10 @@ export function useWhisperStt() {
     await refresh();
   }, [refresh]);
 
-  return { cached, downloading, progress, error, load, clear };
+  const setSize = useCallback((next: WhisperSize) => {
+    setWhisperSize(next);
+    // setWhisperSize emits WHISPER_SIZE_EVENT → listener will sync state + refresh
+  }, []);
+
+  return { size, setSize, cached, downloading, progress, error, load, clear };
 }

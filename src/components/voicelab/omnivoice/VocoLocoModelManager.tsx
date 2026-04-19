@@ -25,8 +25,7 @@ import {
   type VocoLocoModelEntry,
 } from "@/lib/vocoloco/modelRegistry";
 import type { VocoLocoDownloadProgress } from "@/lib/vocoloco/modelCache";
-import { WHISPER_APPROX_BYTES } from "@/lib/vocoloco/whisperStt";
-import type { WhisperLoadProgress } from "@/lib/vocoloco/whisperStt";
+import { WHISPER_VARIANTS, type WhisperLoadProgress, type WhisperSize } from "@/lib/vocoloco/whisperStt";
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
@@ -46,6 +45,8 @@ interface Props {
   onDelete: (entry: VocoLocoModelEntry) => void;
   onCancel: () => void;
   // Whisper STT (optional sub-feature for reference transcription)
+  whisperSize: WhisperSize;
+  onWhisperSizeChange: (size: WhisperSize) => void;
   whisperCached: boolean;
   whisperDownloading: boolean;
   whisperProgress: WhisperLoadProgress | null;
@@ -121,10 +122,12 @@ function ModelRow({
 export function VocoLocoModelManager({
   isRu, statuses, llmModelId, onLlmModelChange,
   downloading, downloadProgress, onDownload, onDelete, onCancel,
+  whisperSize, onWhisperSizeChange,
   whisperCached, whisperDownloading, whisperProgress,
   onWhisperDownload, onWhisperDelete,
 }: Props) {
   const anyDownloading = downloading !== null;
+  const whisperVariant = WHISPER_VARIANTS[whisperSize];
 
   return (
     <Card className="border-primary/30">
@@ -220,24 +223,38 @@ export function VocoLocoModelManager({
 
         {/* Whisper STT — auxiliary, manages its own browser cache */}
         <div className="pt-2 border-t border-border/50 space-y-2">
-          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {isRu ? "Распознавание речи (опционально)" : "Speech recognition (optional)"}
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {isRu ? "Распознавание речи (опционально)" : "Speech recognition (optional)"}
+            </Label>
+            <Select value={whisperSize} onValueChange={(v) => onWhisperSizeChange(v as WhisperSize)}>
+              <SelectTrigger className="h-7 w-[180px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(WHISPER_VARIANTS) as WhisperSize[]).map((s) => (
+                  <SelectItem key={s} value={s} className="text-xs">
+                    {WHISPER_VARIANTS[s].label} — {formatBytes(WHISPER_VARIANTS[s].approxBytes)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center justify-between gap-2 rounded-md bg-muted/20 px-2 py-1.5">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono truncate">Whisper Base</span>
+                <span className="text-xs font-mono truncate">{whisperVariant.label}</span>
                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 uppercase">stt</Badge>
               </div>
               <p className="text-[10px] text-muted-foreground truncate">
                 {isRu
-                  ? "Распознаёт текст с референсного аудио в браузере (Xenova/whisper-base)."
-                  : "Transcribes reference audio in-browser (Xenova/whisper-base)."}
+                  ? `Распознаёт текст с референса в браузере (${whisperVariant.modelId}).`
+                  : `Transcribes reference audio in-browser (${whisperVariant.modelId}).`}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[10px] text-muted-foreground tabular-nums">
-                {formatBytes(WHISPER_APPROX_BYTES)}
+                {formatBytes(whisperVariant.approxBytes)}
               </span>
               {whisperCached ? (
                 <>
