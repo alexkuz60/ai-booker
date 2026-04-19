@@ -301,44 +301,51 @@ export async function downloadModel(
   }
 
   try {
-    // Fetch with streaming progress
-    const resp = await fetch(entry.url, { signal });
+    // Stream directly into OPFS to avoid keeping the entire blob in RAM.
+    const resp = await fetch(entry.url, { signal, cache: "no-store" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
     const contentLength = Number(resp.headers.get("content-length")) || entry.sizeBytes;
     const reader = resp.body?.getReader();
     if (!reader) throw new Error("No readable body");
 
-    const chunks: Uint8Array[] = [];
+    const fh = await dir.getFileHandle(`${entry.id}.onnx`, { create: true });
+    const writable = await fh.createWritable();
     let loaded = 0;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.byteLength;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value);
+        loaded += value.byteLength;
+        onProgress?.({
+          modelId: entry.id, label: entry.label,
+          bytesLoaded: loaded, bytesTotal: contentLength,
+          fraction: Math.min(loaded / contentLength, 1),
+          phase: "downloading",
+        });
+      }
       onProgress?.({
         modelId: entry.id, label: entry.label,
         bytesLoaded: loaded, bytesTotal: contentLength,
-        fraction: Math.min(loaded / contentLength, 1),
-        phase: "downloading",
+        fraction: 1, phase: "writing",
       });
+      await writable.close();
+    } catch (e) {
+      try { await writable.abort(); } catch { /* ignore */ }
+      try { reader.cancel(); } catch { /* ignore */ }
+      throw e;
     }
 
-    // Merge chunks
-    const blob = new Blob(chunks as unknown as BlobPart[]);
+    // Verify the file actually persisted (some browsers silently fail under quota).
+    try {
+      const verify = await (await dir.getFileHandle(`${entry.id}.onnx`)).getFile();
+      if (verify.size === 0) throw new Error("Written file has zero size");
+    } catch (e) {
+      throw new Error(`OPFS verification failed: ${(e as Error).message}`);
+    }
 
-    // Write to OPFS
-    onProgress?.({
-      modelId: entry.id, label: entry.label,
-      bytesLoaded: loaded, bytesTotal: contentLength,
-      fraction: 1, phase: "writing",
-    });
-
-    const fh = await dir.getFileHandle(`${entry.id}.onnx`, { create: true });
-    const writable = await fh.createWritable();
-    await writable.write(blob);
-    await writable.close();
     notifyVcModelCacheChanged();
 
     onProgress?.({
