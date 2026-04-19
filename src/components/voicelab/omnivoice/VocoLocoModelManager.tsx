@@ -75,7 +75,7 @@ function ModelRow({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-[10px] text-muted-foreground tabular-nums">
-          {formatBytes(entry.sizeBytes)}
+          {formatBytes(totalModelBytes(entry))}
         </span>
         {cached ? (
           <>
