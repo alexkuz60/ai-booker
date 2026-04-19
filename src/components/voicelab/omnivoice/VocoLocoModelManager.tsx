@@ -121,6 +121,8 @@ function ModelRow({
 export function VocoLocoModelManager({
   isRu, statuses, llmModelId, onLlmModelChange,
   downloading, downloadProgress, onDownload, onDelete, onCancel,
+  whisperCached, whisperDownloading, whisperProgress,
+  onWhisperDownload, onWhisperDelete,
 }: Props) {
   const anyDownloading = downloading !== null;
 
