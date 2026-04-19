@@ -23,18 +23,22 @@ ort.env.wasm.numThreads = navigator.hardwareConcurrency
  * The OmniVoice LLM uses Concat kernels that bind 14 storage buffers per
  * dispatch — well above the WebGPU spec default of 8. Without this, ORT-Web
  * fails with `Too many bindings of type StorageBuffers in Stage ShaderStages(COMPUTE)`.
- * Idempotent.
+ *
+ * Returns the maximum binding limit the adapter actually supports — callers
+ * can use this to decide whether WebGPU is viable for the LLM (≥14 needed)
+ * or whether to fall back to WASM. Idempotent.
  */
-let webgpuPrepared: Promise<void> | null = null;
-function prepareWebGpuAdapter(): Promise<void> {
+const LLM_MIN_STORAGE_BUFFERS = 14;
+let webgpuPrepared: Promise<{ adapterMax: number } | null> | null = null;
+function prepareWebGpuAdapter(): Promise<{ adapterMax: number } | null> {
   if (webgpuPrepared) return webgpuPrepared;
   webgpuPrepared = (async () => {
-    if (typeof navigator === "undefined" || !(navigator as any).gpu) return;
+    if (typeof navigator === "undefined" || !(navigator as any).gpu) return null;
     try {
       const adapter = await (navigator as any).gpu.requestAdapter({
         powerPreference: "high-performance",
       });
-      if (!adapter) return;
+      if (!adapter) return null;
       const adapterMax = (adapter.limits as any).maxStorageBuffersPerShaderStage ?? 8;
       const desiredLimit = Math.min(adapterMax, 16);
       if (desiredLimit > 8) {
@@ -45,14 +49,11 @@ function prepareWebGpuAdapter(): Promise<void> {
         (ort.env.webgpu as any).device = device;
       } else {
         (ort.env.webgpu as any).adapter = adapter;
-        console.warn(
-          `[VocoLoco worker] WebGPU adapter only supports ${adapterMax} storage buffers/stage; ` +
-          `OmniVoice Concat kernels need ≥14 — synthesis will likely fail on WebGPU. ` +
-          `Switch to WASM backend.`,
-        );
       }
+      return { adapterMax };
     } catch (err) {
       console.warn("[VocoLoco worker] WebGPU adapter prep failed:", err);
+      return null;
     }
   })();
   return webgpuPrepared;
