@@ -84,9 +84,13 @@ export function loadWhisper(
         "automatic-speech-recognition",
         WHISPER_MODEL_ID,
         {
-          // WebGPU when available, otherwise WASM. transformers.js handles
-          // the fallback internally if WebGPU init fails.
-          device: "webgpu" as any,
+          // CPU (WASM) backend — WebGPU EP в ORT-Web падает на decoder Whisper
+          // с "Invalid buffer" в Download() из buffer_manager.cc (известный баг
+          // ORT-Web 1.x при mapAsync для динамических буферов decoder loop).
+          // Whisper-base на CPU работает приемлемо (~1-3x realtime), а это
+          // одноразовая транскрипция референса — не критично к latency.
+          device: "wasm" as any,
+          dtype: "q8" as any,
           progress_callback: (p: any) => {
             if (!onProgress) return;
             const fraction =
