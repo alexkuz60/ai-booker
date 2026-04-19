@@ -181,12 +181,20 @@ self.onmessage = async (e: MessageEvent) => {
         if (!session) throw new Error(`[VocoLoco] No session for "${modelId}". Call createSession first.`);
 
         const feeds: Record<string, ort.Tensor> = {};
+        const feedDiag: Record<string, string> = {};
         for (const inp of inputs) {
           const { data, ortDtype } = bufferToTypedArray(inp.buffer, inp.dtype);
           feeds[inp.name] = new ort.Tensor(ortDtype as any, data, inp.dims);
+          feedDiag[inp.name] = `${ortDtype}[${inp.dims.join(",")}]`;
         }
 
-        const results = await session.run(feeds);
+        let results: ort.InferenceSession.ReturnType;
+        try {
+          results = await session.run(feeds);
+        } catch (runErr: any) {
+          console.error(`[VocoLoco worker] run("${modelId}") failed. Feeds sent:`, feedDiag);
+          throw runErr;
+        }
 
         const outputs: { name: string; buffer: ArrayBuffer; dims: number[]; dtype: string }[] = [];
         const transferables: ArrayBuffer[] = [];
