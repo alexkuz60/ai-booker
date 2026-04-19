@@ -32,6 +32,11 @@ import { OmniVoiceCloningControls } from "./omnivoice/OmniVoiceCloningControls";
 import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
+import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
+import { VocoLocoModelManager } from "./omnivoice/VocoLocoModelManager";
+import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { VOCOLOCO_ALL_MODELS, VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
   resolveOmniVoiceAdvancedFromTags,
   ACCENTUATION_LABELS,
