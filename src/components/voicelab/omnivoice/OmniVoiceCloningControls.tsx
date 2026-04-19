@@ -28,13 +28,16 @@ interface Props {
   refSource: "upload" | "opfs" | "collection" | null;
   onPicked: (picked: OmniVoicePickedRef) => void;
   onTranscriptChange: (value: string) => void;
-  /** When true, transcribe locally via Whisper ONNX (no server needed). */
-  useLocalStt: boolean;
+  /**
+   * @deprecated Whisper всегда работает локально в браузере — STT и TTS-движок
+   * независимы. Параметр оставлен для совместимости и игнорируется.
+   */
+  useLocalStt?: boolean;
 }
 
 export function OmniVoiceCloningControls({
-  isRu, requestBaseUrl, refAudioBlob, refAudioName, refTranscript,
-  refPickedId, refSource, onPicked, onTranscriptChange, useLocalStt,
+  isRu, requestBaseUrl: _requestBaseUrl, refAudioBlob, refAudioName, refTranscript,
+  refPickedId, refSource, onPicked, onTranscriptChange,
 }: Props) {
   const [transcribing, setTranscribing] = useState(false);
 
@@ -45,26 +48,10 @@ export function OmniVoiceCloningControls({
     }
     setTranscribing(true);
     try {
-      let recognized = "";
-      if (useLocalStt) {
-        // Warm Whisper if not already loaded — first call may take ~10-30s
-        // (download + WebGPU compile). Subsequent calls are fast.
-        await loadWhisper();
-        recognized = (await transcribeBlob(refAudioBlob, isRu ? "ru" : "auto")).trim();
-      } else {
-        const form = new FormData();
-        form.append("file", refAudioBlob, refAudioName || "reference.wav");
-        form.append("model", "whisper-1");
-        form.append("response_format", "json");
-
-        const res = await fetch(`${requestBaseUrl}/v1/audio/transcriptions`, { method: "POST", body: form });
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          throw new Error(`HTTP ${res.status}: ${errText || "STT error"}`);
-        }
-        const data = await res.json().catch(() => null) as { text?: string } | null;
-        recognized = (data?.text ?? "").trim();
-      }
+      // Whisper всегда локально: STT и TTS-движок независимы.
+      // Первый вызов догружает ~80 МБ модель (transformers.js + WebGPU).
+      await loadWhisper();
+      const recognized = (await transcribeBlob(refAudioBlob, isRu ? "ru" : "auto")).trim();
       if (!recognized) {
         throw new Error(isRu ? "Распознан пустой текст" : "Empty transcript");
       }
@@ -80,7 +67,7 @@ export function OmniVoiceCloningControls({
     } finally {
       setTranscribing(false);
     }
-  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu, refPickedId, refSource, onTranscriptChange, useLocalStt]);
+  }, [refAudioBlob, isRu, refPickedId, refSource, onTranscriptChange]);
 
 
   const persistTranscriptEdit = useCallback(async () => {
