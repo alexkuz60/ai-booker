@@ -21,6 +21,7 @@ import {
   VOCOLOCO_DECODER,
   VOCOLOCO_ENCODER,
   VOCOLOCO_LLM_VARIANTS,
+  totalModelBytes,
   type VocoLocoModelEntry,
 } from "@/lib/vocoloco/modelRegistry";
 import type { VocoLocoDownloadProgress } from "@/lib/vocoloco/modelCache";
