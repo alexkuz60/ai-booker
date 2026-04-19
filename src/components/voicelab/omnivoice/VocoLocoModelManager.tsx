@@ -45,6 +45,8 @@ interface Props {
   onDelete: (entry: VocoLocoModelEntry) => void;
   onCancel: () => void;
   // Whisper STT (optional sub-feature for reference transcription)
+  whisperSize: WhisperSize;
+  onWhisperSizeChange: (size: WhisperSize) => void;
   whisperCached: boolean;
   whisperDownloading: boolean;
   whisperProgress: WhisperLoadProgress | null;
