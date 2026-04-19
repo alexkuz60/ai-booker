@@ -25,8 +25,7 @@ import {
   type VocoLocoModelEntry,
 } from "@/lib/vocoloco/modelRegistry";
 import type { VocoLocoDownloadProgress } from "@/lib/vocoloco/modelCache";
-import { WHISPER_APPROX_BYTES } from "@/lib/vocoloco/whisperStt";
-import type { WhisperLoadProgress } from "@/lib/vocoloco/whisperStt";
+import { WHISPER_VARIANTS, type WhisperLoadProgress, type WhisperSize } from "@/lib/vocoloco/whisperStt";
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
