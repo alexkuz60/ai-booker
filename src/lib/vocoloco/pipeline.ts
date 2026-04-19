@@ -374,9 +374,9 @@ async function runDiffusionLoop(opts: {
       },
       {
         name: "audio_mask",
-        buffer: audioMaskInt64.buffer as ArrayBuffer,
+        buffer: audioMask.buffer as ArrayBuffer,
         dims: [2, Lmax],
-        dtype: "int64",
+        dtype: "bool",
       },
       {
         name: "attention_mask",
