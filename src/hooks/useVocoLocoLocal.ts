@@ -24,6 +24,7 @@ import {
   VOCOLOCO_ENCODER,
   VOCOLOCO_LLM_DEFAULT_ID,
   VOCOLOCO_LLM_VARIANTS,
+  totalModelBytes,
   type VocoLocoModelEntry,
 } from "@/lib/vocoloco/modelRegistry";
 import {
