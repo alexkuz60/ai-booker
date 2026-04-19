@@ -18,6 +18,46 @@ ort.env.wasm.numThreads = navigator.hardwareConcurrency
   ? Math.min(navigator.hardwareConcurrency, 4)
   : 2;
 
+/**
+ * Pre-request a WebGPU adapter with raised `maxStorageBuffersPerShaderStage`.
+ * The OmniVoice LLM uses Concat kernels that bind 14 storage buffers per
+ * dispatch — well above the WebGPU spec default of 8. Without this, ORT-Web
+ * fails with `Too many bindings of type StorageBuffers in Stage ShaderStages(COMPUTE)`.
+ * Idempotent.
+ */
+let webgpuPrepared: Promise<void> | null = null;
+function prepareWebGpuAdapter(): Promise<void> {
+  if (webgpuPrepared) return webgpuPrepared;
+  webgpuPrepared = (async () => {
+    if (typeof navigator === "undefined" || !(navigator as any).gpu) return;
+    try {
+      const adapter = await (navigator as any).gpu.requestAdapter({
+        powerPreference: "high-performance",
+      });
+      if (!adapter) return;
+      const adapterMax = (adapter.limits as any).maxStorageBuffersPerShaderStage ?? 8;
+      const desiredLimit = Math.min(adapterMax, 16);
+      if (desiredLimit > 8) {
+        const device = await adapter.requestDevice({
+          requiredLimits: { maxStorageBuffersPerShaderStage: desiredLimit },
+        });
+        (ort.env.webgpu as any).adapter = adapter;
+        (ort.env.webgpu as any).device = device;
+      } else {
+        (ort.env.webgpu as any).adapter = adapter;
+        console.warn(
+          `[VocoLoco worker] WebGPU adapter only supports ${adapterMax} storage buffers/stage; ` +
+          `OmniVoice Concat kernels need ≥14 — synthesis will likely fail on WebGPU. ` +
+          `Switch to WASM backend.`,
+        );
+      }
+    } catch (err) {
+      console.warn("[VocoLoco worker] WebGPU adapter prep failed:", err);
+    }
+  })();
+  return webgpuPrepared;
+}
+
 const sessions = new Map<string, ort.InferenceSession>();
 const SESSION_TIMEOUT_MS = 180_000; // LLM is large — allow 3 min
 
