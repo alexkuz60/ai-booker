@@ -15,6 +15,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, type ModelDownloadProgress } from "@/lib/vcModelCache";
+import { VocoLocoModelManager } from "@/components/voicelab/omnivoice/VocoLocoModelManager";
+import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
+import { useWhisperStt } from "@/hooks/useWhisperStt";
+import { useCloudSettings } from "@/hooks/useCloudSettings";
+import { VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
