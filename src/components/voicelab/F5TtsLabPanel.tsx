@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Download, Play, Square, Loader2, CheckCircle2, AlertTriangle, Upload, Trash2, Zap, RotateCcw,
+  Download, Play, Square, Loader2, CheckCircle2, AlertTriangle, Upload, Zap, RotateCcw,
 } from "lucide-react";
 import {
   F5_MODEL_REGISTRY, F5_MODEL_CACHE_EVENT,
@@ -348,9 +348,11 @@ export function F5TtsLabPanel({ isRu }: F5TtsLabPanelProps) {
                         <span className="text-xs">{dlProgress}%</span>
                       </div>
                     ) : modelStatus[entry.id] ? (
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(entry.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                      <DeleteModelButton
+                        isRu={isRu}
+                        modelName={entry.label}
+                        onConfirm={() => handleDelete(entry.id)}
+                      />
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => handleDownload(entry.id)} disabled={!!downloading}>
                         <Download className="w-3 h-3 mr-1" />
