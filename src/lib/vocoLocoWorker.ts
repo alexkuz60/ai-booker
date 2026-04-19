@@ -93,6 +93,12 @@ self.onmessage = async (e: MessageEvent) => {
       case "createSession": {
         const { modelId, buffer, externalData, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
 
+        // If WebGPU is in the EP list, ensure adapter has raised storage-buffer limit
+        // BEFORE ORT-Web creates its own default device.
+        if (Array.isArray(executionProviders) && (executionProviders as string[]).includes("webgpu")) {
+          await prepareWebGpuAdapter();
+        }
+
         // ONNX models with external data (e.g. Qwen3-based LLM where the .onnx
         // is just the graph) require the companion `.onnx_data` to be mounted
         // into ORT-Web's virtual FS via the `externalData` session option.
