@@ -163,7 +163,7 @@ export function VocoLocoModelManager({
             <SelectContent>
               {VOCOLOCO_LLM_VARIANTS.map((v) => (
                 <SelectItem key={v.id} value={v.id} className="text-xs">
-                  {v.label} — {formatBytes(v.sizeBytes)}
+                  {v.label} — {formatBytes(totalModelBytes(v))}
                 </SelectItem>
               ))}
             </SelectContent>
