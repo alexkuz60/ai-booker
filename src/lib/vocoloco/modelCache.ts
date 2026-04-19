@@ -80,6 +80,16 @@ export function getExternalDataFileName(entry: VocoLocoModelEntry): string | nul
   return externalDataFileName(entry);
 }
 
+/**
+ * Fetch a remote file into OPFS with automatic retries on transient network
+ * failures. HuggingFace's CDN occasionally drops connections mid-stream for
+ * large files (>100 MB), so each attempt restarts from scratch with the same
+ * file handle being recreated. We do NOT use HTTP Range resume because not
+ * every CDN edge supports it consistently — restart is simpler and reliable.
+ *
+ * Retries: up to 3 attempts, with 1.5s / 4s backoff. AbortSignal short-circuits
+ * the loop immediately.
+ */
 async function fetchToOPFS(
   dir: FileSystemDirectoryHandle,
   url: string,
@@ -88,30 +98,60 @@ async function fetchToOPFS(
   signal: AbortSignal | undefined,
   onChunk: (loaded: number, total: number) => void,
 ): Promise<number> {
-  const resp = await fetch(url, { signal });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-  const contentLength = Number(resp.headers.get("content-length")) || expectedSize;
-  const reader = resp.body?.getReader();
-  if (!reader) throw new Error(`No readable body for ${url}`);
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [1500, 4000];
+  let lastError: unknown = null;
 
-  const fh = await dir.getFileHandle(fileName, { create: true });
-  const writable = await fh.createWritable();
-  let loaded = 0;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    try {
+      const resp = await fetch(url, { signal, cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText} for ${url}`);
+      const contentLength = Number(resp.headers.get("content-length")) || expectedSize;
+      const reader = resp.body?.getReader();
+      if (!reader) throw new Error(`No readable body for ${url}`);
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      await writable.write(value);
-      loaded += value.byteLength;
-      onChunk(loaded, contentLength);
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const writable = await fh.createWritable();
+      let loaded = 0;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          await writable.write(value);
+          loaded += value.byteLength;
+          onChunk(loaded, contentLength);
+        }
+        await writable.close();
+      } catch (e) {
+        try { await writable.abort(); } catch { /* ignore */ }
+        try { reader.cancel(); } catch { /* ignore */ }
+        throw e;
+      }
+      return loaded;
+    } catch (e: any) {
+      lastError = e;
+      // User-initiated abort — bubble up immediately, no retry.
+      if (e?.name === "AbortError" || signal?.aborted) throw e;
+      const isLast = attempt === MAX_ATTEMPTS;
+      console.warn(
+        `[vocoloco/modelCache] Fetch attempt ${attempt}/${MAX_ATTEMPTS} for ${fileName} failed: ${e?.message ?? e}` +
+        (isLast ? " — giving up" : ` — retrying in ${BACKOFF_MS[attempt - 1]}ms`),
+      );
+      if (isLast) break;
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, BACKOFF_MS[attempt - 1]);
+        signal?.addEventListener("abort", () => {
+          clearTimeout(t);
+          reject(new DOMException("Aborted", "AbortError"));
+        }, { once: true });
+      });
     }
-    await writable.close();
-  } catch (e) {
-    try { await writable.abort(); } catch { /* ignore */ }
-    throw e;
   }
-  return loaded;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Fetch of ${fileName} failed after ${MAX_ATTEMPTS} attempts`);
 }
 
 export async function hasVocoLocoModel(modelId: string): Promise<boolean> {
