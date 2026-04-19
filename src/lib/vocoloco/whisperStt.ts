@@ -1,47 +1,70 @@
 /**
  * VocoLoco — In-browser Whisper STT (reference transcription).
  *
- * Uses @huggingface/transformers (Xenova) `automatic-speech-recognition`
- * pipeline with `Xenova/whisper-base` (~80 MB encoder + decoder ONNX).
+ * Three size variants (user-selectable):
+ *   - tiny  (~40 MB)  — fastest, lower accuracy on long/accented speech
+ *   - base  (~80 MB)  — balanced, default
+ *   - small (~250 MB) — best quality, recommended for tricky references
  *
- * Storage: transformers.js caches model files in IndexedDB under its own
- * cache namespace — we do NOT mirror them into OPFS because:
- *   1. transformers.js owns the file layout and validation, mixing it with
- *      OPFS would require reimplementing its loader.
- *   2. Whisper is auxiliary (not part of the Voice Cloning critical path),
- *      so independent cache lifecycle is acceptable.
+ * The active size is held in module state and can be switched at runtime
+ * via `setWhisperSize`. Each size has its own pipeline instance — switching
+ * sizes drops the previous one (frees VRAM/RAM) without touching cache, so
+ * users can keep multiple sizes warmed in browser cache.
  *
- * Public API:
- *   - hasWhisperCached() → best-effort check via `caches`/IDB presence
- *   - loadWhisper(onProgress?) → warms the pipeline, idempotent
- *   - transcribeBlob(blob, lang?) → string
- *   - releaseWhisper() → drops the in-memory pipeline (does NOT clear cache)
- *   - clearWhisperCache() → wipes IDB entries for the model
- *
- * The pipeline is single-instance per page — concurrent callers share the
- * same warm-up promise.
+ * Storage: transformers.js caches model files under its own Cache Storage
+ * namespace — we do NOT mirror them into OPFS (Whisper is auxiliary, not
+ * part of the Voice Cloning critical path).
  */
 import { pipeline, env, type AutomaticSpeechRecognitionPipeline } from "@huggingface/transformers";
 
 env.allowRemoteModels = true;
 env.allowLocalModels = false;
 
-const WHISPER_MODEL_ID = "Xenova/whisper-base";
-export const WHISPER_APPROX_BYTES = 80 * 1024 * 1024; // ~80 MB across encoder/decoder
+export type WhisperSize = "tiny" | "base" | "small";
+
+interface WhisperVariant {
+  modelId: string;
+  approxBytes: number;
+  label: string;
+}
+
+export const WHISPER_VARIANTS: Record<WhisperSize, WhisperVariant> = {
+  tiny:  { modelId: "Xenova/whisper-tiny",  approxBytes:  40 * 1024 * 1024, label: "Whisper Tiny" },
+  base:  { modelId: "Xenova/whisper-base",  approxBytes:  80 * 1024 * 1024, label: "Whisper Base" },
+  small: { modelId: "Xenova/whisper-small", approxBytes: 250 * 1024 * 1024, label: "Whisper Small" },
+};
+
 export const WHISPER_CACHE_EVENT = "booker-pro:vocoloco-whisper-cache-changed";
+export const WHISPER_SIZE_EVENT = "booker-pro:vocoloco-whisper-size-changed";
+
+let activeSize: WhisperSize = "base";
+const pipelinePromises: Partial<Record<WhisperSize, Promise<AutomaticSpeechRecognitionPipeline>>> = {};
 
 export interface WhisperLoadProgress {
-  /** transformers.js raw status: 'initiate' | 'download' | 'progress' | 'done' | 'ready' */
   status: string;
-  /** File being fetched (e.g. encoder_model_quantized.onnx) */
   file?: string;
   bytesLoaded?: number;
   bytesTotal?: number;
-  /** Aggregated 0..1 across files when computable */
   fraction?: number;
 }
 
-let pipelinePromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
+export function getWhisperSize(): WhisperSize { return activeSize; }
+export function getWhisperVariant(size: WhisperSize = activeSize): WhisperVariant {
+  return WHISPER_VARIANTS[size];
+}
+
+/** Switches active size. Drops the previous in-memory pipeline (cache untouched). */
+export function setWhisperSize(size: WhisperSize): void {
+  if (size === activeSize) return;
+  activeSize = size;
+  // Free RAM/VRAM held by previously active pipeline. Cache stays.
+  for (const k of Object.keys(pipelinePromises) as WhisperSize[]) {
+    if (k !== size) delete pipelinePromises[k];
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(WHISPER_SIZE_EVENT, { detail: size }));
+  }
+}
 
 function notifyCacheChanged(): void {
   if (typeof window !== "undefined") {
@@ -49,19 +72,16 @@ function notifyCacheChanged(): void {
   }
 }
 
-/**
- * Best-effort cache probe — transformers.js v4 stores files in the Cache
- * Storage API under the host name. We check whether ANY entry mentions
- * the Whisper model id. Returns false on any error (treat as "not cached").
- */
-export async function hasWhisperCached(): Promise<boolean> {
+/** Best-effort: any Cache Storage entry mentioning the model id. */
+export async function hasWhisperCached(size: WhisperSize = activeSize): Promise<boolean> {
   try {
     if (typeof caches === "undefined") return false;
+    const modelId = WHISPER_VARIANTS[size].modelId;
     const keys = await caches.keys();
     for (const k of keys) {
       const cache = await caches.open(k);
       const reqs = await cache.keys();
-      if (reqs.some((r) => r.url.includes(WHISPER_MODEL_ID))) return true;
+      if (reqs.some((r) => r.url.includes(modelId))) return true;
     }
     return false;
   } catch {
@@ -69,23 +89,20 @@ export async function hasWhisperCached(): Promise<boolean> {
   }
 }
 
-/**
- * Lazy-load (and warm) the Whisper pipeline. Calls are coalesced — the second
- * caller awaits the first one. On failure the promise is reset so retries
- * actually re-attempt loading.
- */
+/** Lazy-load (and warm) the active Whisper pipeline. Calls are coalesced per size. */
 export function loadWhisper(
   onProgress?: (p: WhisperLoadProgress) => void,
+  size: WhisperSize = activeSize,
 ): Promise<AutomaticSpeechRecognitionPipeline> {
-  if (pipelinePromise) return pipelinePromise;
-  pipelinePromise = (async () => {
+  const cached = pipelinePromises[size];
+  if (cached) return cached;
+  const modelId = WHISPER_VARIANTS[size].modelId;
+  const promise = (async () => {
     try {
       const pipe = await pipeline(
         "automatic-speech-recognition",
-        WHISPER_MODEL_ID,
+        modelId,
         {
-          // WebGPU when available, otherwise WASM. transformers.js handles
-          // the fallback internally if WebGPU init fails.
           device: "webgpu" as any,
           progress_callback: (p: any) => {
             if (!onProgress) return;
@@ -107,17 +124,15 @@ export function loadWhisper(
       notifyCacheChanged();
       return pipe as AutomaticSpeechRecognitionPipeline;
     } catch (err) {
-      pipelinePromise = null;
+      delete pipelinePromises[size];
       throw err;
     }
   })();
-  return pipelinePromise;
+  pipelinePromises[size] = promise;
+  return promise;
 }
 
-/**
- * Transcribe an audio Blob (any format the browser can decode) into text.
- * Decodes via WebAudio at 16 kHz mono — Whisper's required input.
- */
+/** Transcribe an audio Blob using the active Whisper size. */
 export async function transcribeBlob(
   blob: Blob,
   language: "ru" | "en" | "auto" = "auto",
@@ -179,21 +194,24 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return out;
 }
 
-export function releaseWhisper(): void {
-  pipelinePromise = null;
+/** Drops in-memory pipeline for the given size (or all). Cache untouched. */
+export function releaseWhisper(size?: WhisperSize): void {
+  if (size) delete pipelinePromises[size];
+  else for (const k of Object.keys(pipelinePromises) as WhisperSize[]) delete pipelinePromises[k];
 }
 
-/** Deletes Cache Storage entries that include the Whisper model id. */
-export async function clearWhisperCache(): Promise<void> {
-  releaseWhisper();
+/** Deletes Cache Storage entries for the given size (default: active). */
+export async function clearWhisperCache(size: WhisperSize = activeSize): Promise<void> {
+  releaseWhisper(size);
   try {
     if (typeof caches === "undefined") return;
+    const modelId = WHISPER_VARIANTS[size].modelId;
     const keys = await caches.keys();
     for (const k of keys) {
       const cache = await caches.open(k);
       const reqs = await cache.keys();
       for (const r of reqs) {
-        if (r.url.includes(WHISPER_MODEL_ID)) {
+        if (r.url.includes(modelId)) {
           await cache.delete(r);
         }
       }
