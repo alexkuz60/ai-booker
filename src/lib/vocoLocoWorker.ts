@@ -51,14 +51,25 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (type) {
       case "createSession": {
-        const { modelId, buffer, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
+        const { modelId, buffer, externalData, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
+
+        // ONNX models with external data (e.g. Qwen3-based LLM where the .onnx
+        // is just the graph) require the companion `.onnx_data` to be mounted
+        // into ORT-Web's virtual FS via the `externalData` session option.
+        // Without it ORT throws: "Failed to load external data file ... 
+        // Module.MountedFiles is not available."
+        const sessionOptions: ort.InferenceSession.SessionOptions = {
+          executionProviders: executionProviders as string[],
+          graphOptimizationLevel: graphOpt ?? "all",
+        };
+        if (Array.isArray(externalData) && externalData.length > 0) {
+          (sessionOptions as any).externalData = (externalData as Array<{ path: string; buffer: ArrayBuffer }>)
+            .map(({ path, buffer: dataBuf }) => ({ path, data: new Uint8Array(dataBuf) }));
+        }
 
         const sessionPromise = ort.InferenceSession.create(
           new Uint8Array(buffer as ArrayBuffer),
-          {
-            executionProviders: executionProviders as string[],
-            graphOptimizationLevel: graphOpt ?? "all",
-          },
+          sessionOptions,
         );
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(
