@@ -201,18 +201,48 @@ async function resolveModelFile(modelId: string): Promise<ResolvedModelFile | nu
 
 // ---------- OPFS directory helpers ----------
 
-let persistenceRequested = false;
+let lastPersistenceResult: boolean | null = null;
 
-/** Request persistent storage so the browser won't evict large ONNX models */
-async function requestPersistence(): Promise<void> {
-  if (persistenceRequested) return;
-  persistenceRequested = true;
+/**
+ * Request persistent storage so the browser won't evict large ONNX models.
+ *
+ * **Firefox specifics**: Firefox treats OPFS as best-effort by default and may
+ * evict cached files on tab close or browser restart unless the site holds
+ * a `persisted` permission. We re-request on each call (idempotent in browsers)
+ * because a denied result during one session may flip to granted once the user
+ * earns engagement (bookmarks, repeat visits).
+ */
+export async function requestPersistence(): Promise<boolean> {
   try {
-    if (navigator.storage?.persist) {
-      const granted = await navigator.storage.persist();
-      console.info(`[vcModelCache] Persistent storage ${granted ? "granted" : "denied"}`);
+    if (!navigator.storage?.persist) return false;
+    // Skip the actual call if we already know it's persisted.
+    if (navigator.storage.persisted) {
+      const already = await navigator.storage.persisted();
+      if (already) {
+        lastPersistenceResult = true;
+        return true;
+      }
+    }
+    const granted = await navigator.storage.persist();
+    lastPersistenceResult = granted;
+    console.info(`[vcModelCache] Persistent storage ${granted ? "granted" : "denied"}`);
+    return granted;
+  } catch (e) {
+    console.warn("[vcModelCache] persist() threw:", e);
+    return false;
+  }
+}
+
+/** Returns the latest known persistence state without re-requesting. */
+export async function checkPersistence(): Promise<boolean> {
+  try {
+    if (navigator.storage?.persisted) {
+      const v = await navigator.storage.persisted();
+      lastPersistenceResult = v;
+      return v;
     }
   } catch { /* ignore */ }
+  return lastPersistenceResult ?? false;
 }
 
 async function getVcCacheDir(): Promise<FileSystemDirectoryHandle | null> {
