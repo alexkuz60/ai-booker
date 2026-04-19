@@ -236,6 +236,9 @@ export default function VoiceLab() {
   const handleDownloadModels = useCallback(async () => {
     setDownloading(true);
     try {
+      // Request persistence via user gesture before writing large files.
+      const granted = await requestPersistence();
+      setPersisted(granted);
       await downloadAllModels((p) => setDlProgress(p));
       await refreshModelStatus();
       toast.success(isRu ? "Все модели загружены" : "All models downloaded");
