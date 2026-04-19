@@ -330,12 +330,15 @@ async function runDiffusionLoop(opts: {
     uncondPadded.set(prompt.uncondBlock.subarray(cb * prompt.uncondCols, (cb + 1) * prompt.uncondCols), cb * Lmax);
   }
 
-  // Audio mask: True where positions are AUDIO tokens (target window).
-  const audioMaskCond = new Uint8Array(2 * Lmax);
-  for (let i = 0; i < prompt.targetCols; i++) {
-    audioMaskCond[prompt.condTargetStart + i] = 1;
-    audioMaskCond[Lmax + prompt.uncondTargetStart + i] = 1;
-  }
+    // Audio mask: 1 where positions are AUDIO tokens (target window).
+    // The exported ONNX (gluschenko) takes int64 here even though the
+    // upstream PyTorch graph used torch.bool — the bool→int64 cast is
+    // folded into the export, and ORT-Web rejects bool input at runtime.
+    const audioMaskInt64 = new BigInt64Array(2 * Lmax);
+    for (let i = 0; i < prompt.targetCols; i++) {
+      audioMaskInt64[prompt.condTargetStart + i] = 1n;
+      audioMaskInt64[Lmax + prompt.uncondTargetStart + i] = 1n;
+    }
 
   // Attention mask: 4D [B=2, 1, L, L] bool. Allow attention within each
   // sample's REAL (non-padded) length; pad-rows attend only to themselves
