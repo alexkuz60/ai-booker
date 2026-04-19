@@ -99,6 +99,13 @@ export default function VoiceLab() {
   const [pitchBusy, setPitchBusy] = useState<string | null>(null);
   const [pitchDlPct, setPitchDlPct] = useState(0);
 
+  // ── VocoLoco (OmniVoice local) models + Whisper STT ──
+  const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
+    "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
+  );
+  const vocoLoco = useVocoLocoLocal({ isRu, llmModelId });
+  const whisper = useWhisperStt();
+
   // ── References ──
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
   const [collectionRefs, setCollectionRefs] = useState<{ id: string; name: string; category: string; durationMs: number }[]>([]);
