@@ -313,50 +313,79 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">OmniVoice — Zero-Shot TTS</h3>
           <p className="text-sm text-muted-foreground">
-            {isRu
-              ? "Локальный сервер: Voice Design, Voice Cloning, 600+ языков"
-              : "Local server: Voice Design, Voice Cloning, 600+ languages"}
+            {isLocal
+              ? (isRu
+                  ? "Локальный браузерный движок (VocoLoco ONNX): 100% оффлайн, ~1.4 ГБ моделей, WebGPU"
+                  : "In-browser engine (VocoLoco ONNX): fully offline, ~1.4 GB models, WebGPU")
+              : (isRu
+                  ? "Локальный сервер: Voice Design, Voice Cloning, 600+ языков"
+                  : "Local server: Voice Design, Voice Cloning, 600+ languages")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={server.isLocalOrigin ? "secondary" : "outline"} className="gap-1 text-[10px]">
-            <Globe className="w-3 h-3" />
-            {server.isLocalOrigin ? "Local" : "Cloud Preview"}
-          </Badge>
-          {server.serverOnline === true && (
-            <Badge variant="default" className="gap-1">
-              <Wifi className="w-3 h-3" />
-              {isRu ? "Онлайн" : "Online"}
-            </Badge>
-          )}
-          {server.serverOnline === false && (
-            <Badge variant="destructive" className="gap-1">
-              <WifiOff className="w-3 h-3" />
-              {isRu ? "Оффлайн" : "Offline"}
-            </Badge>
-          )}
-          {server.serverOnline === null && server.checkingServer && (
-            <Badge variant="outline" className="gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              {isRu ? "Проверка..." : "Checking..."}
-            </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <VocoLocoEngineToggle
+            isRu={isRu}
+            engine={engine}
+            onChange={setEngine}
+            cachedCount={cachedLocalCount}
+            totalCount={VOCOLOCO_ALL_MODELS.length}
+          />
+          {!isLocal && (
+            <div className="flex items-center gap-2">
+              <Badge variant={server.isLocalOrigin ? "secondary" : "outline"} className="gap-1 text-[10px]">
+                <Globe className="w-3 h-3" />
+                {server.isLocalOrigin ? "Local" : "Cloud Preview"}
+              </Badge>
+              {server.serverOnline === true && (
+                <Badge variant="default" className="gap-1">
+                  <Wifi className="w-3 h-3" />
+                  {isRu ? "Онлайн" : "Online"}
+                </Badge>
+              )}
+              {server.serverOnline === false && (
+                <Badge variant="destructive" className="gap-1">
+                  <WifiOff className="w-3 h-3" />
+                  {isRu ? "Оффлайн" : "Offline"}
+                </Badge>
+              )}
+              {server.serverOnline === null && server.checkingServer && (
+                <Badge variant="outline" className="gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {isRu ? "Проверка..." : "Checking..."}
+                </Badge>
+              )}
+            </div>
           )}
         </div>
       </div>
 
-      <OmniVoiceServerCard
-        isRu={isRu}
-        serverUrl={server.serverUrl}
-        onChangeUrl={server.setServerUrl}
-        onCheck={server.checkServer}
-        checking={server.checkingServer}
-        usingLocalDevProxy={server.usingLocalDevProxy}
-        showPreviewWarning={server.showPreviewWarning}
-      />
+      {isLocal ? (
+        <VocoLocoModelManager
+          isRu={isRu}
+          statuses={local.statuses}
+          llmModelId={llmModelId}
+          onLlmModelChange={setLlmModelId}
+          downloading={local.downloading}
+          downloadProgress={local.downloadProgress}
+          onDownload={local.downloadModel}
+          onDelete={local.deleteModel}
+          onCancel={local.cancelDownload}
+        />
+      ) : (
+        <OmniVoiceServerCard
+          isRu={isRu}
+          serverUrl={server.serverUrl}
+          onChangeUrl={server.setServerUrl}
+          onCheck={server.checkServer}
+          checking={server.checkingServer}
+          usingLocalDevProxy={server.usingLocalDevProxy}
+          showPreviewWarning={server.showPreviewWarning}
+        />
+      )}
 
       {/* Mode + per-mode controls */}
       <Card>
