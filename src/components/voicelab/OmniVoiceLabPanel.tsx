@@ -35,6 +35,7 @@ import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omniv
 import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
 import { VocoLocoModelManager } from "./omnivoice/VocoLocoModelManager";
 import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
+import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { VOCOLOCO_ALL_MODELS, VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
