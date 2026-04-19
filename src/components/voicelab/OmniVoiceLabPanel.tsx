@@ -256,6 +256,9 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const local = useVocoLocoLocal({ isRu, llmModelId });
   const cachedLocalCount = VOCOLOCO_ALL_MODELS.filter((m) => local.statuses[m.id]).length;
 
+  // ── Whisper STT (auxiliary, browser-cached, used by both engines) ──
+  const whisper = useWhisperStt();
+
   /** Engine-aware accessors so the result card / synth button stay one set of props. */
   const isLocal = engine === "local";
   const activeStage = isLocal
