@@ -23,18 +23,22 @@ ort.env.wasm.numThreads = navigator.hardwareConcurrency
  * The OmniVoice LLM uses Concat kernels that bind 14 storage buffers per
  * dispatch — well above the WebGPU spec default of 8. Without this, ORT-Web
  * fails with `Too many bindings of type StorageBuffers in Stage ShaderStages(COMPUTE)`.
- * Idempotent.
+ *
+ * Returns the maximum binding limit the adapter actually supports — callers
+ * can use this to decide whether WebGPU is viable for the LLM (≥14 needed)
+ * or whether to fall back to WASM. Idempotent.
  */
-let webgpuPrepared: Promise<void> | null = null;
-function prepareWebGpuAdapter(): Promise<void> {
+const LLM_MIN_STORAGE_BUFFERS = 14;
+let webgpuPrepared: Promise<{ adapterMax: number } | null> | null = null;
+function prepareWebGpuAdapter(): Promise<{ adapterMax: number } | null> {
   if (webgpuPrepared) return webgpuPrepared;
   webgpuPrepared = (async () => {
-    if (typeof navigator === "undefined" || !(navigator as any).gpu) return;
+    if (typeof navigator === "undefined" || !(navigator as any).gpu) return null;
     try {
       const adapter = await (navigator as any).gpu.requestAdapter({
         powerPreference: "high-performance",
       });
-      if (!adapter) return;
+      if (!adapter) return null;
       const adapterMax = (adapter.limits as any).maxStorageBuffersPerShaderStage ?? 8;
       const desiredLimit = Math.min(adapterMax, 16);
       if (desiredLimit > 8) {
@@ -45,14 +49,11 @@ function prepareWebGpuAdapter(): Promise<void> {
         (ort.env.webgpu as any).device = device;
       } else {
         (ort.env.webgpu as any).adapter = adapter;
-        console.warn(
-          `[VocoLoco worker] WebGPU adapter only supports ${adapterMax} storage buffers/stage; ` +
-          `OmniVoice Concat kernels need ≥14 — synthesis will likely fail on WebGPU. ` +
-          `Switch to WASM backend.`,
-        );
       }
+      return { adapterMax };
     } catch (err) {
       console.warn("[VocoLoco worker] WebGPU adapter prep failed:", err);
+      return null;
     }
   })();
   return webgpuPrepared;
@@ -93,19 +94,30 @@ self.onmessage = async (e: MessageEvent) => {
       case "createSession": {
         const { modelId, buffer, externalData, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
 
-        // If WebGPU is in the EP list, ensure adapter has raised storage-buffer limit
-        // BEFORE ORT-Web creates its own default device.
-        if (Array.isArray(executionProviders) && (executionProviders as string[]).includes("webgpu")) {
-          await prepareWebGpuAdapter();
+        // Effective EP list — may be downgraded to ["wasm"] if WebGPU adapter
+        // can't satisfy the storage-buffer limit needed by the LLM Concat kernels.
+        let effectiveEPs: string[] = Array.isArray(executionProviders)
+          ? [...(executionProviders as string[])]
+          : ["wasm"];
+        let backendDowngradeReason: string | undefined;
+
+        if (effectiveEPs.includes("webgpu")) {
+          const info = await prepareWebGpuAdapter();
+          const isLlm = typeof modelId === "string" && modelId.includes("llm");
+          if (isLlm && (!info || info.adapterMax < LLM_MIN_STORAGE_BUFFERS)) {
+            backendDowngradeReason =
+              `WebGPU adapter supports only ${info?.adapterMax ?? 0} storage buffers/stage ` +
+              `(LLM needs ≥${LLM_MIN_STORAGE_BUFFERS}); using WASM for "${modelId}".`;
+            console.warn(`[VocoLoco worker] ${backendDowngradeReason}`);
+            effectiveEPs = ["wasm"];
+          }
         }
 
         // ONNX models with external data (e.g. Qwen3-based LLM where the .onnx
         // is just the graph) require the companion `.onnx_data` to be mounted
         // into ORT-Web's virtual FS via the `externalData` session option.
-        // Without it ORT throws: "Failed to load external data file ... 
-        // Module.MountedFiles is not available."
         const sessionOptions: ort.InferenceSession.SessionOptions = {
-          executionProviders: executionProviders as string[],
+          executionProviders: effectiveEPs,
           graphOptimizationLevel: graphOpt ?? "all",
         };
         if (Array.isArray(externalData) && externalData.length > 0) {
@@ -204,6 +216,8 @@ self.onmessage = async (e: MessageEvent) => {
           inputNames,
           outputNames,
           contractErrors,
+          actualBackend: effectiveEPs[0],
+          backendDowngradeReason,
         });
         break;
       }
