@@ -103,11 +103,15 @@ self.onmessage = async (e: MessageEvent) => {
 
         if (effectiveEPs.includes("webgpu")) {
           const info = await prepareWebGpuAdapter();
-          const isLlm = typeof modelId === "string" && modelId.includes("llm");
-          if (isLlm && (!info || info.adapterMax < LLM_MIN_STORAGE_BUFFERS)) {
+          // OmniVoice/VocoLoco models (encoder, LLM, decoder) all use Concat
+          // kernels with up to 14 storage buffer bindings — well above the
+          // WebGPU spec default of 8. If the adapter can't raise the limit,
+          // fall back to WASM for THIS session (other sessions on the same
+          // worker can still use whatever EP they were created with).
+          if (!info || info.adapterMax < LLM_MIN_STORAGE_BUFFERS) {
             backendDowngradeReason =
               `WebGPU adapter supports only ${info?.adapterMax ?? 0} storage buffers/stage ` +
-              `(LLM needs ≥${LLM_MIN_STORAGE_BUFFERS}); using WASM for "${modelId}".`;
+              `(VocoLoco needs ≥${LLM_MIN_STORAGE_BUFFERS}); using WASM for "${modelId}".`;
             console.warn(`[VocoLoco worker] ${backendDowngradeReason}`);
             effectiveEPs = ["wasm"];
           }
