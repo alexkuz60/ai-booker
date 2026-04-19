@@ -35,6 +35,7 @@ import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omniv
 import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
 import { VocoLocoModelManager } from "./omnivoice/VocoLocoModelManager";
 import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
+import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
 import { VOCOLOCO_ALL_MODELS, VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
@@ -255,6 +256,9 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
   const local = useVocoLocoLocal({ isRu, llmModelId });
   const cachedLocalCount = VOCOLOCO_ALL_MODELS.filter((m) => local.statuses[m.id]).length;
 
+  // ── Whisper STT (auxiliary, browser-cached, used by both engines) ──
+  const whisper = useWhisperStt();
+
   /** Engine-aware accessors so the result card / synth button stay one set of props. */
   const isLocal = engine === "local";
   const activeStage = isLocal
@@ -374,6 +378,11 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
           onDownload={local.downloadModel}
           onDelete={local.deleteModel}
           onCancel={local.cancelDownload}
+          whisperCached={whisper.cached}
+          whisperDownloading={whisper.downloading}
+          whisperProgress={whisper.progress}
+          onWhisperDownload={() => void whisper.load()}
+          onWhisperDelete={() => void whisper.clear()}
         />
       ) : (
         <OmniVoiceServerCard
@@ -417,6 +426,7 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               refSource={refSource}
               onPicked={handleRefPicked}
               onTranscriptChange={setRefTranscript}
+              useLocalStt={isLocal}
             />
           )}
 

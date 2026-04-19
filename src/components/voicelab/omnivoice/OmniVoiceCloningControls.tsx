@@ -1,5 +1,11 @@
 /**
  * OmniVoiceCloningControls — ref picker + active ref badge + STT + transcript field.
+ *
+ * STT routing:
+ *   - useLocalStt=true  → in-browser Whisper (Xenova/whisper-base) via
+ *                         `transcribeBlob`. Lazily downloads ~80 MB on first use.
+ *   - useLocalStt=false → POSTs the blob to `${requestBaseUrl}/v1/audio/transcriptions`
+ *                         (OmniVoice / OpenAI-compatible Whisper server).
  */
 import { useCallback, useState } from "react";
 import { Loader2, Mic } from "lucide-react";
@@ -10,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { OmniVoiceRefPicker, type OmniVoicePickedRef } from "@/components/voicelab/OmniVoiceRefPicker";
 import { updateVcReferenceMeta } from "@/lib/vcReferenceCache";
+import { transcribeBlob, loadWhisper } from "@/lib/vocoloco/whisperStt";
 
 interface Props {
   isRu: boolean;
@@ -21,11 +28,13 @@ interface Props {
   refSource: "upload" | "opfs" | "collection" | null;
   onPicked: (picked: OmniVoicePickedRef) => void;
   onTranscriptChange: (value: string) => void;
+  /** When true, transcribe locally via Whisper ONNX (no server needed). */
+  useLocalStt: boolean;
 }
 
 export function OmniVoiceCloningControls({
   isRu, requestBaseUrl, refAudioBlob, refAudioName, refTranscript,
-  refPickedId, refSource, onPicked, onTranscriptChange,
+  refPickedId, refSource, onPicked, onTranscriptChange, useLocalStt,
 }: Props) {
   const [transcribing, setTranscribing] = useState(false);
 
@@ -36,20 +45,28 @@ export function OmniVoiceCloningControls({
     }
     setTranscribing(true);
     try {
-      const form = new FormData();
-      form.append("file", refAudioBlob, refAudioName || "reference.wav");
-      form.append("model", "whisper-1");
-      form.append("response_format", "json");
+      let recognized = "";
+      if (useLocalStt) {
+        // Warm Whisper if not already loaded — first call may take ~10-30s
+        // (download + WebGPU compile). Subsequent calls are fast.
+        await loadWhisper();
+        recognized = (await transcribeBlob(refAudioBlob, isRu ? "ru" : "auto")).trim();
+      } else {
+        const form = new FormData();
+        form.append("file", refAudioBlob, refAudioName || "reference.wav");
+        form.append("model", "whisper-1");
+        form.append("response_format", "json");
 
-      const res = await fetch(`${requestBaseUrl}/v1/audio/transcriptions`, { method: "POST", body: form });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}: ${errText || "STT error"}`);
+        const res = await fetch(`${requestBaseUrl}/v1/audio/transcriptions`, { method: "POST", body: form });
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`HTTP ${res.status}: ${errText || "STT error"}`);
+        }
+        const data = await res.json().catch(() => null) as { text?: string } | null;
+        recognized = (data?.text ?? "").trim();
       }
-      const data = await res.json().catch(() => null) as { text?: string } | null;
-      const recognized = data?.text?.trim() ?? "";
       if (!recognized) {
-        throw new Error(isRu ? "Сервер вернул пустой транскрипт" : "Server returned empty transcript");
+        throw new Error(isRu ? "Распознан пустой текст" : "Empty transcript");
       }
       onTranscriptChange(recognized);
 
@@ -63,7 +80,8 @@ export function OmniVoiceCloningControls({
     } finally {
       setTranscribing(false);
     }
-  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu, refPickedId, refSource, onTranscriptChange]);
+  }, [refAudioBlob, refAudioName, requestBaseUrl, isRu, refPickedId, refSource, onTranscriptChange, useLocalStt]);
+
 
   const persistTranscriptEdit = useCallback(async () => {
     if (!refPickedId || !refTranscript.trim()) return;
