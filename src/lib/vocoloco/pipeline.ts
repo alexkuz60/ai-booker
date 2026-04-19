@@ -279,7 +279,8 @@ export async function cloneVoice(input: VocoLocoCloningInput): Promise<VocoLocoS
     input.onProgress?.({ stage: "encode-ref", fraction: 0.05, message: "Encoding reference" });
     const outputs = await runVocoLocoSession(VOCOLOCO_ENCODER.id, [
       {
-        name: "audio",
+        // Upstream input name (HF Transformers convention) — see VOCOLOCO_IO_CONTRACT.encoder.
+        name: "input_values",
         buffer: new Float32Array(input.refAudioPcm).buffer,
         dims: [1, 1, input.refAudioPcm.length],
         dtype: "float32",

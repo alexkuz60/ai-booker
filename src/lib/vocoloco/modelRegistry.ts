@@ -138,7 +138,9 @@ export function findVocoLocoModel(id: string): VocoLocoModelEntry | undefined {
  */
 export const VOCOLOCO_IO_CONTRACT = {
   encoder: {
-    inputs: ["audio"], // waveform [B, 1, samples] — exact name verified at runtime
+    // Upstream gluschenko/higgs-audio-v2-tokenizer-onnx names the waveform input
+    // `input_values` (HF Transformers convention), NOT `audio`. Verified at runtime.
+    inputs: ["input_values"], // waveform [B, 1, samples]
     outputs: ["audio_codes"], // [B, 8, T]
   },
   llm: {
