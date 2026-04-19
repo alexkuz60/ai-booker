@@ -1,0 +1,190 @@
+/**
+ * vocoLocoWorker.ts — dedicated Web Worker for VocoLoco ONNX sessions.
+ *
+ * Isolated from vcOrtWorker so VC (RVC) and VocoLoco (OmniVoice) sessions
+ * never share VRAM lifecycle: terminating one worker doesn't kill the other.
+ *
+ * Protocol mirrors vcOrtWorker for consistency. All tensor data is
+ * transferred (zero-copy) via Transferable ArrayBuffers.
+ *
+ * Stage A scope: session create/release + I/O contract validation + run.
+ * Diffusion sampler logic stays on the main thread (Stage C).
+ */
+import * as ort from "onnxruntime-web";
+
+const ORT_VERSION = "1.25.0-dev.20260327-722743c0e2";
+ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
+ort.env.wasm.numThreads = navigator.hardwareConcurrency
+  ? Math.min(navigator.hardwareConcurrency, 4)
+  : 2;
+
+const sessions = new Map<string, ort.InferenceSession>();
+const SESSION_TIMEOUT_MS = 180_000; // LLM is large — allow 3 min
+
+interface WorkerTensorInput {
+  name: string;
+  buffer: ArrayBuffer;
+  dims: number[];
+  dtype: string;
+}
+
+function bufferToTypedArray(buffer: ArrayBuffer, dtype: string): { data: ort.Tensor["data"]; ortDtype: string } {
+  switch (dtype) {
+    case "float32": return { data: new Float32Array(buffer), ortDtype: "float32" };
+    case "float16": return { data: new Uint16Array(buffer), ortDtype: "float16" };
+    case "int64": return { data: new BigInt64Array(buffer), ortDtype: "int64" };
+    case "int32_as_int64": {
+      const i32 = new Int32Array(buffer);
+      const i64 = new BigInt64Array(i32.length);
+      for (let i = 0; i < i32.length; i++) i64[i] = BigInt(i32[i]);
+      return { data: i64, ortDtype: "int64" };
+    }
+    case "int32": return { data: new Int32Array(buffer), ortDtype: "int32" };
+    case "int16": return { data: new Int16Array(buffer), ortDtype: "int16" };
+    case "bool": return { data: new Uint8Array(buffer), ortDtype: "bool" };
+    default: return { data: new Float32Array(buffer), ortDtype: "float32" };
+  }
+}
+
+self.onmessage = async (e: MessageEvent) => {
+  const { id, type, ...payload } = e.data;
+  try {
+    switch (type) {
+      case "createSession": {
+        const { modelId, buffer, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
+
+        const sessionPromise = ort.InferenceSession.create(
+          new Uint8Array(buffer as ArrayBuffer),
+          {
+            executionProviders: executionProviders as string[],
+            graphOptimizationLevel: graphOpt ?? "all",
+          },
+        );
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(
+              `[VocoLoco] Session creation for "${modelId}" timed out after ${SESSION_TIMEOUT_MS / 1000}s.`,
+            )),
+            SESSION_TIMEOUT_MS,
+          ),
+        );
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
+        sessions.set(modelId, session);
+
+        const inputNames = [...session.inputNames];
+        const outputNames = [...session.outputNames];
+
+        // Contract validation — fail-fast if upstream broke I/O
+        const contractErrors: string[] = [];
+        if (Array.isArray(expectedInputs)) {
+          for (const expected of expectedInputs as string[]) {
+            if (!inputNames.includes(expected)) {
+              contractErrors.push(`missing input "${expected}"`);
+            }
+          }
+        }
+        if (Array.isArray(expectedOutputs)) {
+          for (const expected of expectedOutputs as string[]) {
+            if (!outputNames.includes(expected)) {
+              contractErrors.push(`missing output "${expected}"`);
+            }
+          }
+        }
+
+        self.postMessage({
+          id,
+          type: "sessionCreated",
+          inputNames,
+          outputNames,
+          contractErrors,
+        });
+        break;
+      }
+
+      case "run": {
+        const { modelId, inputs } = payload as { modelId: string; inputs: WorkerTensorInput[] };
+        const session = sessions.get(modelId);
+        if (!session) throw new Error(`[VocoLoco] No session for "${modelId}". Call createSession first.`);
+
+        const feeds: Record<string, ort.Tensor> = {};
+        for (const inp of inputs) {
+          const { data, ortDtype } = bufferToTypedArray(inp.buffer, inp.dtype);
+          feeds[inp.name] = new ort.Tensor(ortDtype as any, data, inp.dims);
+        }
+
+        const results = await session.run(feeds);
+
+        const outputs: { name: string; buffer: ArrayBuffer; dims: number[]; dtype: string }[] = [];
+        const transferables: ArrayBuffer[] = [];
+
+        for (const [name, tensor] of Object.entries(results)) {
+          const srcData = tensor.data;
+          let outBuf: ArrayBuffer;
+
+          if (srcData instanceof Float32Array) {
+            outBuf = new Float32Array(srcData).buffer;
+          } else if (srcData instanceof BigInt64Array) {
+            outBuf = new BigInt64Array(srcData).buffer;
+          } else if (srcData instanceof Int32Array) {
+            outBuf = new Int32Array(srcData).buffer;
+          } else if (srcData instanceof Int16Array) {
+            outBuf = new Int16Array(srcData).buffer;
+          } else if (srcData instanceof Uint16Array) {
+            outBuf = new Uint16Array(srcData).buffer;
+          } else {
+            outBuf = new Float32Array(srcData as any).buffer;
+          }
+
+          outputs.push({
+            name,
+            buffer: outBuf,
+            dims: Array.from(tensor.dims),
+            dtype: tensor.type,
+          });
+          transferables.push(outBuf);
+
+          try { tensor.dispose(); } catch {}
+        }
+
+        for (const t of Object.values(feeds)) {
+          try { t.dispose(); } catch {}
+        }
+
+        (self as unknown as Worker).postMessage(
+          { id, type: "runResult", outputs },
+          transferables as any,
+        );
+        break;
+      }
+
+      case "releaseSession": {
+        const session = sessions.get(payload.modelId);
+        if (session) {
+          try { await session.release(); } catch {}
+          sessions.delete(payload.modelId);
+        }
+        self.postMessage({ id, type: "released" });
+        break;
+      }
+
+      case "releaseAll": {
+        const ids = [...sessions.keys()];
+        for (const [, session] of sessions) {
+          try { await session.release(); } catch {}
+        }
+        sessions.clear();
+        self.postMessage({ id, type: "releasedAll", modelIds: ids });
+        break;
+      }
+
+      default:
+        self.postMessage({ id, type: "error", message: `[VocoLoco] Unknown message type: ${type}` });
+    }
+  } catch (err: any) {
+    self.postMessage({
+      id,
+      type: "error",
+      message: err?.message ?? String(err),
+    });
+  }
+};
