@@ -216,6 +216,8 @@ self.onmessage = async (e: MessageEvent) => {
           inputNames,
           outputNames,
           contractErrors,
+          actualBackend: effectiveEPs[0],
+          backendDowngradeReason,
         });
         break;
       }
