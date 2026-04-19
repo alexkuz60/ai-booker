@@ -379,11 +379,16 @@ async function runDiffusionLoop(opts: {
         dtype: "bool",
       },
       {
+        // HF/Qwen ONNX exports declare attention_mask as int64 even though
+        // PyTorch uses bool — convert here so dtype matches the model graph.
         name: "attention_mask",
-        // ORT-Web bool tensor: 1 byte per element.
-        buffer: new Uint8Array(attentionMask).buffer,
+        buffer: (() => {
+          const i64 = new BigInt64Array(attentionMask.length);
+          for (let i = 0; i < attentionMask.length; i++) i64[i] = BigInt(attentionMask[i]);
+          return i64.buffer;
+        })(),
         dims: [2, 1, Lmax, Lmax],
-        dtype: "bool",
+        dtype: "int64",
       },
       {
         name: "position_ids",
