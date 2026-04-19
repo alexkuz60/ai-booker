@@ -591,6 +591,7 @@ export default function VoiceLab() {
 // ── Models Panel ──
 function ModelsPanel({
   modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu,
+  persisted, onRequestPersistence,
   onDownloadAll, onDownloadPitch, onDeleteModel,
   vocoLoco, whisper, llmModelId, onLlmModelChange,
 }: {
@@ -601,6 +602,8 @@ function ModelsPanel({
   pitchBusy: string | null;
   pitchDlPct: number;
   isRu: boolean;
+  persisted: boolean | null;
+  onRequestPersistence: () => void;
   onDownloadAll: () => void;
   onDownloadPitch: (entry: any) => void;
   onDeleteModel: (id: string, label: string) => void;
@@ -610,7 +613,23 @@ function ModelsPanel({
   onLlmModelChange: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-w-[1600px]">
+    <div className="space-y-4 max-w-[1600px]">
+      {persisted === false && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="text-sm">
+              {isRu
+                ? "Браузер не предоставил «постоянное хранилище». В Firefox модели могут исчезать после перезагрузки. Нажмите кнопку и подтвердите запрос разрешения."
+                : "Browser didn't grant persistent storage. In Firefox models may disappear after reload. Click the button and accept the prompt."}
+            </span>
+            <Button size="sm" variant="outline" onClick={onRequestPersistence} className="shrink-0">
+              {isRu ? "Запросить разрешение" : "Request permission"}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
       {/* ═══ Column 1 — Voice Conversion (RVC) ═══ */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
