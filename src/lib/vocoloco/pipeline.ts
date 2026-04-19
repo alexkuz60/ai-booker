@@ -173,6 +173,7 @@ async function encodeReference(
 
   await createVocoLocoSession(VOCOLOCO_ENCODER.id, { backend });
   try {
+    const tEnc = performance.now();
     const outputs = await runVocoLocoSession(VOCOLOCO_ENCODER.id, [
       {
         name: "input_values",
@@ -181,6 +182,7 @@ async function encodeReference(
         dtype: "float32",
       },
     ]);
+    console.log(`[VocoLoco] encoder.run = ${(performance.now() - tEnc).toFixed(0)} ms`);
     const codesOut = outputs.find((o) => o.name === "audio_codes");
     if (!codesOut) throw new Error("[VocoLoco] Encoder did not return audio_codes");
     const i64 = new BigInt64Array(codesOut.buffer);
@@ -353,6 +355,8 @@ async function runDiffusionLoop(opts: {
   const schedule = buildUnmaskSchedule(totalMaskable, params.numSteps, params.tShift);
   const rng = makeRng(params.seed);
 
+  let totalLlmRunMs = 0;
+  let totalSamplerMs = 0;
   for (let step = 0; step < params.numSteps; step++) {
     // Pack [2, 8, L_max] int64 input_ids snapshot.
     const packedIds = packBatchInt64(condPadded, uncondPadded, nCodebooks, Lmax);
@@ -396,7 +400,9 @@ async function runDiffusionLoop(opts: {
       },
     ];
 
+    const tRun = performance.now();
     const outputs = await runVocoLocoSession(llmModelId, feeds);
+    totalLlmRunMs += performance.now() - tRun;
     const logitsOut = outputs.find((o) => o.name === "logits");
     if (!logitsOut) throw new Error("[VocoLoco] LLM did not return logits");
     const logits = new Float32Array(logitsOut.buffer);
@@ -434,6 +440,7 @@ async function runDiffusionLoop(opts: {
       }
     }
 
+    const tSamp = performance.now();
     applyDiffusionStep({
       condLogits: trailingCondLogits,
       uncondLogits: trailingUncondLogits,
@@ -449,6 +456,7 @@ async function runDiffusionLoop(opts: {
       classTemperature: params.classTemperature,
       rng,
     });
+    totalSamplerMs += performance.now() - tSamp;
 
     // Mirror updated tokens back into BOTH cond and uncond input blocks
     // (target window only, after the ref prefix).
@@ -469,12 +477,21 @@ async function runDiffusionLoop(opts: {
     });
   }
 
+  const avgLlm = totalLlmRunMs / params.numSteps;
+  const avgSamp = totalSamplerMs / params.numSteps;
+  console.log(
+    `[VocoLoco] diffusion done — ${params.numSteps} steps, ` +
+    `llm avg=${avgLlm.toFixed(0)} ms (total=${(totalLlmRunMs / 1000).toFixed(1)} s), ` +
+    `sampler avg=${avgSamp.toFixed(1)} ms (total=${(totalSamplerMs / 1000).toFixed(1)} s)`,
+  );
+
   return tokens;
 }
 
 /** Run the decoder on `[8, T_target]` codes and return 24 kHz Float32 PCM. */
 async function runDecoder(audioCodes: Int32Array, numFrames: number): Promise<Float32Array> {
   const { nCodebooks } = VOCOLOCO_CONFIG;
+  const tDec = performance.now();
   const outputs = await runVocoLocoSession(VOCOLOCO_DECODER.id, [
     {
       name: "audio_codes",
@@ -483,6 +500,7 @@ async function runDecoder(audioCodes: Int32Array, numFrames: number): Promise<Fl
       dtype: "int32_as_int64",
     },
   ]);
+  console.log(`[VocoLoco] decoder.run = ${(performance.now() - tDec).toFixed(0)} ms`);
   const wavOut = outputs.find((o) => o.name === "audio_values");
   if (!wavOut) throw new Error("[VocoLoco] Decoder did not return audio_values");
   return new Float32Array(wavOut.buffer);
