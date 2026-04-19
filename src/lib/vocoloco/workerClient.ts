@@ -150,9 +150,18 @@ export async function runVocoLocoSession(
   modelId: string,
   inputs: TensorInput[],
 ): Promise<WorkerOutput[]> {
-  const transferables = inputs.map((i) => i.buffer);
+  // Copy each input buffer before transfer so callers can safely reuse the
+  // originals across multiple `run()` calls (e.g. diffusion loop reuses the
+  // same audio_mask / position_ids on every step). Without this, transferring
+  // detaches the source ArrayBuffer and the next iteration throws
+  // "attempting to access detached ArrayBuffer".
+  const copiedInputs: TensorInput[] = inputs.map((i) => ({
+    ...i,
+    buffer: i.buffer.slice(0),
+  }));
+  const transferables = copiedInputs.map((i) => i.buffer);
   const result = await send<{ outputs: WorkerOutput[] }>(
-    { type: "run", modelId, inputs },
+    { type: "run", modelId, inputs: copiedInputs },
     transferables,
   );
   return result.outputs;
