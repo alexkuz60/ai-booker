@@ -33,7 +33,7 @@ import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
 import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
-import { VocoLocoModelManager } from "./omnivoice/VocoLocoModelManager";
+// VocoLocoModelManager moved to VoiceLab "Models" tab — kept import-less here.
 import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
 import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
