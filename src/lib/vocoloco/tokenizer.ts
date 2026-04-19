@@ -22,11 +22,18 @@ env.allowRemoteModels = true;
 env.allowLocalModels = false;
 
 /**
- * Qwen3-0.6B repo on HF — used by upstream OmniVoice and gluschenko's ONNX export.
+ * Qwen3-0.6B tokenizer repo — using the `onnx-community` mirror because
+ * the official `Qwen/Qwen3-0.6B` repo is missing `special_tokens_map.json`
+ * which makes transformers.js v4 throw "i is undefined" during init.
+ *
+ * Both repos share the same `Qwen2Tokenizer` class, vocab.json and merges.txt
+ * (151 936 token BPE), so token IDs are identical — fully compatible with the
+ * OmniVoice LLM (gluschenko/omnivoice-onnx) which wraps Qwen3-0.6B.
+ *
  * If a future OmniVoice revision switches the backbone (e.g. Qwen3.5),
  * bump this constant — pipeline contract test will surface vocab mismatch.
  */
-const QWEN3_TOKENIZER_REPO = "Qwen/Qwen3-0.6B";
+const QWEN3_TOKENIZER_REPO = "onnx-community/Qwen3-0.6B-ONNX";
 
 let tokenizerPromise: Promise<PreTrainedTokenizer> | null = null;
 
