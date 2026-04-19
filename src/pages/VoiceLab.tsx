@@ -204,6 +204,7 @@ export default function VoiceLab() {
     };
 
     void refreshModelStatus();
+    void checkPersistence().then(setPersisted);
     listVcReferences().then(setLocalRefs);
     listVcIndexes().then(setLocalIndexes);
     window.addEventListener(VC_MODEL_CACHE_EVENT, handleCacheChange);
@@ -216,6 +217,20 @@ export default function VoiceLab() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshModelStatus]);
+
+  const handleRequestPersistence = useCallback(async () => {
+    const granted = await requestPersistence();
+    setPersisted(granted);
+    if (granted) {
+      toast.success(isRu ? "Постоянное хранилище включено" : "Persistent storage enabled");
+    } else {
+      toast.warning(
+        isRu
+          ? "Браузер пока не выдал разрешение. Чаще пользуйтесь сайтом — Firefox решит вопрос автоматически."
+          : "Browser didn't grant permission. Visit the site more often — Firefox will grant it automatically.",
+      );
+    }
+  }, [isRu]);
 
   // ── Model download ──
   const handleDownloadModels = useCallback(async () => {
