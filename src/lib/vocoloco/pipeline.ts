@@ -367,7 +367,7 @@ async function runDiffusionLoop(opts: {
     const feeds: TensorInput[] = [
       {
         name: "input_ids",
-        buffer: packedIds.buffer,
+        buffer: packedIds.buffer as ArrayBuffer,
         dims: [2, nCodebooks, Lmax],
         dtype: "int64",
       },
@@ -392,7 +392,7 @@ async function runDiffusionLoop(opts: {
             for (let b = 0; b < 2; b++) for (let i = 0; i < Lmax; i++) arr[b * Lmax + i] = i;
             return arr;
           })(),
-        ).buffer,
+        ).buffer as ArrayBuffer,
         dims: [2, Lmax],
         dtype: "int64",
       },
@@ -480,7 +480,7 @@ async function runDecoder(audioCodes: Int32Array, numFrames: number): Promise<Fl
   const outputs = await runVocoLocoSession(VOCOLOCO_DECODER.id, [
     {
       name: "audio_codes",
-      buffer: audioCodes.buffer.slice(0),
+      buffer: audioCodes.buffer.slice(0) as ArrayBuffer,
       dims: [1, nCodebooks, numFrames],
       dtype: "int32_as_int64",
     },
