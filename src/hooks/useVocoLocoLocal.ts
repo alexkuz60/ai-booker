@@ -210,9 +210,8 @@ export function useVocoLocoLocal(args: UseVocoLocoLocalArgs) {
             targetSeconds: input.targetSeconds ?? 4.0,
             params: {
               numSteps: Math.round(input.advanced.num_step),
-              temperature: input.advanced.class_temperature,
-              topP: 0.95,
-              cfgScale: input.advanced.guidance_scale,
+              classTemperature: input.advanced.class_temperature,
+              guidanceScale: input.advanced.guidance_scale,
               tShift: input.advanced.t_shift,
             },
             onProgress,
@@ -224,9 +223,8 @@ export function useVocoLocoLocal(args: UseVocoLocoLocalArgs) {
             targetSeconds: input.targetSeconds ?? 4.0,
             params: {
               numSteps: Math.round(input.advanced.num_step),
-              temperature: input.advanced.class_temperature,
-              topP: 0.95,
-              cfgScale: input.advanced.guidance_scale,
+              classTemperature: input.advanced.class_temperature,
+              guidanceScale: input.advanced.guidance_scale,
               tShift: input.advanced.t_shift,
             },
             onProgress,

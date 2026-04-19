@@ -1,43 +1,57 @@
 /**
- * VocoLoco — diffusion sampler.
+ * VocoLoco — diffusion sampler (mask-predict + CFG + layer penalty).
  *
- * OmniVoice LLM is NOT autoregressive — it does parallel masked diffusion
- * over `T` audio frames × 8 codebooks. The sampler:
- *   1. starts with `[B=1, 8, T]` filled with mask token (id = 1024)
- *   2. for `numSteps` iterations:
- *      - run LLM forward → logits `[B, 8, T, 1025]`
- *      - apply temperature + top-p to logits at currently-masked positions
- *      - sample tokens, fill into `audio_codes`
- *      - shrink the mask (cosine schedule) — fewer positions stay masked
- *   3. after final step, all codebooks are filled
+ * OmniVoice is NOT autoregressive — it does parallel masked diffusion over
+ * `T_target` audio frames × 8 codebooks. Faithful port of the upstream
+ * `_generate_iterative` and `_predict_tokens_with_scoring` from
+ * github.com/k2-fsa/OmniVoice/omnivoice/models/omnivoice.py.
  *
- * Reference: OmniVoice diffusion loop in upstream Python implementation.
- * We keep all sampling math in float32 on the main thread — the heavy
- * 613 MB LLM forward stays in the worker.
+ * Per step:
+ *   1. LLM forward TWICE — once with full conditional input (style+text+
+ *      [ref]+target), once with ONLY the target slice (uncond). The two
+ *      logit slices are combined via Classifier-Free Guidance:
+ *          log_p = log_softmax( c + cfg * (c - u) )
+ *   2. Mask-out token id 1024 (audio_mask_id) — model never picks it
+ *   3. Predicted token = argmax(log_p) (or Gumbel-temperature sample when
+ *      class_temperature > 0)
+ *   4. Confidence = max(log_p) - layer_penalty_factor * codebook_index
+ *      (encourages bottom codebooks to be filled FIRST)
+ *   5. Apply Gumbel position_temperature to confidence
+ *   6. Pick top-k highest-confidence positions globally and write their
+ *      predicted tokens into `audio_codes`. `k` = number of tokens this
+ *      step's schedule allows to unmask.
+ *
+ * The schedule is built from a (t_shift-warped) cosine timeline, but we
+ * unmask EXACT integer counts per step (not ratios) — same as upstream.
+ *
+ * All math runs on the main thread in Float32 — small arrays, fast loops.
  */
 import { VOCOLOCO_CONFIG } from "./config";
 
 export interface DiffusionParams {
-  /** Number of denoising steps (typical 16-32). More = better quality, slower. */
+  /** Number of denoising steps (typical 16–32). More = better quality, slower. */
   numSteps: number;
-  /** Sampling temperature. >1 = more diverse, <1 = more conservative. */
-  temperature: number;
-  /** Top-p (nucleus) sampling threshold (0..1). Set to 1 to disable. */
-  topP: number;
-  /** Optional CFG scale for prompt-conditioning strength (1 = no guidance). */
-  cfgScale?: number;
-  /** Optional time-shift parameter for the mask schedule (>1 keeps more mask early). */
-  tShift?: number;
+  /** CFG scale (>0). 0 disables CFG. Upstream default: 2.0. */
+  guidanceScale: number;
+  /** Time-shift for the schedule. <1 emphasises low-SNR steps. Upstream default: 0.1. */
+  tShift: number;
+  /** Penalty per codebook layer when scoring positions (encourages early layers first). Upstream default: 5.0. */
+  layerPenaltyFactor: number;
+  /** Gumbel temperature for position selection. Upstream default: 5.0. */
+  positionTemperature: number;
+  /** Gumbel temperature for token sampling. 0 = greedy argmax. Upstream default: 0.0. */
+  classTemperature: number;
   /** Deterministic RNG seed (optional). */
   seed?: number;
 }
 
 export const DEFAULT_DIFFUSION_PARAMS: DiffusionParams = {
   numSteps: VOCOLOCO_CONFIG.defaultDiffusionSteps,
-  temperature: 0.95,
-  topP: 0.9,
-  cfgScale: 1.5,
-  tShift: 1.0,
+  guidanceScale: 2.0,
+  tShift: 0.1,
+  layerPenaltyFactor: 5.0,
+  positionTemperature: 5.0,
+  classTemperature: 0.0,
 };
 
 /**
@@ -55,12 +69,11 @@ class SeededRng {
     x ^= x >>> 17;
     x ^= x << 5;
     this.state = x | 0;
-    // map int32 → [0, 1)
     return ((x >>> 0) / 0x100000000);
   }
 }
 
-function makeRng(seed?: number): () => number {
+export function makeRng(seed?: number): () => number {
   if (typeof seed === "number") {
     const r = new SeededRng(seed);
     return () => r.next();
@@ -69,177 +82,176 @@ function makeRng(seed?: number): () => number {
 }
 
 /**
- * Cosine mask schedule — fraction of positions to keep masked at step `t`.
- * t in [0, 1] (0 = first step, 1 = last). Returns mask ratio in [0, 1].
+ * Build the per-step schedule of how many tokens to UNMASK at each step.
+ * Total tokens = T_target * nCodebooks. The cosine-shaped timeline is
+ * shifted by `tShift` (smaller value = unmask less early on, more late).
+ * Last step always drains everything that's left.
  *
- * `tShift > 1` slows the unmasking early (keeps more uncertain longer).
+ * Mirrors upstream `_get_time_steps` + the per-item loop:
+ *   timesteps = linspace(0, 1, num_step+1)
+ *   timesteps = t_shift * timesteps / (1 + (t_shift-1) * timesteps)
+ *   k_step = ceil(total * (timesteps[i+1] - timesteps[i]))
  */
-export function maskScheduleCosine(t: number, tShift: number = 1.0): number {
-  // standard cosine schedule from MaskGIT-like papers
-  const shifted = Math.min(1, t * tShift);
-  return Math.cos((Math.PI / 2) * shifted);
+export function buildUnmaskSchedule(
+  totalTokens: number,
+  numSteps: number,
+  tShift: number,
+): number[] {
+  const ts = new Float64Array(numSteps + 1);
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    ts[i] = (tShift * t) / (1 + (tShift - 1) * t);
+  }
+  const out: number[] = [];
+  let remaining = totalTokens;
+  for (let step = 0; step < numSteps; step++) {
+    const want =
+      step === numSteps - 1
+        ? remaining
+        : Math.min(Math.ceil(totalTokens * (ts[step + 1] - ts[step])), remaining);
+    const k = Math.max(0, want);
+    out.push(k);
+    remaining -= k;
+  }
+  return out;
 }
 
 /**
- * Apply temperature scaling, then top-p truncation, then categorical sample.
- * Returns the sampled token id.
- *
- * @param logits Float32Array of length `vocabSize` for ONE position.
- * @param temperature >0
- * @param topP (0, 1]
- * @param rng () => number in [0, 1)
+ * log_softmax over the last axis of a Float32Array slice.
+ * Returns a NEW Float32Array of the same length.
  */
-export function sampleFromLogits(
-  logits: Float32Array,
-  temperature: number,
-  topP: number,
-  rng: () => number,
-): number {
-  const V = logits.length;
-  const t = Math.max(temperature, 1e-4);
-
-  // 1. softmax with temperature
-  let maxLogit = -Infinity;
-  for (let i = 0; i < V; i++) {
-    const v = logits[i] / t;
-    if (v > maxLogit) maxLogit = v;
-  }
-  const probs = new Float32Array(V);
-  let sum = 0;
-  for (let i = 0; i < V; i++) {
-    const p = Math.exp(logits[i] / t - maxLogit);
-    probs[i] = p;
-    sum += p;
-  }
-  const inv = sum > 0 ? 1 / sum : 0;
-  for (let i = 0; i < V; i++) probs[i] *= inv;
-
-  // 2. top-p nucleus filtering (sort indices by prob desc)
-  if (topP < 1.0) {
-    const indices = Array.from({ length: V }, (_, i) => i);
-    indices.sort((a, b) => probs[b] - probs[a]);
-    let acc = 0;
-    let cutoff = V;
-    for (let i = 0; i < V; i++) {
-      acc += probs[indices[i]];
-      if (acc >= topP) {
-        cutoff = i + 1;
-        break;
-      }
-    }
-    // zero everything outside the nucleus
-    const keep = new Set(indices.slice(0, cutoff));
-    let renorm = 0;
-    for (let i = 0; i < V; i++) {
-      if (!keep.has(i)) probs[i] = 0;
-      else renorm += probs[i];
-    }
-    if (renorm > 0) {
-      const k = 1 / renorm;
-      for (let i = 0; i < V; i++) probs[i] *= k;
-    }
-  }
-
-  // 3. categorical sample
-  const r = rng();
-  let acc = 0;
-  for (let i = 0; i < V; i++) {
-    acc += probs[i];
-    if (r < acc) return i;
-  }
-  // fallback (numerical edge): return argmax
-  let best = 0;
-  let bestP = -1;
-  for (let i = 0; i < V; i++) if (probs[i] > bestP) { bestP = probs[i]; best = i; }
-  return best;
+function logSoftmax(slice: Float32Array): Float32Array {
+  const V = slice.length;
+  let max = -Infinity;
+  for (let i = 0; i < V; i++) if (slice[i] > max) max = slice[i];
+  let sumExp = 0;
+  for (let i = 0; i < V; i++) sumExp += Math.exp(slice[i] - max);
+  const logZ = max + Math.log(sumExp);
+  const out = new Float32Array(V);
+  for (let i = 0; i < V; i++) out[i] = slice[i] - logZ;
+  return out;
 }
 
-/**
- * One step of the diffusion loop — given current `audio_codes` and mask,
- * decide which masked positions to fill this step.
- *
- * @param logits Float32Array layout `[8, T, vocabSize]` flattened in C order
- * @param audioCodes Int32Array `[8, T]` — current state (mask token = 1024)
- * @param positionScores Float32Array `[8, T]` — confidence (max prob) for each position; used to pick "easiest" positions to unmask first
- * @param targetMasked Number of positions that should REMAIN masked after this step
- * @param sampler (codebookIdx, frameIdx) → tokenId — pluggable for tests
- * @returns updated audio_codes (mutates in-place + returns reference)
- */
-export function applyDiffusionStep(opts: {
-  logits: Float32Array;
+/** Gumbel(0,1) noise — `−log(−log(U))` with U ~ Uniform(0,1). */
+function gumbelNoise(rng: () => number): number {
+  // clamp to avoid log(0)
+  const u = Math.max(rng(), 1e-12);
+  return -Math.log(-Math.log(u));
+}
+
+export interface ApplyDiffusionStepInput {
+  /** Conditional logits slice for the target region: layout `[8, T_target, V]` flat. */
+  condLogits: Float32Array;
+  /** Unconditional logits slice: same layout. */
+  uncondLogits: Float32Array;
+  /** Current audio_codes for the target: `[8, T_target]` flat (cb-major). */
   audioCodes: Int32Array;
   nCodebooks: number;
   numFrames: number;
   vocabSize: number;
   maskTokenId: number;
-  targetMaskedAfterStep: number;
-  temperature: number;
-  topP: number;
+  /** How many positions to UNMASK in this step. */
+  unmaskCount: number;
+  guidanceScale: number;
+  layerPenaltyFactor: number;
+  positionTemperature: number;
+  classTemperature: number;
   rng: () => number;
-}): { audioCodes: Int32Array; remainingMasked: number } {
-  const {
-    logits, audioCodes, nCodebooks, numFrames, vocabSize, maskTokenId,
-    targetMaskedAfterStep, temperature, topP, rng,
-  } = opts;
-
-  // For each currently masked position, sample a candidate + record confidence
-  type Candidate = { cb: number; t: number; tokenId: number; confidence: number };
-  const candidates: Candidate[] = [];
-
-  for (let cb = 0; cb < nCodebooks; cb++) {
-    for (let t = 0; t < numFrames; t++) {
-      const idx = cb * numFrames + t;
-      if (audioCodes[idx] !== maskTokenId) continue;
-
-      const offset = (cb * numFrames + t) * vocabSize;
-      const slice = logits.subarray(offset, offset + vocabSize);
-
-      const tokenId = sampleFromLogits(slice, temperature, topP, rng);
-
-      // Confidence = softmax prob of sampled token (recompute, cheap)
-      let maxL = -Infinity;
-      for (let i = 0; i < vocabSize; i++) if (slice[i] > maxL) maxL = slice[i];
-      let denom = 0;
-      for (let i = 0; i < vocabSize; i++) denom += Math.exp(slice[i] - maxL);
-      const conf = Math.exp(slice[tokenId] - maxL) / Math.max(denom, 1e-9);
-
-      candidates.push({ cb, t, tokenId, confidence: conf });
-    }
-  }
-
-  // Sort by confidence desc — fill the most confident positions first
-  candidates.sort((a, b) => b.confidence - a.confidence);
-
-  const totalMasked = candidates.length;
-  const toUnmask = Math.max(0, totalMasked - targetMaskedAfterStep);
-
-  for (let i = 0; i < toUnmask; i++) {
-    const c = candidates[i];
-    audioCodes[c.cb * numFrames + c.t] = c.tokenId;
-  }
-
-  return { audioCodes, remainingMasked: totalMasked - toUnmask };
 }
 
 /**
- * Compute the target number of masked positions remaining at each step.
- * Returns an array of length `numSteps + 1` where index 0 = full mask
- * and last index = 0 masked.
+ * Apply ONE diffusion step in-place. Returns the modified `audioCodes`.
  */
-export function buildMaskSchedule(
-  totalPositions: number,
-  numSteps: number,
-  tShift: number = 1.0,
-): number[] {
-  const schedule: number[] = [];
-  for (let step = 0; step <= numSteps; step++) {
-    const t = step / numSteps;
-    const ratio = maskScheduleCosine(t, tShift);
-    schedule.push(Math.round(totalPositions * ratio));
-  }
-  // Force last step to fully unmask
-  schedule[schedule.length - 1] = 0;
-  return schedule;
-}
+export function applyDiffusionStep(input: ApplyDiffusionStepInput): Int32Array {
+  const {
+    condLogits,
+    uncondLogits,
+    audioCodes,
+    nCodebooks,
+    numFrames,
+    vocabSize,
+    maskTokenId,
+    unmaskCount,
+    guidanceScale,
+    layerPenaltyFactor,
+    positionTemperature,
+    classTemperature,
+    rng,
+  } = input;
 
-export { makeRng };
+  if (unmaskCount <= 0) return audioCodes;
+
+  // For each masked position: compute predicted token + scoring confidence.
+  type Cand = { idx: number; cb: number; tokenId: number; score: number };
+  const cands: Cand[] = [];
+
+  for (let cb = 0; cb < nCodebooks; cb++) {
+    for (let t = 0; t < numFrames; t++) {
+      const flatIdx = cb * numFrames + t;
+      if (audioCodes[flatIdx] !== maskTokenId) continue;
+
+      const offset = (cb * numFrames + t) * vocabSize;
+      const cSlice = condLogits.subarray(offset, offset + vocabSize);
+      const uSlice = uncondLogits.subarray(offset, offset + vocabSize);
+
+      // Build CFG-combined log_probs.
+      let logProbs: Float32Array;
+      if (guidanceScale !== 0) {
+        const cLog = logSoftmax(cSlice);
+        const uLog = logSoftmax(uSlice);
+        const combined = new Float32Array(vocabSize);
+        for (let v = 0; v < vocabSize; v++) {
+          combined[v] = cLog[v] + guidanceScale * (cLog[v] - uLog[v]);
+        }
+        logProbs = logSoftmax(combined);
+      } else {
+        logProbs = logSoftmax(cSlice);
+      }
+
+      // Suppress mask token — model must never re-emit it.
+      logProbs[maskTokenId] = -Infinity;
+
+      // Pick predicted token: argmax, or Gumbel sample if class_temperature > 0.
+      let predToken = 0;
+      let predLogProb = -Infinity;
+      if (classTemperature > 0.0) {
+        // Gumbel-max trick: argmax(log_p + temp * G) where G ~ Gumbel
+        let bestScore = -Infinity;
+        for (let v = 0; v < vocabSize; v++) {
+          const lp = logProbs[v];
+          if (!isFinite(lp)) continue;
+          const noisy = lp + classTemperature * gumbelNoise(rng);
+          if (noisy > bestScore) {
+            bestScore = noisy;
+            predToken = v;
+          }
+        }
+        predLogProb = logProbs[predToken];
+      } else {
+        for (let v = 0; v < vocabSize; v++) {
+          const lp = logProbs[v];
+          if (lp > predLogProb) {
+            predLogProb = lp;
+            predToken = v;
+          }
+        }
+      }
+
+      // Confidence score with layer penalty + position Gumbel.
+      let score = predLogProb - cb * layerPenaltyFactor;
+      if (positionTemperature > 0.0) score += positionTemperature * gumbelNoise(rng);
+
+      cands.push({ idx: flatIdx, cb, tokenId: predToken, score });
+    }
+  }
+
+  if (cands.length === 0) return audioCodes;
+
+  // Pick top-k by score (descending).
+  cands.sort((a, b) => b.score - a.score);
+  const k = Math.min(unmaskCount, cands.length);
+  for (let i = 0; i < k; i++) {
+    audioCodes[cands[i].idx] = cands[i].tokenId;
+  }
+  return audioCodes;
+}

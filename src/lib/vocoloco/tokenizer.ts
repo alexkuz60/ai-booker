@@ -1,83 +1,94 @@
 /**
- * VocoLoco — Qwen3 BPE tokenizer wrapper.
+ * VocoLoco — OmniVoice tokenizer wrapper (k2-fsa/OmniVoice).
  *
- * Uses @huggingface/transformers (Xenova) which lazy-loads the tokenizer
- * config + merges + vocab JSON files from the HuggingFace CDN on first use,
- * then caches them in IndexedDB via the `transformers.js` cache layer.
+ * The OmniVoice LLM expects audio-codebook-shaped input_ids `[B, 8, L]`.
+ * Text tokens are produced by a Qwen3 BPE tokenizer that has been EXTENDED
+ * with 7 OmniVoice-specific control tokens (<|text_start|>, <|denoise|>,
+ * <|lang_start|>, …) — these are added on top of the 151643-token Qwen3
+ * vocab and share the same Qwen2Tokenizer class.
  *
- * The OmniVoice LLM (gluschenko/omnivoice-onnx) wraps Qwen3-0.6B which uses
- * the Qwen2Tokenizer BPE — `Qwen/Qwen3-0.6B` repo provides the same files.
+ * IMPORTANT: We use `k2-fsa/OmniVoice` as the canonical source instead of
+ * the stock `Qwen/Qwen3-0.6B` — the latter does not contain the OmniVoice
+ * extra tokens, so the model would never see them and the diffusion loop
+ * would degenerate to noise.
  *
- * Public API is intentionally tiny: encode(text) → BigInt64Array.
- * Model loading is async and idempotent — first call warms the cache.
- *
- * NOTE: We deliberately keep the tokenizer on the main thread (not in the
- * worker). Tokenization is fast (<5 ms per phrase) and putting BPE inside
- * the worker would force every text to round-trip through postMessage.
+ * Tokenization is fast (<5 ms per phrase) and stays on the main thread —
+ * no need to round-trip through the worker.
  */
 import { AutoTokenizer, env, type PreTrainedTokenizer } from "@huggingface/transformers";
+import { OMNIVOICE_SPECIAL_TOKENS, type SpecialTokenName } from "./specialTokens";
 
-// Allow remote model fetches (transformers.js disables them by default in some setups)
 env.allowRemoteModels = true;
 env.allowLocalModels = false;
 
 /**
- * Qwen3-0.6B tokenizer repo — using the `onnx-community` mirror because
- * the official `Qwen/Qwen3-0.6B` repo is missing `special_tokens_map.json`
- * which makes transformers.js v4 throw "i is undefined" during init.
- *
- * Both repos share the same `Qwen2Tokenizer` class, vocab.json and merges.txt
- * (151 936 token BPE), so token IDs are identical — fully compatible with the
- * OmniVoice LLM (gluschenko/omnivoice-onnx) which wraps Qwen3-0.6B.
- *
- * If a future OmniVoice revision switches the backbone (e.g. Qwen3.5),
- * bump this constant — pipeline contract test will surface vocab mismatch.
+ * k2-fsa/OmniVoice repo — the canonical OmniVoice tokenizer with the
+ * extended special tokens. Same Qwen2Tokenizer BPE class as Qwen3-0.6B.
  */
-const QWEN3_TOKENIZER_REPO = "onnx-community/Qwen3-0.6B-ONNX";
+const OMNIVOICE_TOKENIZER_REPO = "k2-fsa/OmniVoice";
 
 let tokenizerPromise: Promise<PreTrainedTokenizer> | null = null;
 
 /**
- * Lazy-load the Qwen3 tokenizer. Subsequent calls return the cached instance.
- * Throws on network/CDN failure — caller decides whether to retry or fall back.
+ * Lazy-load the OmniVoice tokenizer. Subsequent calls return the cached
+ * instance. Throws on network/CDN failure — caller decides retry policy.
  */
-export function getQwen3Tokenizer(): Promise<PreTrainedTokenizer> {
+export function getOmniVoiceTokenizer(): Promise<PreTrainedTokenizer> {
   if (!tokenizerPromise) {
-    tokenizerPromise = AutoTokenizer.from_pretrained(QWEN3_TOKENIZER_REPO).catch((err) => {
-      // Reset so the next caller can retry instead of getting a stuck rejection
+    tokenizerPromise = AutoTokenizer.from_pretrained(OMNIVOICE_TOKENIZER_REPO).catch((err) => {
       tokenizerPromise = null;
-      throw new Error(`[VocoLoco] Failed to load Qwen3 tokenizer: ${err?.message ?? err}`);
+      throw new Error(`[VocoLoco] Failed to load OmniVoice tokenizer: ${err?.message ?? err}`);
     });
   }
   return tokenizerPromise;
 }
 
 /**
- * Tokenize a text string into the BigInt64Array tensor data expected by
- * the OmniVoice LLM `input_ids` input.
+ * Tokenize a wrapped prompt string into a flat number[] of token ids.
+ * The input string MUST already include the OmniVoice control tokens
+ * (built by `buildOmniVoicePrompt`).
  *
- * @param text Input string (any language Qwen3 supports — RU/EN/ZH/etc.)
- * @returns BigInt64 array of token ids ready for ort.Tensor("int64", ..., [1, N])
+ * `add_special_tokens: false` — we never want extra BOS/EOS confusing
+ * the LLM's audio codebook stream.
  */
-export async function tokenizeForVocoLoco(text: string): Promise<BigInt64Array> {
+export async function tokenizeOmniVoiceText(text: string): Promise<number[]> {
   if (typeof text !== "string") throw new Error("[VocoLoco] tokenize: text must be a string");
-  const tok = await getQwen3Tokenizer();
-  // `add_special_tokens: false` — OmniVoice prepends its own audio control
-  // tokens at the LLM stage, we don't want extra BOS/EOS confusing the codebook stream.
+  const tok = await getOmniVoiceTokenizer();
   const encoded = await tok(text, { add_special_tokens: false });
-  // transformers.js returns a Tensor with `.data` as BigInt64Array for int64 dtype
   const data = encoded.input_ids?.data;
   if (!(data instanceof BigInt64Array)) {
     throw new Error(`[VocoLoco] Unexpected tokenizer output type: ${data?.constructor?.name ?? typeof data}`);
   }
-  return data;
+  // Return as plain number[] — values fit in 32-bit easily (max ~152000).
+  const out: number[] = new Array(data.length);
+  for (let i = 0; i < data.length; i++) out[i] = Number(data[i]);
+  return out;
+}
+
+/**
+ * Resolve a special-token id from the live tokenizer (slow path) and fall
+ * back to the hardcoded constants when the tokenizer reports unknown — the
+ * constants were verified on 2026-04-19 against the upstream tokenizer.json.
+ */
+export async function resolveSpecialTokenId(name: SpecialTokenName): Promise<number> {
+  const tok = await getOmniVoiceTokenizer();
+  // transformers.js exposes `model.tokens_to_ids` for added_tokens lookup.
+  const literal = `<|${name}|>`;
+  const ids = (tok as any)?.model?.tokens_to_ids?.get?.(literal);
+  if (typeof ids === "number") return ids;
+  // Fallback: encoded with add_special_tokens:false should yield exactly 1 token
+  const encoded = await tok(literal, { add_special_tokens: false });
+  const arr = encoded.input_ids?.data as BigInt64Array | undefined;
+  if (arr && arr.length === 1) return Number(arr[0]);
+  // Last resort — hardcoded fallback
+  return OMNIVOICE_SPECIAL_TOKENS[name];
 }
 
 /**
  * Cheap helper for diagnostics — returns the human-readable token strings.
  */
 export async function previewTokens(text: string): Promise<string[]> {
-  const tok = await getQwen3Tokenizer();
+  const tok = await getOmniVoiceTokenizer();
   return tok.tokenize(text);
 }
 
@@ -88,5 +99,5 @@ export function resetVocoLocoTokenizer(): void {
   tokenizerPromise = null;
 }
 
-/** Repo identifier (exposed for diagnostics + future versioning UI) */
-export const VOCOLOCO_TOKENIZER_REPO = QWEN3_TOKENIZER_REPO;
+/** Repo identifier (exposed for diagnostics + future versioning UI). */
+export const VOCOLOCO_TOKENIZER_REPO = OMNIVOICE_TOKENIZER_REPO;
