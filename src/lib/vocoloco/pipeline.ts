@@ -379,7 +379,7 @@ async function runDiffusionLoop(opts: {
           for (let i = 0; i < attentionMask.length; i++) i64[i] = BigInt(attentionMask[i]);
           return i64.buffer;
         })(),
-        dims: [2, 1, Lmax, Lmax],
+        dims: [2, Lmax],
         dtype: "int64",
       },
       {
