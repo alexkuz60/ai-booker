@@ -94,19 +94,30 @@ self.onmessage = async (e: MessageEvent) => {
       case "createSession": {
         const { modelId, buffer, externalData, executionProviders, graphOpt, expectedInputs, expectedOutputs } = payload;
 
-        // If WebGPU is in the EP list, ensure adapter has raised storage-buffer limit
-        // BEFORE ORT-Web creates its own default device.
-        if (Array.isArray(executionProviders) && (executionProviders as string[]).includes("webgpu")) {
-          await prepareWebGpuAdapter();
+        // Effective EP list — may be downgraded to ["wasm"] if WebGPU adapter
+        // can't satisfy the storage-buffer limit needed by the LLM Concat kernels.
+        let effectiveEPs: string[] = Array.isArray(executionProviders)
+          ? [...(executionProviders as string[])]
+          : ["wasm"];
+        let backendDowngradeReason: string | undefined;
+
+        if (effectiveEPs.includes("webgpu")) {
+          const info = await prepareWebGpuAdapter();
+          const isLlm = typeof modelId === "string" && modelId.includes("llm");
+          if (isLlm && (!info || info.adapterMax < LLM_MIN_STORAGE_BUFFERS)) {
+            backendDowngradeReason =
+              `WebGPU adapter supports only ${info?.adapterMax ?? 0} storage buffers/stage ` +
+              `(LLM needs ≥${LLM_MIN_STORAGE_BUFFERS}); using WASM for "${modelId}".`;
+            console.warn(`[VocoLoco worker] ${backendDowngradeReason}`);
+            effectiveEPs = ["wasm"];
+          }
         }
 
         // ONNX models with external data (e.g. Qwen3-based LLM where the .onnx
         // is just the graph) require the companion `.onnx_data` to be mounted
         // into ORT-Web's virtual FS via the `externalData` session option.
-        // Without it ORT throws: "Failed to load external data file ... 
-        // Module.MountedFiles is not available."
         const sessionOptions: ort.InferenceSession.SessionOptions = {
-          executionProviders: executionProviders as string[],
+          executionProviders: effectiveEPs,
           graphOptimizationLevel: graphOpt ?? "all",
         };
         if (Array.isArray(externalData) && externalData.length > 0) {
