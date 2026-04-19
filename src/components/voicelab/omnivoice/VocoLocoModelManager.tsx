@@ -122,10 +122,12 @@ function ModelRow({
 export function VocoLocoModelManager({
   isRu, statuses, llmModelId, onLlmModelChange,
   downloading, downloadProgress, onDownload, onDelete, onCancel,
+  whisperSize, onWhisperSizeChange,
   whisperCached, whisperDownloading, whisperProgress,
   onWhisperDownload, onWhisperDelete,
 }: Props) {
   const anyDownloading = downloading !== null;
+  const whisperVariant = WHISPER_VARIANTS[whisperSize];
 
   return (
     <Card className="border-primary/30">
