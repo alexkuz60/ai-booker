@@ -5,7 +5,7 @@
  * worker lifecycle. Calling `terminateVocoLocoWorker()` is the ONLY
  * reliable way to release VRAM in browsers (Firefox especially).
  */
-import { readVocoLocoModel } from "./modelCache";
+import { readVocoLocoModel, readVocoLocoExternalData } from "./modelCache";
 import { findVocoLocoModel, VOCOLOCO_IO_CONTRACT } from "./modelRegistry";
 
 export type VocoLocoBackend = "webgpu" | "wasm";
