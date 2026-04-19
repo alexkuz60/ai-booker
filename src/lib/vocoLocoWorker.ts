@@ -223,9 +223,12 @@ self.onmessage = async (e: MessageEvent) => {
 
         let results: ort.InferenceSession.ReturnType;
         try {
+          if (modelId.includes("llm")) {
+            console.log(`[VocoLoco worker] run("${modelId}") feeds:`, JSON.stringify(feedDiag));
+          }
           results = await session.run(feeds);
         } catch (runErr: any) {
-          console.error(`[VocoLoco worker] run("${modelId}") failed. Feeds sent:`, feedDiag);
+          console.error(`[VocoLoco worker] run("${modelId}") failed. Feeds sent:`, JSON.stringify(feedDiag));
           throw runErr;
         }
 
