@@ -217,6 +217,71 @@ export function VocoLocoModelManager({
             </div>
           </div>
         )}
+
+        {/* Whisper STT — auxiliary, manages its own browser cache */}
+        <div className="pt-2 border-t border-border/50 space-y-2">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {isRu ? "Распознавание речи (опционально)" : "Speech recognition (optional)"}
+          </Label>
+          <div className="flex items-center justify-between gap-2 rounded-md bg-muted/20 px-2 py-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono truncate">Whisper Base</span>
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 uppercase">stt</Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground truncate">
+                {isRu
+                  ? "Распознаёт текст с референсного аудио в браузере (Xenova/whisper-base)."
+                  : "Transcribes reference audio in-browser (Xenova/whisper-base)."}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {formatBytes(WHISPER_APPROX_BYTES)}
+              </span>
+              {whisperCached ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                  <Button
+                    size="sm" variant="ghost"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={onWhisperDelete}
+                    title={isRu ? "Удалить из кэша" : "Remove from cache"}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </>
+              ) : whisperDownloading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+              ) : (
+                <>
+                  <XCircle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                  <Button
+                    size="sm" variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={onWhisperDownload}
+                  >
+                    <Download className="w-3 h-3 mr-1" />
+                    {isRu ? "Скачать" : "Get"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          {whisperDownloading && whisperProgress && (
+            <div className="space-y-1">
+              <Progress
+                value={whisperProgress.fraction != null ? Math.round(whisperProgress.fraction * 100) : undefined}
+                className="h-1.5"
+              />
+              <div className="text-[10px] text-muted-foreground truncate">
+                {whisperProgress.file ?? whisperProgress.status}
+                {whisperProgress.bytesLoaded != null && whisperProgress.bytesTotal != null &&
+                  ` — ${formatBytes(whisperProgress.bytesLoaded)} / ${formatBytes(whisperProgress.bytesTotal)}`}
+              </div>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
