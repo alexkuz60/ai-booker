@@ -131,6 +131,23 @@ self.onmessage = async (e: MessageEvent) => {
         const inputNames = [...session.inputNames];
         const outputNames = [...session.outputNames];
 
+        // Diagnostic: log expected input dtypes so we can match feed dtypes
+        try {
+          const meta = (session as any).inputMetadata ?? (session as any).handler?.inputMetadata;
+          if (meta) {
+            const dtypeMap: Record<string, string> = {};
+            for (const name of inputNames) {
+              const m = meta[name] ?? meta.get?.(name);
+              if (m) dtypeMap[name] = m.type ?? m.dataType ?? JSON.stringify(m);
+            }
+            console.log(`[VocoLoco worker] "${modelId}" input dtypes:`, dtypeMap);
+          } else {
+            console.log(`[VocoLoco worker] "${modelId}" inputMetadata unavailable`);
+          }
+        } catch (e) {
+          console.warn(`[VocoLoco worker] inputMetadata probe failed:`, e);
+        }
+
         // Contract validation — fail-fast if upstream broke I/O
         const contractErrors: string[] = [];
         if (Array.isArray(expectedInputs)) {
