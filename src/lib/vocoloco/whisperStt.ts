@@ -27,7 +27,7 @@ env.allowRemoteModels = true;
 env.allowLocalModels = false;
 
 const WHISPER_MODEL_ID = "Xenova/whisper-base";
-export const WHISPER_APPROX_BYTES = 80 * 1024 * 1024; // ~80 MB across encoder/decoder
+export const WHISPER_APPROX_BYTES = 290 * 1024 * 1024; // ~290 MB FP32 (encoder+decoder)
 export const WHISPER_CACHE_EVENT = "booker-pro:vocoloco-whisper-cache-changed";
 
 export interface WhisperLoadProgress {
