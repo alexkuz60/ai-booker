@@ -152,6 +152,7 @@ export async function createVocoLocoSession(
       expectedInputs,
       expectedOutputs,
       minStorageBuffers,
+      verbose: isDebugEnabled(),
     },
     transferables,
   );
