@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { OmniVoiceRefPicker, type OmniVoicePickedRef } from "@/components/voicelab/OmniVoiceRefPicker";
 import { updateVcReferenceMeta } from "@/lib/vcReferenceCache";
-import { transcribeBlob, loadWhisper } from "@/lib/vocoloco/whisperStt";
+import { transcribeBlob, loadWhisper } from "@/lib/whisper/whisperStt";
 
 interface Props {
   isRu: boolean;

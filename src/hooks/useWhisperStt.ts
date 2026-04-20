@@ -17,7 +17,7 @@ import {
   clearWhisperCache,
   WHISPER_CACHE_EVENT,
   type WhisperLoadProgress,
-} from "@/lib/vocoloco/whisperStt";
+} from "@/lib/whisper/whisperStt";
 
 export function useWhisperStt() {
   const [cached, setCached] = useState(false);
