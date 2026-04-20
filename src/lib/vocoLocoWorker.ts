@@ -69,22 +69,34 @@ function prepareWebGpuAdapter(): Promise<{ adapterMax: number; deviceLimit: numb
       // Try to raise the device limit as high as the adapter allows (cap at 16
       // — that's enough for everything VocoLoco runs).
       const deviceLimit = Math.min(adapterMax, 16);
+      let device: any = null;
       try {
-        const device = await adapter.requestDevice({
+        device = await adapter.requestDevice({
           requiredLimits:
             deviceLimit > 8
               ? { maxStorageBuffersPerShaderStage: deviceLimit }
               : undefined,
         });
-        (ort.env.webgpu as any).adapter = adapter;
-        (ort.env.webgpu as any).device = device;
       } catch (devErr) {
-        console.warn("[VocoLoco worker] requestDevice with raised limits failed:", devErr);
-        (ort.env.webgpu as any).adapter = adapter;
+        console.warn("[VocoLoco worker] requestDevice with raised limits failed, falling back to default:", devErr);
+        try {
+          device = await adapter.requestDevice();
+        } catch (fallbackErr) {
+          console.error("[VocoLoco worker] requestDevice() default also failed:", fallbackErr);
+          return null;
+        }
       }
+      if (!device) return null;
+
+      // CRITICAL: only set `device`, never `adapter`. Setting adapter causes
+      // ORT to call `adapter.requestDevice()` again per-session → Chrome
+      // throws "adapter is consumed" because GPUAdapter can only mint one
+      // device. Setting only `device` makes ORT reuse our pre-created one.
+      (ort.env.webgpu as any).device = device;
+
       const adapterInfo = (adapter as any).info ?? {};
       console.log(
-        `[VocoLoco worker] WebGPU adapter ready — vendor="${adapterInfo.vendor ?? "?"}" ` +
+        `[VocoLoco worker] WebGPU device ready — vendor="${adapterInfo.vendor ?? "?"}" ` +
         `architecture="${adapterInfo.architecture ?? "?"}" ` +
         `maxStorageBuffersPerShaderStage adapter=${adapterMax} device=${deviceLimit}`,
       );
