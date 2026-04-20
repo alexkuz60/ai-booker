@@ -19,6 +19,25 @@ ort.env.wasm.numThreads = navigator.hardwareConcurrency
   : 2;
 
 /**
+ * Verbose ORT diagnostics — enabled when the host page passes
+ * `?vocoloco-debug=1`. Surfaces per-node EP assignment so we can see
+ * exactly which graph nodes fall back to CPU on WebGPU runs (the prime
+ * suspect for slow INT8 LLM forwards). Toggled per `createSession`.
+ */
+let verboseLogs = false;
+function applyVerboseLogging(enabled: boolean) {
+  if (!enabled || verboseLogs) return;
+  verboseLogs = true;
+  try {
+    (ort.env as any).logLevel = "verbose";
+    (ort.env as any).debug = true;
+    console.log("[VocoLoco worker] verbose ORT logging enabled");
+  } catch (e) {
+    console.warn("[VocoLoco worker] failed to enable verbose logging:", e);
+  }
+}
+
+/**
  * Pre-request a WebGPU adapter with raised `maxStorageBuffersPerShaderStage`.
  *
  * VocoLoco model bindings-per-stage budget (Concat / Reshape kernels):
