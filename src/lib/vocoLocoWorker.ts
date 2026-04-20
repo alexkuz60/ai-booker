@@ -136,7 +136,10 @@ self.onmessage = async (e: MessageEvent) => {
           // Caller-supplied per-model minimum storage buffers per shader stage.
           // Defaults to 14 (LLM worst-case) for safety if not provided.
           minStorageBuffers,
+          // Per-call verbose ORT logging — surface CPU fallback nodes.
+          verbose,
         } = payload;
+        applyVerboseLogging(verbose === true);
         const minBuffers: number = typeof minStorageBuffers === "number" ? minStorageBuffers : 14;
 
         // Effective EP list — may be downgraded to ["wasm"] if WebGPU adapter

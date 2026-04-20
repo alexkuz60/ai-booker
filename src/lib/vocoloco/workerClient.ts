@@ -74,6 +74,21 @@ export interface CreateSessionOptions {
   minStorageBuffers?: number;
 }
 
+/**
+ * Verbose ORT logging is enabled when the page URL contains
+ * `?vocoloco-debug=1` — surfaces per-node EP assignment so we can see
+ * which graph nodes fall back to CPU on WebGPU runs (root cause of slow
+ * INT8 LLM forward passes). One-shot: only the first session create
+ * actually flips the global ORT flag.
+ */
+function isDebugEnabled(): boolean {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("vocoloco-debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export interface CreateSessionResult {
   inputNames: string[];
   outputNames: string[];
