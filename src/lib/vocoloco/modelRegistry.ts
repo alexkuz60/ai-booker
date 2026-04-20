@@ -40,6 +40,11 @@ export interface VocoLocoModelEntry {
   quant?: "fp32" | "qint16" | "qint8" | "quint8" | "qdq-u8s8";
   /** Description for UI */
   description: string;
+  /**
+   * Performance hint for the UI — empirical, not authoritative.
+   * Used to recommend the right quant given the user's GPU.
+   */
+  perfHint?: "fastest-gpu" | "balanced" | "smallest" | "best-cpu";
 }
 
 /**
@@ -72,9 +77,45 @@ export const VOCOLOCO_DECODER: VocoLocoModelEntry = {
 
 /**
  * LLM — multiple quants, user-selectable in UI.
- * Default: INT8 per-channel (best balance of size/quality/compatibility).
+ *
+ * Performance ordering on WebGPU (empirical, ymmv):
+ *   FP32 ≫ QInt16 > QInt8 ≈ QDQ-u8s8
+ *
+ * Quantized ONNX-Runtime-Web models trigger many MatMulNBits / Dequantize-
+ * Linear ops that the JSEP backend partially executes on CPU, causing
+ * GPU↔CPU tensor copies every node. FP32 has none of these — every op
+ * stays on GPU. Cost: 2.45 GB VRAM and 4× longer download.
+ *
+ * Default kept as INT8 (smallest "works everywhere" option). Users with
+ * a discrete GPU + 6 GB VRAM should pick FP32 for ~10× speedup.
  */
 export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
+  {
+    id: "vocoloco-llm-fp32",
+    role: "llm",
+    quant: "fp32",
+    label: "OmniVoice LLM (FP32, fastest on GPU)",
+    url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.onnx",
+    sizeBytes: 1_416_504,
+    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.onnx_data",
+    externalDataSize: 2_450_309_184,
+    revision: "2026-04-19b",
+    description: "Unquantized — needs ≥6 GB VRAM, but 5-10× faster on WebGPU",
+    perfHint: "fastest-gpu",
+  },
+  {
+    id: "vocoloco-llm-qint16",
+    role: "llm",
+    quant: "qint16",
+    label: "OmniVoice LLM (QInt16)",
+    url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx",
+    sizeBytes: 3_951_863,
+    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx_data",
+    externalDataSize: 1_061_572_672,
+    revision: "2026-04-19b",
+    description: "Higher quality than INT8, ~2× faster on GPU than INT8",
+    perfHint: "balanced",
+  },
   {
     id: "vocoloco-llm-int8",
     role: "llm",
@@ -85,19 +126,8 @@ export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
     externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint8_per_channel.onnx_data",
     externalDataSize: 612_773_952,
     revision: "2026-04-19b",
-    description: "Default — Qwen3-0.6B backbone, balanced quality/size",
-  },
-  {
-    id: "vocoloco-llm-qint16",
-    role: "llm",
-    quant: "qint16",
-    label: "OmniVoice LLM (QInt16)",
-    url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx",
-    sizeBytes: 3_951_539,
-    externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.qint16_per_channel.onnx_data",
-    externalDataSize: 1_061_572_672,
-    revision: "2026-04-19b",
-    description: "Higher quality, +400 MB to OPFS and VRAM",
+    description: "Smallest — works everywhere, but slow on WebGPU INT8 path",
+    perfHint: "smallest",
   },
   {
     id: "vocoloco-llm-qdq",
@@ -105,11 +135,12 @@ export const VOCOLOCO_LLM_VARIANTS: VocoLocoModelEntry[] = [
     quant: "qdq-u8s8",
     label: "OmniVoice LLM (Static QDQ u8s8)",
     url: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.static_qdq_u8s8.onnx",
-    sizeBytes: 3_951_539,
+    sizeBytes: 3_970_237,
     externalDataUrl: "https://huggingface.co/gluschenko/omnivoice-onnx/resolve/main/onnx/omnivoice.static_qdq_u8s8.onnx_data",
     externalDataSize: 612_577_344,
     revision: "2026-04-19b",
-    description: "Best CPU/WASM performance — recommended if WebGPU unstable",
+    description: "Optimised for CPU/WASM — pick if WebGPU is unavailable",
+    perfHint: "best-cpu",
   },
 ];
 

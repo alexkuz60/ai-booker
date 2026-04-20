@@ -26,7 +26,15 @@ export interface VocoLocoConfig {
   framesPerSecond: number;
   /** LLM backbone identification (informational) */
   llmBackbone: string;
-  /** Default diffusion sampling steps (typical 16–32) */
+  /**
+   * Default diffusion sampling steps (typical 16–32).
+   *
+   * Set to 16 because LLM forward dominates the wall-clock budget — each
+   * step is one full Qwen3 forward over [2, 8, L]. On INT8/WebGPU we measure
+   * ~10 s/step, so 32 steps = ~5 minutes. 16 steps cuts it in half with
+   * acceptable quality for a "draft" preview. Higher-quality presets can
+   * raise this back to 24-32 explicitly.
+   */
   defaultDiffusionSteps: number;
 }
 
@@ -37,5 +45,5 @@ export const VOCOLOCO_CONFIG: VocoLocoConfig = {
   maskTokenId: 1024,
   framesPerSecond: 25, // 24000 / 960 hop_length
   llmBackbone: "qwen3-0.6b",
-  defaultDiffusionSteps: 24,
+  defaultDiffusionSteps: 16,
 };
