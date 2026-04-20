@@ -156,22 +156,40 @@ async function fetchToOPFS(
 
 export async function hasVocoLocoModel(modelId: string): Promise<boolean> {
   const dir = await getCacheDir();
-  if (!dir) return false;
+  if (!dir) {
+    console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): no cache dir`);
+    return false;
+  }
   const entry = VOCOLOCO_ALL_MODELS.find((m) => m.id === modelId);
-  if (!entry) return false;
+  if (!entry) {
+    console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): unknown id`);
+    return false;
+  }
   try {
     const handle = await dir.getFileHandle(graphFileName(entry));
     const file = await handle.getFile();
-    if (file.size === 0) return false;
+    if (file.size === 0) {
+      console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): graph "${graphFileName(entry)}" zero size`);
+      return false;
+    }
 
     const dataName = externalDataFileName(entry);
     if (dataName) {
-      const dh = await dir.getFileHandle(dataName);
-      const df = await dh.getFile();
-      if (df.size === 0) return false;
+      try {
+        const dh = await dir.getFileHandle(dataName);
+        const df = await dh.getFile();
+        if (df.size === 0) {
+          console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): data "${dataName}" zero size`);
+          return false;
+        }
+      } catch (e) {
+        console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): data "${dataName}" missing:`, e);
+        return false;
+      }
     }
     return true;
-  } catch {
+  } catch (e) {
+    console.warn(`[vocoloco/modelCache] hasVocoLocoModel(${modelId}): graph "${graphFileName(entry)}" missing:`, e);
     return false;
   }
 }
