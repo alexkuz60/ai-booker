@@ -286,6 +286,20 @@ export async function downloadVocoLocoModel(
       bytesLoaded: loadedAcc, bytesTotal: total,
       fraction: 1, phase: "writing",
     });
+
+    // Post-download integrity check — both files must be readable from OPFS.
+    // Catches: silent OPFS write failures, quota exhaustion, or registry
+    // updates where externalDataUrl was added after the user already cached
+    // the .onnx-only graph from a previous app version.
+    const verified = await hasVocoLocoModel(entry.id);
+    if (!verified) {
+      throw new Error(
+        `OPFS verification failed for "${entry.id}" after download` +
+        (dataName ? ` (expected ${graphFileName(entry)} + ${dataName})` : "") +
+        `. Check available disk space (need ${(total / 1e9).toFixed(1)} GB) and retry.`,
+      );
+    }
+
     notifyVocoLocoCacheChanged();
     onProgress?.({
       modelId: entry.id, label: entry.label,
