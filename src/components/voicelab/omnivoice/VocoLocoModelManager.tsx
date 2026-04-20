@@ -172,6 +172,11 @@ export function VocoLocoModelManager({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            {isRu
+              ? "FP32 — самый быстрый на WebGPU (нужно ≥6 ГБ VRAM). INT8 — самый компактный, но ~10× медленнее на GPU из-за квантизационных операторов."
+              : "FP32 is the fastest on WebGPU (≥6 GB VRAM). INT8 is the smallest but ~10× slower on GPU due to quantization ops."}
+          </p>
         </div>
 
         {VOCOLOCO_LLM_VARIANTS.map((v) => (
