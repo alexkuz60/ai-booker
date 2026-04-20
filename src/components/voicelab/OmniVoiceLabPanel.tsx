@@ -1,13 +1,17 @@
 /**
  * OmniVoiceLabPanel — composition root for the OmniVoice tab in VoiceLab.
  *
+ * Server-only OmniVoice (local GPU server via OpenAI-compatible HTTP API).
+ *
  * Wires together:
  *   • useOmniVoiceServer       — URL / dev-proxy / health check
  *   • useOmniVoiceSynthesis    — synthesize, play, download, reset
  *   • OmniVoiceRefPicker       — unified reference picker (Upload / OPFS / Collection)
  *
- * Sub-UI is split across `./omnivoice/*` to keep this file small and stable
- * when we add Advanced Generation parameters in a later pass.
+ * History: an in-browser ONNX engine ("VocoLoco") was prototyped here but
+ * archived to `.lovable/archive/vocoloco/` after WebGPU instability across
+ * Firefox/Chrome (per-version regressions, INT16 MatMulInteger unsupported,
+ * adapter consumed errors). Local server stack is the long-term path.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Wifi, WifiOff, Globe } from "lucide-react";
@@ -32,12 +36,7 @@ import { OmniVoiceCloningControls } from "./omnivoice/OmniVoiceCloningControls";
 import { OmniVoiceTextEditor } from "./omnivoice/OmniVoiceTextEditor";
 import { OmniVoiceResultCard } from "./omnivoice/OmniVoiceResultCard";
 import { OmniVoiceAdvancedParams as OmniVoiceAdvancedParamsPanel } from "./omnivoice/OmniVoiceAdvancedParams";
-import { VocoLocoEngineToggle, type OmniVoiceEngine } from "./omnivoice/VocoLocoEngineToggle";
-// VocoLocoModelManager moved to VoiceLab "Models" tab — kept import-less here.
-import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
-import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { VOCOLOCO_ALL_MODELS, VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
   resolveOmniVoiceAdvancedFromTags,
   ACCENTUATION_LABELS,
@@ -83,14 +82,6 @@ const DEFAULT_TAB_STATE: OmniVoiceTabState = {
 };
 
 export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
-  // ── Engine: server (HTTP) vs local (in-browser ONNX VocoLoco) ──
-  const { value: engine, update: setEngine } = useCloudSettings<OmniVoiceEngine>(
-    "omnivoice-engine", "server",
-  );
-  const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
-    "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
-  );
-
   // ── Persisted tab state (mode/preset/text/speed/ref selection + transcript) ──
   const { value: tabState, update: setTabState } = useCloudSettings<OmniVoiceTabState>(
     "omnivoice-tab-state", DEFAULT_TAB_STATE,
@@ -332,67 +323,27 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
     advanced,
   });
 
-  // ── Local-mode (VocoLoco ONNX) ──
-  const local = useVocoLocoLocal({ isRu, llmModelId });
-  const cachedLocalCount = VOCOLOCO_ALL_MODELS.filter((m) => local.statuses[m.id]).length;
-
-  // ── Whisper STT (auxiliary, browser-cached, used by both engines) ──
-  const whisper = useWhisperStt();
-
-  /** Engine-aware accessors so the result card / synth button stay one set of props. */
-  const isLocal = engine === "local";
-  const activeStage = isLocal
-    ? (local.stage === "done" || local.stage === "idle" || local.stage === "error"
-        ? local.stage
-        : "synthesizing") as "idle" | "synthesizing" | "done" | "error"
-    : synth.stage;
-  const activeBusy = isLocal ? local.busy : synth.busy;
-  const activeLatencyMs = isLocal ? local.latencyMs : synth.latencyMs;
-  const activeErrorMessage = isLocal ? local.errorMessage : synth.errorMessage;
-  const activeResultUrl = isLocal ? local.resultUrl : synth.resultUrl;
-  const activePlaying = isLocal ? local.playing : synth.playing;
-
-  const handleSynthesizeUnified = () => {
-    if (isLocal) {
-      // VocoLoco: only design + clone supported. "auto" falls back to design.
-      const localMode: "design" | "clone" = mode === "clone" ? "clone" : "design";
-      void local.synthesize({
-        mode: localMode,
-        text: synthText,
-        refAudioBlob,
-        speed,
-        advanced,
-      });
-    } else {
-      void synth.handleSynthesize();
-    }
-  };
-
-  const handleResetUnified = () => (isLocal ? local.reset() : synth.handleReset());
-  const handlePlayUnified = () => (isLocal ? local.play() : synth.handlePlay());
-  const handleDownloadUnified = () => (isLocal ? void local.download() : void synth.handleDownload());
-
   // ── Capture params snapshot of the latest successful run (for chip display) ──
   const [usedRun, setUsedRun] = useState<{
     params: OmniVoiceAdvancedParams;
     speed: number;
     source: string | null;
   } | null>(null);
-  const prevStageRef = useRef(activeStage);
+  const prevStageRef = useRef(synth.stage);
   useEffect(() => {
     const prev = prevStageRef.current;
-    if (prev !== "done" && activeStage === "done") {
+    if (prev !== "done" && synth.stage === "done") {
       setUsedRun({
         params: { ...advanced },
         speed,
         source: advancedHint ?? advancedSource,
       });
     }
-    if (activeStage === "idle" && !activeResultUrl) {
+    if (synth.stage === "idle" && !synth.resultUrl) {
       setUsedRun(null);
     }
-    prevStageRef.current = activeStage;
-  }, [activeStage, activeResultUrl, advanced, speed, advancedHint, advancedSource]);
+    prevStageRef.current = synth.stage;
+  }, [synth.stage, synth.resultUrl, advanced, speed, advancedHint, advancedSource]);
 
   return (
     <div className="space-y-4">
@@ -401,76 +352,46 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
         <div>
           <h3 className="text-lg font-semibold">OmniVoice — Zero-Shot TTS</h3>
           <p className="text-sm text-muted-foreground">
-            {isLocal
-              ? (isRu
-                  ? "Локальный браузерный движок (VocoLoco ONNX): 100% оффлайн, ~1.4 ГБ моделей, WebGPU"
-                  : "In-browser engine (VocoLoco ONNX): fully offline, ~1.4 GB models, WebGPU")
-              : (isRu
-                  ? "Локальный сервер: Voice Design, Voice Cloning, 600+ языков"
-                  : "Local server: Voice Design, Voice Cloning, 600+ languages")}
+            {isRu
+              ? "Локальный сервер: Voice Design, Voice Cloning, 600+ языков"
+              : "Local server: Voice Design, Voice Cloning, 600+ languages"}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <VocoLocoEngineToggle
-            isRu={isRu}
-            engine={engine}
-            onChange={setEngine}
-            cachedCount={cachedLocalCount}
-            totalCount={VOCOLOCO_ALL_MODELS.length}
-          />
-          {!isLocal && (
-            <div className="flex items-center gap-2">
-              <Badge variant={server.isLocalOrigin ? "secondary" : "outline"} className="gap-1 text-[10px]">
-                <Globe className="w-3 h-3" />
-                {server.isLocalOrigin ? "Local" : "Cloud Preview"}
-              </Badge>
-              {server.serverOnline === true && (
-                <Badge variant="default" className="gap-1">
-                  <Wifi className="w-3 h-3" />
-                  {isRu ? "Онлайн" : "Online"}
-                </Badge>
-              )}
-              {server.serverOnline === false && (
-                <Badge variant="destructive" className="gap-1">
-                  <WifiOff className="w-3 h-3" />
-                  {isRu ? "Оффлайн" : "Offline"}
-                </Badge>
-              )}
-              {server.serverOnline === null && server.checkingServer && (
-                <Badge variant="outline" className="gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  {isRu ? "Проверка..." : "Checking..."}
-                </Badge>
-              )}
-            </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={server.isLocalOrigin ? "secondary" : "outline"} className="gap-1 text-[10px]">
+            <Globe className="w-3 h-3" />
+            {server.isLocalOrigin ? "Local" : "Cloud Preview"}
+          </Badge>
+          {server.serverOnline === true && (
+            <Badge variant="default" className="gap-1">
+              <Wifi className="w-3 h-3" />
+              {isRu ? "Онлайн" : "Online"}
+            </Badge>
+          )}
+          {server.serverOnline === false && (
+            <Badge variant="destructive" className="gap-1">
+              <WifiOff className="w-3 h-3" />
+              {isRu ? "Оффлайн" : "Offline"}
+            </Badge>
+          )}
+          {server.serverOnline === null && server.checkingServer && (
+            <Badge variant="outline" className="gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {isRu ? "Проверка..." : "Checking..."}
+            </Badge>
           )}
         </div>
       </div>
 
-      {isLocal ? (
-        <Alert className="border-primary/30 bg-primary/5">
-          <AlertDescription className="text-xs flex items-center justify-between gap-3">
-            <span>
-              {isRu
-                ? `Модели VocoLoco: ${cachedLocalCount}/${VOCOLOCO_ALL_MODELS.length} в кэше. Загрузка и удаление — во вкладке «Модели».`
-                : `VocoLoco models: ${cachedLocalCount}/${VOCOLOCO_ALL_MODELS.length} cached. Download / delete from the “Models” tab.`}
-            </span>
-            <Badge variant="outline" className="shrink-0 text-[10px]">
-              LLM: {llmModelId.replace(/^vocoloco-llm-/, "")}
-            </Badge>
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <OmniVoiceServerCard
-          isRu={isRu}
-          serverUrl={server.serverUrl}
-          onChangeUrl={server.setServerUrl}
-          onCheck={server.checkServer}
-          checking={server.checkingServer}
-          usingLocalDevProxy={server.usingLocalDevProxy}
-          showPreviewWarning={server.showPreviewWarning}
-        />
-      )}
+      <OmniVoiceServerCard
+        isRu={isRu}
+        serverUrl={server.serverUrl}
+        onChangeUrl={server.setServerUrl}
+        onCheck={server.checkServer}
+        checking={server.checkingServer}
+        usingLocalDevProxy={server.usingLocalDevProxy}
+        showPreviewWarning={server.showPreviewWarning}
+      />
 
       {/* Mode + per-mode controls */}
       <Card>
@@ -502,7 +423,6 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
               refSource={refSource}
               onPicked={handleRefPicked}
               onTranscriptChange={handleTranscriptChange}
-              useLocalStt={isLocal}
             />
           )}
 
@@ -531,16 +451,6 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             <Slider value={[speed]} onValueChange={([v]) => setSpeed(v)} min={0.5} max={2.0} step={0.05} />
           </div>
 
-          {isLocal && mode === "auto" && (
-            <Alert>
-              <AlertDescription className="text-xs">
-                {isRu
-                  ? "В локальном движке режим Auto эквивалентен Voice Design (без референса)."
-                  : "In the local engine, Auto mode falls back to Voice Design (no reference)."}
-              </AlertDescription>
-            </Alert>
-          )}
-
           <OmniVoiceAdvancedParamsPanel
             isRu={isRu}
             open={advancedOpen}
@@ -554,34 +464,21 @@ export function OmniVoiceLabPanel({ isRu }: OmniVoiceLabPanelProps) {
             onUserPresetApply={handleUserPresetApply}
           />
 
-          {isLocal && local.busy && (
-            <p className="text-[11px] text-muted-foreground">
-              {isRu ? "Стадия" : "Stage"}: <span className="font-mono">{local.stage}</span>
-              {local.stageMessage ? ` — ${local.stageMessage}` : ""}
-              {" · "}
-              {(local.progressFraction * 100).toFixed(0)}%
-            </p>
-          )}
-
           <OmniVoiceResultCard
             isRu={isRu}
-            stage={activeStage}
-            busy={activeBusy}
-            canSynthesize={!!synthText.trim() && (
-              isLocal
-                ? (mode === "clone" ? local.cloneReady : local.designReady)
-                : true
-            )}
-            serverOnline={isLocal ? true : server.serverOnline}
-            latencyMs={activeLatencyMs}
-            errorMessage={activeErrorMessage}
-            resultUrl={activeResultUrl}
-            playing={activePlaying}
+            stage={synth.stage}
+            busy={synth.busy}
+            canSynthesize={!!synthText.trim()}
+            serverOnline={server.serverOnline}
+            latencyMs={synth.latencyMs}
+            errorMessage={synth.errorMessage}
+            resultUrl={synth.resultUrl}
+            playing={synth.playing}
             usedRun={usedRun}
-            onSynthesize={handleSynthesizeUnified}
-            onReset={handleResetUnified}
-            onPlay={handlePlayUnified}
-            onDownload={handleDownloadUnified}
+            onSynthesize={() => void synth.handleSynthesize()}
+            onReset={synth.handleReset}
+            onPlay={synth.handlePlay}
+            onDownload={() => void synth.handleDownload()}
           />
         </CardContent>
       </Card>

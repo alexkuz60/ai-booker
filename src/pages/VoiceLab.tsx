@@ -15,11 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, requestPersistence, checkPersistence, type ModelDownloadProgress } from "@/lib/vcModelCache";
-import { VocoLocoModelManager } from "@/components/voicelab/omnivoice/VocoLocoModelManager";
-import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
-import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
@@ -100,12 +96,9 @@ export default function VoiceLab() {
   const [pitchDlPct, setPitchDlPct] = useState(0);
   const [persisted, setPersisted] = useState<boolean | null>(null);
 
-  // ── VocoLoco (OmniVoice local) models + Whisper STT ──
-  const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
-    "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
-  );
-  const vocoLoco = useVocoLocoLocal({ isRu, llmModelId });
-  const whisper = useWhisperStt();
+  // (VocoLoco in-browser ONNX engine archived to .lovable/archive/vocoloco/ —
+  // server-only OmniVoice is the supported path. See archived useVocoLocoLocal
+  // for the original prototype.)
 
   // ── References ──
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
@@ -528,10 +521,6 @@ export default function VoiceLab() {
             onDownloadAll={handleDownloadModels}
             onDownloadPitch={handleDownloadPitch}
             onDeleteModel={handleDeletePitch}
-            vocoLoco={vocoLoco}
-            whisper={whisper}
-            llmModelId={llmModelId}
-            onLlmModelChange={setLlmModelId}
           />}
 
           {effectiveTab === "references" && <ReferencesPanel
@@ -593,7 +582,6 @@ function ModelsPanel({
   modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu,
   persisted, onRequestPersistence,
   onDownloadAll, onDownloadPitch, onDeleteModel,
-  vocoLoco, whisper, llmModelId, onLlmModelChange,
 }: {
   modelStatus: Record<string, boolean>;
   coreModelsReady: boolean;
@@ -607,10 +595,6 @@ function ModelsPanel({
   onDownloadAll: () => void;
   onDownloadPitch: (entry: any) => void;
   onDeleteModel: (id: string, label: string) => void;
-  vocoLoco: ReturnType<typeof useVocoLocoLocal>;
-  whisper: ReturnType<typeof useWhisperStt>;
-  llmModelId: string;
-  onLlmModelChange: (id: string) => void;
 }) {
   return (
     <div className="space-y-4 max-w-[1600px]">
@@ -813,32 +797,7 @@ function ModelsPanel({
         </Card>
       </div>
 
-      {/* ═══ Column 2 — OmniVoice (VocoLoco) ═══ */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <FlaskConical className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {isRu ? "ONNX модели для OmniVoice" : "ONNX models for OmniVoice"}
-          </h2>
-        </div>
-
-        <VocoLocoModelManager
-          isRu={isRu}
-          statuses={vocoLoco.statuses}
-          llmModelId={llmModelId}
-          onLlmModelChange={onLlmModelChange}
-          downloading={vocoLoco.downloading}
-          downloadProgress={vocoLoco.downloadProgress}
-          onDownload={vocoLoco.downloadModel}
-          onDelete={vocoLoco.deleteModel}
-          onCancel={vocoLoco.cancelDownload}
-          whisperCached={whisper.cached}
-          whisperDownloading={whisper.downloading}
-          whisperProgress={whisper.progress}
-          onWhisperDownload={() => void whisper.load()}
-          onWhisperDelete={() => void whisper.clear()}
-        />
-      </div>
+      {/* OmniVoice models column removed — server-only mode (see archived VocoLoco). */}
       </div>
     </div>
   );
