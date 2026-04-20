@@ -15,11 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { getModelStatus, VC_MODEL_REGISTRY, VC_PITCH_MODELS, VC_ENCODER_MODELS, downloadAllModels, downloadModel, deleteModel, VC_MODEL_CACHE_EVENT, requestPersistence, checkPersistence, type ModelDownloadProgress } from "@/lib/vcModelCache";
-import { VocoLocoModelManager } from "@/components/voicelab/omnivoice/VocoLocoModelManager";
-import { useVocoLocoLocal } from "@/hooks/useVocoLocoLocal";
-import { useWhisperStt } from "@/hooks/useWhisperStt";
 import { useCloudSettings } from "@/hooks/useCloudSettings";
-import { VOCOLOCO_LLM_DEFAULT_ID } from "@/lib/vocoloco/modelRegistry";
 import {
   listVcReferences, saveVcReference, deleteVcReference, hasVcReference, readVcReferenceBlob,
   type VcReferenceEntry,
@@ -100,12 +96,9 @@ export default function VoiceLab() {
   const [pitchDlPct, setPitchDlPct] = useState(0);
   const [persisted, setPersisted] = useState<boolean | null>(null);
 
-  // ── VocoLoco (OmniVoice local) models + Whisper STT ──
-  const { value: llmModelId, update: setLlmModelId } = useCloudSettings<string>(
-    "vocoloco-llm-model-id", VOCOLOCO_LLM_DEFAULT_ID,
-  );
-  const vocoLoco = useVocoLocoLocal({ isRu, llmModelId });
-  const whisper = useWhisperStt();
+  // (VocoLoco in-browser ONNX engine archived to .lovable/archive/vocoloco/ —
+  // server-only OmniVoice is the supported path. See archived useVocoLocoLocal
+  // for the original prototype.)
 
   // ── References ──
   const [localRefs, setLocalRefs] = useState<VcReferenceEntry[]>([]);
