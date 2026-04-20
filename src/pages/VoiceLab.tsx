@@ -582,7 +582,6 @@ function ModelsPanel({
   modelStatus, coreModelsReady, downloading, dlProgress, pitchBusy, pitchDlPct, isRu,
   persisted, onRequestPersistence,
   onDownloadAll, onDownloadPitch, onDeleteModel,
-  vocoLoco, whisper, llmModelId, onLlmModelChange,
 }: {
   modelStatus: Record<string, boolean>;
   coreModelsReady: boolean;
@@ -596,10 +595,6 @@ function ModelsPanel({
   onDownloadAll: () => void;
   onDownloadPitch: (entry: any) => void;
   onDeleteModel: (id: string, label: string) => void;
-  vocoLoco: ReturnType<typeof useVocoLocoLocal>;
-  whisper: ReturnType<typeof useWhisperStt>;
-  llmModelId: string;
-  onLlmModelChange: (id: string) => void;
 }) {
   return (
     <div className="space-y-4 max-w-[1600px]">
