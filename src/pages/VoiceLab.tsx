@@ -797,32 +797,7 @@ function ModelsPanel({
         </Card>
       </div>
 
-      {/* ═══ Column 2 — OmniVoice (VocoLoco) ═══ */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <FlaskConical className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {isRu ? "ONNX модели для OmniVoice" : "ONNX models for OmniVoice"}
-          </h2>
-        </div>
-
-        <VocoLocoModelManager
-          isRu={isRu}
-          statuses={vocoLoco.statuses}
-          llmModelId={llmModelId}
-          onLlmModelChange={onLlmModelChange}
-          downloading={vocoLoco.downloading}
-          downloadProgress={vocoLoco.downloadProgress}
-          onDownload={vocoLoco.downloadModel}
-          onDelete={vocoLoco.deleteModel}
-          onCancel={vocoLoco.cancelDownload}
-          whisperCached={whisper.cached}
-          whisperDownloading={whisper.downloading}
-          whisperProgress={whisper.progress}
-          onWhisperDownload={() => void whisper.load()}
-          onWhisperDelete={() => void whisper.clear()}
-        />
-      </div>
+      {/* OmniVoice models column removed — server-only mode (see archived VocoLoco). */}
       </div>
     </div>
   );
