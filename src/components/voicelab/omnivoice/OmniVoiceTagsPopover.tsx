@@ -26,30 +26,38 @@ export function OmniVoiceTagsPopover({ isRu, onInsert }: Props) {
           {isRu ? "Теги" : "Tags"}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-2 space-y-2">
+      <PopoverContent align="end" className="w-80 p-2 space-y-2 max-h-[480px] overflow-y-auto">
         <p className="text-[10px] text-muted-foreground px-1">
           {isRu ? "Клик — вставка в позицию курсора" : "Click to insert at cursor position"}
         </p>
-        {NON_VERBAL_TAG_GROUPS.map((group) => (
-          <div key={group.label_en} className="space-y-1">
-            <div className="text-[10px] font-medium text-muted-foreground px-1">
-              {isRu ? group.label_ru : group.label_en}
+        {NON_VERBAL_TAG_GROUPS.map((group) => {
+          const note = isRu ? group.note_ru : group.note_en;
+          return (
+            <div key={group.label_en} className="space-y-1">
+              <div className="text-[10px] font-medium text-muted-foreground px-1">
+                {isRu ? group.label_ru : group.label_en}
+              </div>
+              {note && (
+                <div className="text-[10px] text-muted-foreground/80 px-1 italic leading-tight">
+                  {note}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1">
+                {group.tags.map((tag) => (
+                  <Button
+                    key={tag}
+                    variant="secondary"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] font-mono"
+                    onClick={() => onInsert(tag)}
+                  >
+                    {tag}
+                  </Button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {group.tags.map((tag) => (
-                <Button
-                  key={tag}
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 px-2 text-[10px] font-mono"
-                  onClick={() => onInsert(tag)}
-                >
-                  {tag}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </PopoverContent>
     </Popover>
   );

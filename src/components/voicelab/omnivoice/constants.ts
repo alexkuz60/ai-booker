@@ -11,7 +11,19 @@ export const OPENAI_PRESETS = [
  * Full set of OmniVoice non-verbal control tags (https://github.com/k2-fsa/OmniVoice),
  * grouped by meaning for easy insertion from UI.
  */
-export const NON_VERBAL_TAG_GROUPS: { label_ru: string; label_en: string; tags: string[] }[] = [
+export const NON_VERBAL_TAG_GROUPS: { label_ru: string; label_en: string; tags: string[]; note_ru?: string; note_en?: string }[] = [
+  {
+    label_ru: "Пение (ModelsLab)", label_en: "Singing (ModelsLab)",
+    tags: ["[singing]"],
+    note_ru: "Только для модели ModelsLab/omnivoice-singing. Лучше всего работает на простых мелодиях (детские песни, напевы). Музыкальные инструменты не поддерживаются.",
+    note_en: "Only for ModelsLab/omnivoice-singing model. Best on simple melodies (nursery rhymes, chants). No instrumental backing.",
+  },
+  {
+    label_ru: "Тон (ModelsLab)", label_en: "Mood (ModelsLab)",
+    tags: ["[happy]", "[sad]", "[angry]", "[excited]", "[calm]", "[nervous]", "[whisper]"],
+    note_ru: "Только для модели ModelsLab/omnivoice-singing. Можно комбинировать с [singing], например: [singing] [sad] текст. Теги [calm] и [excited] выражены слабее.",
+    note_en: "Only for ModelsLab/omnivoice-singing model. Combinable with [singing], e.g. [singing] [sad] text. [calm] and [excited] are weaker.",
+  },
   {
     label_ru: "Эмоции", label_en: "Emotions",
     tags: ["[laughter]", "[sigh]", "[cry]", "[gasp]"],
