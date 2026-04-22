@@ -214,7 +214,7 @@ check_omnivoice_fork() {
   if [[ -z "$pip_show" ]]; then
     warn "omnivoice-server is not installed via pip (or not visible to current python)."
     warn "  Install the patched fork:"
-    warn "    pip install --force-reinstall git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+    warn "    pip install --force-reinstall $OMNI_FORK_INSTALL_URL"
     return 0
   fi
   if printf "%s\n" "$pip_show" | grep -Eiq "$OMNI_FORK_MARKER"; then
@@ -228,7 +228,7 @@ check_omnivoice_fork() {
   warn ""
   warn "Reinstall from our fork:"
   warn "  pip install --force-reinstall \\"
-  warn "    git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+  warn "    $OMNI_FORK_INSTALL_URL"
   warn ""
   warn "Workflow & PR template:"
   warn "  .lovable/memory/tech/audio/omnivoice-fork-workflow.md"

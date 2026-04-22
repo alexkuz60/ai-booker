@@ -6,6 +6,10 @@ type: feature
 
 # OmniVoice Server — Fork Workflow
 
+**Our fork:** https://github.com/alexkuz60/BookerLab_OmniVoice
+**Patch branch:** `booker-patches`
+**Upstream:** https://github.com/k2-fsa/omnivoice-server
+
 ## Why we have a fork
 
 The vanilla `omnivoice-server` package ships an `audio.py` whose
@@ -18,19 +22,19 @@ upstream issues open). We patched it locally by trial-and-error to:
 
 A plain `pip install -U omnivoice-server` silently overwrites this patch.
 To make the patch survive upgrades and be reproducible across machines we
-maintain a **fork on GitHub** and install from it.
+maintain the fork above and install from it.
 
-## One-time setup
+## One-time setup (already done — for reference / new machines)
 
-1. Fork `k2-fsa/omnivoice-server` on GitHub → `<your-user>/omnivoice-server`.
+1. Fork created: `alexkuz60/BookerLab_OmniVoice`.
 2. Clone locally:
    ```bash
-   git clone https://github.com/<your-user>/omnivoice-server.git
-   cd omnivoice-server
+   git clone https://github.com/alexkuz60/BookerLab_OmniVoice.git
+   cd BookerLab_OmniVoice
    git remote add upstream https://github.com/k2-fsa/omnivoice-server.git
    git fetch upstream
    ```
-3. Create a long-lived branch for our patches:
+3. Long-lived patch branch:
    ```bash
    git checkout -b booker-patches upstream/main
    ```
@@ -52,7 +56,7 @@ maintain a **fork on GitHub** and install from it.
 
 ```bash
 pip install --force-reinstall \
-  "git+https://github.com/<your-user>/omnivoice-server.git@booker-patches"
+  "git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches"
 ```
 
 `scripts/dev-omnivoice.sh` checks at startup whether the installed package
@@ -62,7 +66,7 @@ accidental `pip install -U omnivoice-server`).
 ## Periodic upstream sync (every ~2 weeks or when upstream releases)
 
 ```bash
-cd omnivoice-server
+cd BookerLab_OmniVoice
 git fetch upstream
 git checkout booker-patches
 git rebase upstream/main
@@ -76,20 +80,20 @@ back to vanilla:
 
 ```bash
 pip install --force-reinstall omnivoice-server
-# then delete the fork or archive the booker-patches branch
+# then archive the booker-patches branch
 ```
 
 ## Update checklist (when bumping the patched version)
 
 - [ ] `git fetch upstream && git rebase upstream/main` clean
-- [ ] `pip install --force-reinstall git+...@booker-patches`
+- [ ] `pip install --force-reinstall git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches`
 - [ ] `omnivoice-server --device cuda` starts
-- [ ] `scripts/dev-omnivoice.sh` reports fork install + all required probes pass
+- [ ] `scripts/dev-omnivoice.sh` reports "patched fork detected ✓" + all required probes pass
 - [ ] Voice Cloning round-trip in VoiceLab produces a playable WAV (no clicks/silence)
 - [ ] If upstream merged the fix → uninstall fork, document removal here
 
 ## Files involved on our side
 
-- `scripts/dev-omnivoice.sh` — install-source check + warning
+- `scripts/dev-omnivoice.sh` — install-source check + warning (uses `OMNI_FORK_MARKER` / `OMNI_FORK_INSTALL_URL`)
 - `.lovable/memory/tech/audio/omnivoice-audio-py-pr-template.md` — PR description
 - `.lovable/memory/tech/audio/omnivoice-fork-workflow.md` — this file
