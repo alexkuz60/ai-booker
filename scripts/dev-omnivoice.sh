@@ -39,9 +39,10 @@ PROD_URL="https://booker-studio.lovable.app"
 
 # Substring that must appear in `pip show omnivoice-server` output (Home-page
 # or Project-URLs) to confirm the *patched fork* is installed instead of the
-# vanilla PyPI build. Override via env if you fork under a different name.
-#   export OMNI_FORK_MARKER="github.com/your-user/omnivoice-server"
-OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/.*/omnivoice-server}"
+# vanilla PyPI build. Override via env if you ever move the fork.
+#   export OMNI_FORK_MARKER="github.com/other-user/other-repo"
+OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/alexkuz60/BookerLab_OmniVoice}"
+OMNI_FORK_INSTALL_URL="git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches"
 
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
@@ -213,7 +214,7 @@ check_omnivoice_fork() {
   if [[ -z "$pip_show" ]]; then
     warn "omnivoice-server is not installed via pip (or not visible to current python)."
     warn "  Install the patched fork:"
-    warn "    pip install --force-reinstall git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+    warn "    pip install --force-reinstall $OMNI_FORK_INSTALL_URL"
     return 0
   fi
   if printf "%s\n" "$pip_show" | grep -Eiq "$OMNI_FORK_MARKER"; then
@@ -227,7 +228,7 @@ check_omnivoice_fork() {
   warn ""
   warn "Reinstall from our fork:"
   warn "  pip install --force-reinstall \\"
-  warn "    git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+  warn "    $OMNI_FORK_INSTALL_URL"
   warn ""
   warn "Workflow & PR template:"
   warn "  .lovable/memory/tech/audio/omnivoice-fork-workflow.md"

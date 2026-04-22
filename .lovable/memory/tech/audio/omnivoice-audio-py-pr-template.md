@@ -6,7 +6,8 @@ type: reference
 
 # Upstream PR draft — `audio.py`: correct WAV encoding in `tensor_to_wav_bytes`
 
-> Copy/adapt this when opening the PR against `k2-fsa/omnivoice-server`.
+> Copy/adapt this when opening the PR against `k2-fsa/omnivoice-server`
+> from branch `booker-patches` of https://github.com/alexkuz60/BookerLab_OmniVoice.
 > Replace `<...>` placeholders before submitting.
 
 ---
