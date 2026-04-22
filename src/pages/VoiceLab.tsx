@@ -43,6 +43,7 @@ import { useProjectStorageContext } from "@/hooks/useProjectStorageContext";
 import { readCharacterIndex, saveCharacterIndex } from "@/lib/localCharacters";
 import { VoiceConversionTab } from "@/components/narrators/VoiceConversionTab";
 import { OmniVoiceLabPanel } from "@/components/voicelab/OmniVoiceLabPanel";
+import { OmniVoiceModelsColumn } from "@/components/voicelab/OmniVoiceModelsColumn";
 import { buildTtsRequestFromConfig } from "@/lib/buildTtsRequestFromConfig";
 import { PROVIDER_LABELS, getVoiceDisplayName } from "@/lib/voiceMatching";
 import type { CharacterIndex } from "@/pages/parser/types";
