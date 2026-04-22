@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
+  Music2,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +42,42 @@ interface ServerHealth {
   memory_rss_mb?: number;
   uptime_s?: number;
 }
+
+/**
+ * Known OmniVoice server-side checkpoints. The server loads exactly one at a
+ * time (chosen via `omnivoice-server --model <hf-id>`); we just *display* the
+ * catalog so the user can see what's available and which one is currently
+ * loaded (matched by `health.model_id`).
+ */
+interface OmniVoiceModelEntry {
+  id: string;
+  label_ru: string;
+  label_en: string;
+  desc_ru: string;
+  desc_en: string;
+  tags?: string[];
+  url: string;
+}
+
+const OMNIVOICE_CATALOG: OmniVoiceModelEntry[] = [
+  {
+    id: "k2-fsa/OmniVoice",
+    label_ru: "OmniVoice (база)",
+    label_en: "OmniVoice (base)",
+    desc_ru: "Базовый чекпоинт k2-fsa: Voice Design + Voice Cloning, 600+ языков, non-verbal теги ([laughter], [sigh] и т.д.).",
+    desc_en: "k2-fsa base checkpoint: Voice Design + Cloning, 600+ languages, non-verbal tags ([laughter], [sigh], …).",
+    url: "https://huggingface.co/k2-fsa/OmniVoice",
+  },
+  {
+    id: "ModelsLab/omnivoice-singing",
+    label_ru: "OmniVoice Singing (ModelsLab)",
+    label_en: "OmniVoice Singing (ModelsLab)",
+    desc_ru: "Finetune ModelsLab: добавляет [singing] + 7 эмоций ([happy]/[sad]/[angry]/[excited]/[calm]/[nervous]/[whisper]). Простые мелодии, без аккомпанемента.",
+    desc_en: "ModelsLab finetune: adds [singing] + 7 emotions ([happy]/[sad]/[angry]/[excited]/[calm]/[nervous]/[whisper]). Simple melodies only, no instrumental backing.",
+    tags: ["[singing]", "[happy]", "[sad]"],
+    url: "https://huggingface.co/ModelsLab/omnivoice-singing",
+  },
+];
 
 interface Props {
   isRu: boolean;
