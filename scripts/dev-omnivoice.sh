@@ -232,6 +232,8 @@ probe_omnivoice_api() {
   probe_endpoint "/v1/voices"                  optional get
   probe_endpoint "/v1/models"                  optional get
   probe_endpoint "/v1/audio/speech/clone"      optional post-only
+  # booker-gpu-server fork only — keep optional so vanilla omnivoice-server still passes.
+  probe_endpoint "/v1/health/extended"         optional get
 
   if [[ "$failed" -ne 0 ]]; then
     warn "One or more REQUIRED OmniVoice endpoints failed. See $PROBE_LOG and $OMNI_LOG"
