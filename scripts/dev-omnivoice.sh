@@ -79,15 +79,17 @@ ln -sfn "$SESSION_DIR" "$LOG_ROOT/latest"
 
 MODE_PROD=0
 DO_PULL=1
-for arg in "$@"; do
-  case "$arg" in
-    --prod)    MODE_PROD=1 ;;
-    --no-pull) DO_PULL=0 ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prod)    MODE_PROD=1; shift ;;
+    --no-pull) DO_PULL=0; shift ;;
+    --venv)    OMNIVOICE_VENV="${2:-}"; shift 2 ;;
+    --venv=*)  OMNIVOICE_VENV="${1#--venv=}"; shift ;;
     -h|--help)
-      sed -n '2,30p' "$0"
+      sed -n '2,40p' "$0"
       exit 0
       ;;
-    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
