@@ -25,6 +25,17 @@
 #   ./scripts/dev-omnivoice.sh --no-pull # skip git pull this run
 #
 # One Ctrl+C kills both background processes cleanly.
+#
+# History note (2026-04-22):
+#   We previously maintained a fork (alexkuz60/BookerLab_OmniVoice) to patch
+#   omnivoice/utils/audio.py (broken WAV encoding in tensor_to_wav_bytes).
+#   Upstream k2-fsa/OmniVoice fixed it in master, so the fork is no longer
+#   needed. We now install vanilla:
+#     pip install -U \
+#       "git+https://github.com/k2-fsa/OmniVoice.git" \
+#       "git+https://github.com/maemreyo/omnivoice-server.git@main"
+#   The startup check below greps the installed audio.py for `PCM_16` as a
+#   regression canary — if upstream ever reverts the fix we'll know on launch.
 # ==========================================================================
 
 set -euo pipefail
@@ -37,12 +48,9 @@ OMNI_BASE="http://$OMNI_HOST:$OMNI_PORT"
 VITE_PORT="8080"
 PROD_URL="https://booker-studio.lovable.app"
 
-# Substring that must appear in `pip show omnivoice-server` output (Home-page
-# or Project-URLs) to confirm the *patched fork* is installed instead of the
-# vanilla PyPI build. Override via env if you ever move the fork.
-#   export OMNI_FORK_MARKER="github.com/other-user/other-repo"
-OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/alexkuz60/BookerLab_OmniVoice}"
-OMNI_FORK_INSTALL_URL="git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches"
+# Upstream install URLs — used in warnings if the audio.py canary check fails.
+OMNI_LIB_INSTALL_URL="git+https://github.com/k2-fsa/OmniVoice.git"
+OMNI_SERVER_INSTALL_URL="git+https://github.com/maemreyo/omnivoice-server.git@main"
 
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
@@ -198,72 +206,37 @@ else
   log "Dependencies unchanged, skipping npm install."
 fi
 
-# -------- step 2b: verify patched fork is installed --------
-# We maintain a fork of omnivoice-server with a fix for audio.py
-# (tensor_to_wav_bytes WAV encoding). A plain `pip install -U omnivoice-server`
-# silently overwrites the patch — warn loudly so we don't lose hours debugging
-# silent/broken WAV output later.
-# See: .lovable/memory/tech/audio/omnivoice-fork-workflow.md
-check_omnivoice_fork() {
-  if ! command -v pip >/dev/null 2>&1; then
-    warn "pip not found, cannot verify omnivoice-server install source."
+# -------- step 2b: regression canary for omnivoice/utils/audio.py --------
+# Upstream k2-fsa/OmniVoice fixed the WAV-encoding bug in tensor_to_wav_bytes
+# (used `subtype="PCM_16"` via soundfile). If a future release ever reverts
+# that fix, /v1/audio/speech will silently produce broken WAVs. Catch it here.
+check_omnivoice_audio_canary() {
+  local audio_path
+  audio_path="$(python3 -c 'import omnivoice.utils.audio as a; print(a.__file__)' 2>/dev/null || true)"
+  if [[ -z "$audio_path" || ! -f "$audio_path" ]]; then
+    warn "Could not locate installed omnivoice/utils/audio.py."
+    warn "  Is omnivoice installed for the active python? Try:"
+    warn "    pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+    warn "    pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
     return 0
   fi
-  local pip_show
-  pip_show="$(pip show omnivoice-server 2>/dev/null || true)"
-  if [[ -z "$pip_show" ]]; then
-    warn "omnivoice-server is not installed via pip (or not visible to current python)."
-    warn "  Install the patched fork:"
-    warn "    pip install --force-reinstall $OMNI_FORK_INSTALL_URL"
-    return 0
-  fi
-  if printf "%s\n" "$pip_show" | grep -Eiq "$OMNI_FORK_MARKER"; then
-    log "omnivoice-server: patched fork detected ✓ (by pip metadata)"
-    # Belt-and-braces: even if the fork repo is installed, the actual
-    # audio.py inside the package might still be vanilla (e.g. patch was
-    # accidentally dropped during a rebase, or only committed at repo root
-    # instead of omnivoice/utils/). Inspect the installed file directly.
-    local audio_path
-    audio_path="$(python3 -c 'import omnivoice.utils.audio as a; print(a.__file__)' 2>/dev/null || true)"
-    if [[ -z "$audio_path" || ! -f "$audio_path" ]]; then
-      warn "  Could not locate installed omnivoice/utils/audio.py to verify patch contents."
-      warn "  (python3 -c 'import omnivoice.utils.audio' failed)"
-      return 0
-    fi
-    if grep -q 'PCM_16' "$audio_path"; then
-      log "omnivoice-server: audio.py patch verified ✓ (PCM_16 present in $audio_path)"
-      return 0
-    fi
-    warn "============================================================"
-    warn "omnivoice-server fork is installed BUT audio.py is NOT patched."
-    warn "  File: $audio_path"
-    warn "  Marker 'PCM_16' (subtype=\"PCM_16\") was not found."
-    warn ""
-    warn "Likely causes:"
-    warn "  - the patch was committed to repo root instead of omnivoice/utils/"
-    warn "  - a recent rebase against upstream dropped the fix"
-    warn ""
-    warn "Fix on the fork side, then reinstall:"
-    warn "  pip install --force-reinstall \\"
-    warn "    $OMNI_FORK_INSTALL_URL"
-    warn "============================================================"
+  if grep -q 'PCM_16' "$audio_path"; then
+    log "omnivoice audio.py canary OK ✓ (PCM_16 present in $audio_path)"
     return 0
   fi
   warn "============================================================"
-  warn "omnivoice-server appears to be the VANILLA PyPI build."
-  warn "The audio.py WAV-encoding patch is NOT applied → expect"
+  warn "omnivoice/utils/audio.py is missing the 'PCM_16' marker."
+  warn "  File: $audio_path"
+  warn ""
+  warn "Upstream may have regressed the WAV-encoding fix → expect"
   warn "silent / broken WAV output from /v1/audio/speech*."
   warn ""
-  warn "Reinstall from our fork:"
-  warn "  pip install --force-reinstall \\"
-  warn "    $OMNI_FORK_INSTALL_URL"
-  warn ""
-  warn "Workflow & PR template:"
-  warn "  .lovable/memory/tech/audio/omnivoice-fork-workflow.md"
-  warn "  .lovable/memory/tech/audio/omnivoice-audio-py-pr-template.md"
+  warn "Try reinstalling fresh upstream:"
+  warn "  pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+  warn "  pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
   warn "============================================================"
 }
-check_omnivoice_fork
+check_omnivoice_audio_canary
 
 # -------- step 3: start omnivoice-server --------
 if curl -fsS --max-time 1 "$OMNI_BASE/health" >/dev/null 2>&1; then
