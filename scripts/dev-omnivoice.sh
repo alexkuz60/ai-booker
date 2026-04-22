@@ -218,7 +218,35 @@ check_omnivoice_fork() {
     return 0
   fi
   if printf "%s\n" "$pip_show" | grep -Eiq "$OMNI_FORK_MARKER"; then
-    log "omnivoice-server: patched fork detected ✓"
+    log "omnivoice-server: patched fork detected ✓ (by pip metadata)"
+    # Belt-and-braces: even if the fork repo is installed, the actual
+    # audio.py inside the package might still be vanilla (e.g. patch was
+    # accidentally dropped during a rebase, or only committed at repo root
+    # instead of omnivoice/utils/). Inspect the installed file directly.
+    local audio_path
+    audio_path="$(python3 -c 'import omnivoice.utils.audio as a; print(a.__file__)' 2>/dev/null || true)"
+    if [[ -z "$audio_path" || ! -f "$audio_path" ]]; then
+      warn "  Could not locate installed omnivoice/utils/audio.py to verify patch contents."
+      warn "  (python3 -c 'import omnivoice.utils.audio' failed)"
+      return 0
+    fi
+    if grep -q 'PCM_16' "$audio_path"; then
+      log "omnivoice-server: audio.py patch verified ✓ (PCM_16 present in $audio_path)"
+      return 0
+    fi
+    warn "============================================================"
+    warn "omnivoice-server fork is installed BUT audio.py is NOT patched."
+    warn "  File: $audio_path"
+    warn "  Marker 'PCM_16' (subtype=\"PCM_16\") was not found."
+    warn ""
+    warn "Likely causes:"
+    warn "  - the patch was committed to repo root instead of omnivoice/utils/"
+    warn "  - a recent rebase against upstream dropped the fix"
+    warn ""
+    warn "Fix on the fork side, then reinstall:"
+    warn "  pip install --force-reinstall \\"
+    warn "    $OMNI_FORK_INSTALL_URL"
+    warn "============================================================"
     return 0
   fi
   warn "============================================================"
