@@ -798,7 +798,8 @@ function ModelsPanel({
         </Card>
       </div>
 
-      {/* OmniVoice models column removed — server-only mode (see archived VocoLoco). */}
+      {/* ═══ Column 2 — OmniVoice TTS (server) + Whisper STT (browser) ═══ */}
+      <OmniVoiceModelsColumn isRu={isRu} />
       </div>
     </div>
   );
