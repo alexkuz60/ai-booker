@@ -116,6 +116,45 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# -------- venv / interpreter resolution --------
+# We need to know WHICH python has omnivoice-server installed, otherwise:
+#   - the canary will grep the wrong (system) python for audio.py
+#   - `omnivoice-server` may not even be on PATH
+# Resolution order: --venv flag > $OMNIVOICE_VENV > ~/.venvs/omnivoice > PATH.
+OMNI_PY=""           # absolute path to python interpreter that owns omnivoice-server
+OMNI_BIN=""          # absolute path to the omnivoice-server entrypoint
+resolve_omnivoice_env() {
+  local candidate=""
+  if [[ -n "$OMNIVOICE_VENV" ]]; then
+    candidate="$OMNIVOICE_VENV"
+  elif [[ -d "$OMNIVOICE_VENV_DEFAULT" ]]; then
+    candidate="$OMNIVOICE_VENV_DEFAULT"
+  fi
+
+  if [[ -n "$candidate" ]]; then
+    if [[ -x "$candidate/bin/python" && -x "$candidate/bin/omnivoice-server" ]]; then
+      OMNI_PY="$candidate/bin/python"
+      OMNI_BIN="$candidate/bin/omnivoice-server"
+      log "Using venv: $candidate"
+      return 0
+    else
+      warn "Venv $candidate exists but is missing python or omnivoice-server."
+    fi
+  fi
+
+  # Fall back to whatever is on PATH.
+  if command -v omnivoice-server >/dev/null 2>&1; then
+    OMNI_BIN="$(command -v omnivoice-server)"
+    OMNI_PY="$(command -v python3 || command -v python || true)"
+    warn "No venv detected — using PATH: $OMNI_BIN (python: ${OMNI_PY:-?})"
+    warn "  If imports/canary fail, pass --venv ~/.venvs/omnivoice"
+    return 0
+  fi
+
+  die "omnivoice-server not found. Install with scripts/install-omnivoice.sh, then re-run."
+}
+resolve_omnivoice_env
+
 # Wait for a URL to return 2xx/3xx; on failure, dump tail of given log file.
 wait_for_url() {
   local url="$1"
