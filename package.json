@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "bash scripts/dev-omnivoice.sh",
+    "dev:full:prod": "bash scripts/dev-omnivoice.sh --prod",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
