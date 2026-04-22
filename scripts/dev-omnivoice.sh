@@ -265,10 +265,13 @@ fi
 check_omnivoice_audio_canary() {
   # The WAV fix lives in omnivoice_server/utils/audio.py (the *server* package),
   # not omnivoice/utils/audio.py. Try server first, fall back to library.
+  # IMPORTANT: probe with the SAME python that runs omnivoice-server, not
+  # whatever `python3` resolves to on PATH (usually the system one without
+  # the package).
   local audio_path="" source=""
   for mod in omnivoice_server.utils.audio omnivoice.utils.audio; do
     local p
-    p="$(python3 -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
+    p="$("$OMNI_PY" -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
     if [[ -n "$p" && -f "$p" ]]; then
       audio_path="$p"
       source="$mod"
@@ -276,10 +279,11 @@ check_omnivoice_audio_canary() {
     fi
   done
   if [[ -z "$audio_path" ]]; then
-    warn "Could not locate omnivoice_server.utils.audio (or omnivoice.utils.audio)."
-    warn "  Is omnivoice-server installed for the active python? Try:"
-    warn "    pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
-    warn "    pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
+    warn "Could not locate omnivoice_server.utils.audio (or omnivoice.utils.audio)"
+    warn "  using interpreter $OMNI_PY."
+    warn "  Reinstall in that env:"
+    warn "    $OMNI_PY -m pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+    warn "    $OMNI_PY -m pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
     return 0
   fi
   if grep -q 'PCM_16' "$audio_path"; then
@@ -292,22 +296,27 @@ check_omnivoice_audio_canary() {
   warn "Upstream may have regressed the WAV-encoding fix → expect"
   warn "silent / broken WAV output from /v1/audio/speech*."
   warn ""
-  warn "Try reinstalling fresh upstream:"
-  warn "  pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
-  warn "  pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
+  warn "Try reinstalling fresh upstream into $OMNI_PY:"
+  warn "  $OMNI_PY -m pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+  warn "  $OMNI_PY -m pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
   warn "============================================================"
 }
 check_omnivoice_audio_canary
 
 # -------- step 3: start omnivoice-server --------
+# Run the server from an isolated cwd ($OMNI_RUNTIME_DIR), NOT from the project
+# root. pydantic-settings auto-loads .env from cwd, and our project .env has
+# VITE_SUPABASE_* / SUPABASE_* keys that the server's strict Settings model
+# rejects with "Extra inputs are not permitted" → hard crash before /health
+# ever comes up.
 if curl -fsS --max-time 1 "$OMNI_BASE/health" >/dev/null 2>&1; then
   log "OmniVoice already running on :$OMNI_PORT, reusing."
 else
-  command -v omnivoice-server >/dev/null 2>&1 \
-    || die "omnivoice-server not found in PATH. Install: pip install omnivoice-server"
-  log "Starting omnivoice-server (cuda) → $OMNI_LOG"
+  mkdir -p "$OMNI_RUNTIME_DIR"
+  log "Starting omnivoice-server (cuda) from $OMNI_RUNTIME_DIR → $OMNI_LOG"
+  log "  binary: $OMNI_BIN"
   : > "$OMNI_LOG"
-  omnivoice-server --device cuda >>"$OMNI_LOG" 2>&1 &
+  ( cd "$OMNI_RUNTIME_DIR" && "$OMNI_BIN" --device cuda ) >>"$OMNI_LOG" 2>&1 &
   OMNI_PID=$!
   wait_for_url "$OMNI_BASE/health" "OmniVoice /health" 60 "$OMNI_LOG"
 fi
