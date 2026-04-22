@@ -20,11 +20,12 @@
 #                             so it can talk to http://127.0.0.1:8880
 #
 # Usage:
-#   ./scripts/dev-omnivoice.sh           # local dev (default)
-#   ./scripts/dev-omnivoice.sh --prod    # test against published booker-studio
-#   ./scripts/dev-omnivoice.sh --no-pull # skip git pull this run
-#
-# One Ctrl+C kills both background processes cleanly.
+#   ./scripts/dev-omnivoice.sh                       # local dev (default)
+#   ./scripts/dev-omnivoice.sh --prod                # test against published booker-studio
+#   ./scripts/dev-omnivoice.sh --no-pull             # skip git pull this run
+#   ./scripts/dev-omnivoice.sh --venv ~/.venvs/omni  # use a specific venv
+#                                                    # (auto-detects ~/.venvs/omnivoice
+#                                                    #  if --venv not given)
 #
 # History note (2026-04-22):
 #   We previously maintained a fork (alexkuz60/BookerLab_OmniVoice) to patch
@@ -52,6 +53,17 @@ PROD_URL="https://booker-studio.lovable.app"
 OMNI_LIB_INSTALL_URL="git+https://github.com/k2-fsa/OmniVoice.git"
 OMNI_SERVER_INSTALL_URL="git+https://github.com/maemreyo/omnivoice-server.git@main"
 
+# Where omnivoice-server is installed. We auto-detect a venv so we don't run it
+# under the system python (which doesn't have the package).
+#   Priority: --venv <path>  >  $OMNIVOICE_VENV  >  ~/.venvs/omnivoice  >  PATH
+OMNIVOICE_VENV_DEFAULT="$HOME/.venvs/omnivoice"
+OMNIVOICE_VENV="${OMNIVOICE_VENV:-}"
+
+# Isolated cwd for omnivoice-server. We MUST NOT start it from $PROJECT_ROOT,
+# because pydantic-settings auto-loads .env from cwd and chokes on our
+# VITE_SUPABASE_* / SUPABASE_* keys ("Extra inputs are not permitted").
+OMNI_RUNTIME_DIR="${OMNI_RUNTIME_DIR:-$HOME/omnivoice-runtime}"
+
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
 SESSION_ID="$(date +%Y%m%d-%H%M%S)"
@@ -68,15 +80,17 @@ ln -sfn "$SESSION_DIR" "$LOG_ROOT/latest"
 
 MODE_PROD=0
 DO_PULL=1
-for arg in "$@"; do
-  case "$arg" in
-    --prod)    MODE_PROD=1 ;;
-    --no-pull) DO_PULL=0 ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prod)    MODE_PROD=1; shift ;;
+    --no-pull) DO_PULL=0; shift ;;
+    --venv)    OMNIVOICE_VENV="${2:-}"; shift 2 ;;
+    --venv=*)  OMNIVOICE_VENV="${1#--venv=}"; shift ;;
     -h|--help)
-      sed -n '2,30p' "$0"
+      sed -n '2,40p' "$0"
       exit 0
       ;;
-    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -102,6 +116,45 @@ cleanup() {
   log "Bye. Session logs: $SESSION_DIR"
 }
 trap cleanup EXIT INT TERM
+
+# -------- venv / interpreter resolution --------
+# We need to know WHICH python has omnivoice-server installed, otherwise:
+#   - the canary will grep the wrong (system) python for audio.py
+#   - `omnivoice-server` may not even be on PATH
+# Resolution order: --venv flag > $OMNIVOICE_VENV > ~/.venvs/omnivoice > PATH.
+OMNI_PY=""           # absolute path to python interpreter that owns omnivoice-server
+OMNI_BIN=""          # absolute path to the omnivoice-server entrypoint
+resolve_omnivoice_env() {
+  local candidate=""
+  if [[ -n "$OMNIVOICE_VENV" ]]; then
+    candidate="$OMNIVOICE_VENV"
+  elif [[ -d "$OMNIVOICE_VENV_DEFAULT" ]]; then
+    candidate="$OMNIVOICE_VENV_DEFAULT"
+  fi
+
+  if [[ -n "$candidate" ]]; then
+    if [[ -x "$candidate/bin/python" && -x "$candidate/bin/omnivoice-server" ]]; then
+      OMNI_PY="$candidate/bin/python"
+      OMNI_BIN="$candidate/bin/omnivoice-server"
+      log "Using venv: $candidate"
+      return 0
+    else
+      warn "Venv $candidate exists but is missing python or omnivoice-server."
+    fi
+  fi
+
+  # Fall back to whatever is on PATH.
+  if command -v omnivoice-server >/dev/null 2>&1; then
+    OMNI_BIN="$(command -v omnivoice-server)"
+    OMNI_PY="$(command -v python3 || command -v python || true)"
+    warn "No venv detected — using PATH: $OMNI_BIN (python: ${OMNI_PY:-?})"
+    warn "  If imports/canary fail, pass --venv ~/.venvs/omnivoice"
+    return 0
+  fi
+
+  die "omnivoice-server not found. Install with scripts/install-omnivoice.sh, then re-run."
+}
+resolve_omnivoice_env
 
 # Wait for a URL to return 2xx/3xx; on failure, dump tail of given log file.
 wait_for_url() {
@@ -213,10 +266,13 @@ fi
 check_omnivoice_audio_canary() {
   # The WAV fix lives in omnivoice_server/utils/audio.py (the *server* package),
   # not omnivoice/utils/audio.py. Try server first, fall back to library.
+  # IMPORTANT: probe with the SAME python that runs omnivoice-server, not
+  # whatever `python3` resolves to on PATH (usually the system one without
+  # the package).
   local audio_path="" source=""
   for mod in omnivoice_server.utils.audio omnivoice.utils.audio; do
     local p
-    p="$(python3 -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
+    p="$("$OMNI_PY" -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
     if [[ -n "$p" && -f "$p" ]]; then
       audio_path="$p"
       source="$mod"
@@ -224,10 +280,11 @@ check_omnivoice_audio_canary() {
     fi
   done
   if [[ -z "$audio_path" ]]; then
-    warn "Could not locate omnivoice_server.utils.audio (or omnivoice.utils.audio)."
-    warn "  Is omnivoice-server installed for the active python? Try:"
-    warn "    pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
-    warn "    pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
+    warn "Could not locate omnivoice_server.utils.audio (or omnivoice.utils.audio)"
+    warn "  using interpreter $OMNI_PY."
+    warn "  Reinstall in that env:"
+    warn "    $OMNI_PY -m pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+    warn "    $OMNI_PY -m pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
     return 0
   fi
   if grep -q 'PCM_16' "$audio_path"; then
@@ -240,22 +297,27 @@ check_omnivoice_audio_canary() {
   warn "Upstream may have regressed the WAV-encoding fix → expect"
   warn "silent / broken WAV output from /v1/audio/speech*."
   warn ""
-  warn "Try reinstalling fresh upstream:"
-  warn "  pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
-  warn "  pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
+  warn "Try reinstalling fresh upstream into $OMNI_PY:"
+  warn "  $OMNI_PY -m pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
+  warn "  $OMNI_PY -m pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
   warn "============================================================"
 }
 check_omnivoice_audio_canary
 
 # -------- step 3: start omnivoice-server --------
+# Run the server from an isolated cwd ($OMNI_RUNTIME_DIR), NOT from the project
+# root. pydantic-settings auto-loads .env from cwd, and our project .env has
+# VITE_SUPABASE_* / SUPABASE_* keys that the server's strict Settings model
+# rejects with "Extra inputs are not permitted" → hard crash before /health
+# ever comes up.
 if curl -fsS --max-time 1 "$OMNI_BASE/health" >/dev/null 2>&1; then
   log "OmniVoice already running on :$OMNI_PORT, reusing."
 else
-  command -v omnivoice-server >/dev/null 2>&1 \
-    || die "omnivoice-server not found in PATH. Install: pip install omnivoice-server"
-  log "Starting omnivoice-server (cuda) → $OMNI_LOG"
+  mkdir -p "$OMNI_RUNTIME_DIR"
+  log "Starting omnivoice-server (cuda) from $OMNI_RUNTIME_DIR → $OMNI_LOG"
+  log "  binary: $OMNI_BIN"
   : > "$OMNI_LOG"
-  omnivoice-server --device cuda >>"$OMNI_LOG" 2>&1 &
+  ( cd "$OMNI_RUNTIME_DIR" && "$OMNI_BIN" --device cuda ) >>"$OMNI_LOG" 2>&1 &
   OMNI_PID=$!
   wait_for_url "$OMNI_BASE/health" "OmniVoice /health" 60 "$OMNI_LOG"
 fi
