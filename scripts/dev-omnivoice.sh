@@ -39,9 +39,10 @@ PROD_URL="https://booker-studio.lovable.app"
 
 # Substring that must appear in `pip show omnivoice-server` output (Home-page
 # or Project-URLs) to confirm the *patched fork* is installed instead of the
-# vanilla PyPI build. Override via env if you fork under a different name.
-#   export OMNI_FORK_MARKER="github.com/your-user/omnivoice-server"
-OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/.*/omnivoice-server}"
+# vanilla PyPI build. Override via env if you ever move the fork.
+#   export OMNI_FORK_MARKER="github.com/other-user/other-repo"
+OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/alexkuz60/BookerLab_OmniVoice}"
+OMNI_FORK_INSTALL_URL="git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches"
 
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
