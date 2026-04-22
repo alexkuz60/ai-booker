@@ -211,22 +211,31 @@ fi
 # (used `subtype="PCM_16"` via soundfile). If a future release ever reverts
 # that fix, /v1/audio/speech will silently produce broken WAVs. Catch it here.
 check_omnivoice_audio_canary() {
-  local audio_path
-  audio_path="$(python3 -c 'import omnivoice.utils.audio as a; print(a.__file__)' 2>/dev/null || true)"
-  if [[ -z "$audio_path" || ! -f "$audio_path" ]]; then
-    warn "Could not locate installed omnivoice/utils/audio.py."
-    warn "  Is omnivoice installed for the active python? Try:"
+  # The WAV fix lives in omnivoice_server/utils/audio.py (the *server* package),
+  # not omnivoice/utils/audio.py. Try server first, fall back to library.
+  local audio_path="" source=""
+  for mod in omnivoice_server.utils.audio omnivoice.utils.audio; do
+    local p
+    p="$(python3 -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
+    if [[ -n "$p" && -f "$p" ]]; then
+      audio_path="$p"
+      source="$mod"
+      break
+    fi
+  done
+  if [[ -z "$audio_path" ]]; then
+    warn "Could not locate omnivoice_server.utils.audio (or omnivoice.utils.audio)."
+    warn "  Is omnivoice-server installed for the active python? Try:"
     warn "    pip install --force-reinstall $OMNI_LIB_INSTALL_URL"
     warn "    pip install --force-reinstall $OMNI_SERVER_INSTALL_URL"
     return 0
   fi
   if grep -q 'PCM_16' "$audio_path"; then
-    log "omnivoice audio.py canary OK ✓ (PCM_16 present in $audio_path)"
+    log "omnivoice audio.py canary OK ✓ (PCM_16 present in $source → $audio_path)"
     return 0
   fi
   warn "============================================================"
-  warn "omnivoice/utils/audio.py is missing the 'PCM_16' marker."
-  warn "  File: $audio_path"
+  warn "$source ($audio_path) is missing the 'PCM_16' marker."
   warn ""
   warn "Upstream may have regressed the WAV-encoding fix → expect"
   warn "silent / broken WAV output from /v1/audio/speech*."
