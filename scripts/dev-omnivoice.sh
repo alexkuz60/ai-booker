@@ -20,11 +20,12 @@
 #                             so it can talk to http://127.0.0.1:8880
 #
 # Usage:
-#   ./scripts/dev-omnivoice.sh           # local dev (default)
-#   ./scripts/dev-omnivoice.sh --prod    # test against published booker-studio
-#   ./scripts/dev-omnivoice.sh --no-pull # skip git pull this run
-#
-# One Ctrl+C kills both background processes cleanly.
+#   ./scripts/dev-omnivoice.sh                       # local dev (default)
+#   ./scripts/dev-omnivoice.sh --prod                # test against published booker-studio
+#   ./scripts/dev-omnivoice.sh --no-pull             # skip git pull this run
+#   ./scripts/dev-omnivoice.sh --venv ~/.venvs/omni  # use a specific venv
+#                                                    # (auto-detects ~/.venvs/omnivoice
+#                                                    #  if --venv not given)
 #
 # History note (2026-04-22):
 #   We previously maintained a fork (alexkuz60/BookerLab_OmniVoice) to patch
