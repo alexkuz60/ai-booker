@@ -183,19 +183,29 @@ wait_for_url() {
 # Writes status + first ~200 chars of body to $PROBE_LOG.
 probe_endpoint() {
   local path="$1"
-  local mode="${2:-required}"
+  local mode="${2:-required}"          # required | optional
+  local kind="${3:-get}"               # get | post-only
   local url="$OMNI_BASE$path"
   local code body
   code="$(curl -s -o /tmp/booker-probe-body.$$ -w '%{http_code}' --max-time 5 "$url" || echo "000")"
   body="$(head -c 200 /tmp/booker-probe-body.$$ 2>/dev/null || true)"
   rm -f /tmp/booker-probe-body.$$
   {
-    printf "[%s] GET %s -> %s\n" "$(date +%H:%M:%S)" "$url" "$code"
+    printf "[%s] GET %s -> %s (kind=%s)\n" "$(date +%H:%M:%S)" "$url" "$code" "$kind"
     printf "    body[0..200]: %s\n" "$body"
   } >> "$PROBE_LOG"
 
+  # 2xx/3xx = healthy on any kind.
   if [[ "$code" =~ ^(2|3)[0-9][0-9]$ ]]; then
     log "  ✓ $path ($code)"
+    return 0
+  fi
+
+  # POST-only routes legitimately answer 405 (Method Not Allowed) or 422
+  # (Unprocessable: missing JSON body) to a probing GET. That proves the
+  # route is *registered and alive*, which is exactly what we want to know.
+  if [[ "$kind" == "post-only" && ( "$code" == "405" || "$code" == "422" ) ]]; then
+    log "  ✓ $path ($code, POST-only — route is alive)"
     return 0
   fi
 
