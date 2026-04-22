@@ -1,99 +1,47 @@
 ---
-name: OmniVoice fork workflow
-description: How we maintain a patched omnivoice-server fork (audio.py WAV fix) without losing the patch on upstream updates
-type: feature
+name: OmniVoice fork workflow (ARCHIVED)
+description: ARCHIVED 2026-04-22 — fork no longer needed; upstream k2-fsa fixed audio.py. Kept for historical context only.
+type: reference
 ---
 
-# OmniVoice Server — Fork Workflow
+# OmniVoice Server — Fork Workflow (ARCHIVED 2026-04-22)
 
-**Our fork:** https://github.com/alexkuz60/BookerLab_OmniVoice
-**Patch branch:** `booker-patches`
-**Upstream:** https://github.com/k2-fsa/omnivoice-server
+> **Status:** ARCHIVED. Do not use. Kept only as historical context.
+>
+> **Reason:** Upstream `k2-fsa/OmniVoice` fixed the `tensor_to_wav_bytes()` WAV
+> encoding bug in master (commit ~2026-04-22). The fork
+> `alexkuz60/BookerLab_OmniVoice` is no longer required.
+>
+> **Current install (vanilla, both upstreams):**
+>
+> ```bash
+> pip install --force-reinstall \
+>   "git+https://github.com/k2-fsa/OmniVoice.git" \
+>   "git+https://github.com/maemreyo/omnivoice-server.git@main"
+> ```
+>
+> **Regression canary:** `scripts/dev-omnivoice.sh` greps the installed
+> `omnivoice/utils/audio.py` for the `PCM_16` marker on every launch. If
+> upstream ever reverts the fix we'll see a loud warning and can re-fork.
+>
+> The original fork branch (`booker-patches`) can be archived/deleted on the
+> GitHub side.
 
-## Why we have a fork
+---
 
-The vanilla `omnivoice-server` package ships an `audio.py` whose
-`tensor_to_wav_bytes()` produces broken WAV output in some cases (multiple
-upstream issues open). We patched it locally by trial-and-error to:
+## Original (historical) content
 
-- always move tensor to CPU first
-- transpose `(channels, samples) → (samples, channels)` when needed
-- write 16-bit PCM WAV at 24 kHz via `soundfile`
-
-A plain `pip install -U omnivoice-server` silently overwrites this patch.
-To make the patch survive upgrades and be reproducible across machines we
-maintain the fork above and install from it.
-
-## One-time setup (already done — for reference / new machines)
-
-1. Fork created: `alexkuz60/BookerLab_OmniVoice`.
-2. Clone locally:
-   ```bash
-   git clone https://github.com/alexkuz60/BookerLab_OmniVoice.git
-   cd BookerLab_OmniVoice
-   git remote add upstream https://github.com/k2-fsa/omnivoice-server.git
-   git fetch upstream
-   ```
-3. Long-lived patch branch:
-   ```bash
-   git checkout -b booker-patches upstream/main
-   ```
-4. Apply the `audio.py` fix as **one focused commit**:
-   ```
-   fix(audio): correct WAV encoding in tensor_to_wav_bytes
-
-   Refs: <link-to-upstream-issue-1>, <link-to-upstream-issue-2>
-   See: .lovable/memory/tech/audio/omnivoice-audio-py-pr-template.md
-   ```
-   Keep the diff minimal — only the bytes that actually need to change.
-   This makes future rebases trivial.
-5. Push:
-   ```bash
-   git push -u origin booker-patches
-   ```
-
-## Install on a dev machine (replaces `pip install omnivoice-server`)
+We previously maintained `alexkuz60/BookerLab_OmniVoice@booker-patches` with a
+hand-written patch to `omnivoice/utils/audio.py` (`cpu()` + transpose +
+`sf.write(..., subtype="PCM_16")` at 24 kHz). The patch lived inside
+`omnivoice-server`'s submodule. We installed it via:
 
 ```bash
 pip install --force-reinstall \
   "git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches"
 ```
 
-`scripts/dev-omnivoice.sh` checks at startup whether the installed package
-points to our fork and prints a loud warning if it doesn't (e.g. after an
-accidental `pip install -U omnivoice-server`).
+`scripts/dev-omnivoice.sh` checked at startup that the installed package
+matched the fork marker and that `audio.py` actually contained `PCM_16`.
 
-## Periodic upstream sync (every ~2 weeks or when upstream releases)
-
-```bash
-cd BookerLab_OmniVoice
-git fetch upstream
-git checkout booker-patches
-git rebase upstream/main
-# resolve conflicts in audio.py if any
-git push --force-with-lease
-```
-
-If the rebase reports **no conflicts in `audio.py` and the file content matches
-upstream**, that means upstream has merged a fix → drop our commit and switch
-back to vanilla:
-
-```bash
-pip install --force-reinstall omnivoice-server
-# then archive the booker-patches branch
-```
-
-## Update checklist (when bumping the patched version)
-
-- [ ] `git fetch upstream && git rebase upstream/main` clean
-- [ ] `pip install --force-reinstall git+https://github.com/alexkuz60/BookerLab_OmniVoice.git@booker-patches`
-- [ ] `omnivoice-server --device cuda` starts
-- [ ] `scripts/dev-omnivoice.sh` reports "patched fork detected ✓" + all required probes pass
-- [ ] Voice Cloning round-trip in VoiceLab produces a playable WAV (no clicks/silence)
-- [ ] If upstream merged the fix → uninstall fork, document removal here
-
-## Files involved on our side
-
-- `scripts/dev-omnivoice.sh` — install-source check + warning (uses `OMNI_FORK_MARKER` / `OMNI_FORK_INSTALL_URL`)
-- `.lovable/memory/tech/audio/omnivoice-audio-py-pr-template.md` — PR description
-- `.lovable/memory/tech/audio/omnivoice-fork-workflow.md` — this file
+That whole layer was removed when upstream merged the equivalent fix.
