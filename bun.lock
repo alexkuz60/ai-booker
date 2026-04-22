@@ -2048,9 +2048,9 @@
 
     "core-js-compat/browserslist/caniuse-lite": ["caniuse-lite@1.0.30001788", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/caniuse-lite/-/caniuse-lite-1.0.30001788.tgz", {}, "sha512-6q8HFp+lOQtcf7wBK+uEenxymVWkGKkjFpCvw5W25cmMwEDU45p1xQFBQv8JDlMMry7eNxyBaR+qxgmTUZkIRQ=="],
 
-    "core-js-compat/browserslist/electron-to-chromium": ["electron-to-chromium@1.5.341", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/electron-to-chromium/-/electron-to-chromium-1.5.341.tgz", {}, "sha512-1sZTssferjgDgaqRTc0ieP+ozzpOy7LQTPTtEW3yQFn4+ORdIAZWV5BthXPyHF7YqLvFJCUPhNhdAJQYlYUgiw=="],
+    "core-js-compat/browserslist/electron-to-chromium": ["electron-to-chromium@1.5.343", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/electron-to-chromium/-/electron-to-chromium-1.5.343.tgz", {}, "sha512-YHnQ3MXI08icvL9ZKnEBy05F2EQ8ob01UaMOuMbM8l+4UcAq6MPPbBTJBbsBUg3H8JeZNt+O4fjsoWth3p6IFg=="],
 
-    "core-js-compat/browserslist/node-releases": ["node-releases@2.0.37", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/node-releases/-/node-releases-2.0.37.tgz", {}, "sha512-1h5gKZCF+pO/o3Iqt5Jp7wc9rH3eJJ0+nh/CIoiRwjRxde/hAHyLPXYN4V3CqKAbiZPSeJFSWHmJsbkicta0Eg=="],
+    "core-js-compat/browserslist/node-releases": ["node-releases@2.0.38", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/node-releases/-/node-releases-2.0.38.tgz", {}, "sha512-3qT/88Y3FbH/Kx4szpQQ4HzUbVrHPKTLVpVocKiLfoYvw9XSGOX2FmD2d6DrXbVYyAQTF2HeF6My8jmzx7/CRw=="],
 
     "core-js-compat/browserslist/update-browserslist-db": ["update-browserslist-db@1.2.3", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz", { "dependencies": { "escalade": "^3.2.0", "picocolors": "^1.1.1" }, "peerDependencies": { "browserslist": ">= 4.21.0" }, "bin": { "update-browserslist-db": "cli.js" } }, "sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w=="],
 
