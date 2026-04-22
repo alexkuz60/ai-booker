@@ -229,6 +229,93 @@ export function OmniVoiceModelsColumn({ isRu }: Props) {
         </CardContent>
       </Card>
 
+      {/* ── Каталог известных OmniVoice-чекпоинтов ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Music2 className="h-4 w-4 text-primary" />
+            {isRu ? "Каталог моделей OmniVoice" : "OmniVoice catalog"}
+            <Badge variant="outline" className="text-[10px] ml-auto">
+              {isRu ? "серверные" : "server-side"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            {isRu
+              ? "Сервер загружает один чекпоинт за раз. Переключение — флагом --model при запуске omnivoice-server."
+              : "The server loads one checkpoint at a time. Switch via --model when starting omnivoice-server."}
+          </p>
+          <div className="space-y-2">
+            {OMNIVOICE_CATALOG.map((m) => {
+              const active = health?.model_id === m.id;
+              return (
+                <div
+                  key={m.id}
+                  className={`rounded-md border p-3 transition-colors ${
+                    active
+                      ? "border-primary/60 bg-primary/5"
+                      : "border-border/60 bg-muted/20"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">
+                          {isRu ? m.label_ru : m.label_en}
+                        </p>
+                        {active && (
+                          <Badge className="text-[10px] h-5 bg-primary/15 text-primary border-primary/40 hover:bg-primary/20">
+                            {isRu ? "активна" : "active"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">
+                        {m.id}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {isRu ? m.desc_ru : m.desc_en}
+                      </p>
+                      {m.tags && m.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {m.tags.map((t) => (
+                            <Badge
+                              key={t}
+                              variant="outline"
+                              className="text-[10px] h-4 px-1.5 font-mono"
+                            >
+                              {t}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      title={isRu ? "Открыть на HuggingFace" : "Open on HuggingFace"}
+                    >
+                      <a href={m.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {serverOnline === true && health?.model_id && !OMNIVOICE_CATALOG.some(m => m.id === health.model_id) && (
+            <p className="text-[11px] text-muted-foreground italic">
+              {isRu
+                ? `Сервер сообщил неизвестный чекпоинт: ${health.model_id}. Добавьте его в OMNIVOICE_CATALOG, чтобы он отобразился как «активный».`
+                : `Server reported an unknown checkpoint: ${health.model_id}. Add it to OMNIVOICE_CATALOG to mark it as active.`}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Whisper STT в OPFS / IndexedDB ── */}
       <Card>
         <CardHeader className="pb-3">
