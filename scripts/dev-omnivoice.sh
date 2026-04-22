@@ -37,6 +37,12 @@ OMNI_BASE="http://$OMNI_HOST:$OMNI_PORT"
 VITE_PORT="8080"
 PROD_URL="https://booker-studio.lovable.app"
 
+# Substring that must appear in `pip show omnivoice-server` output (Home-page
+# or Project-URLs) to confirm the *patched fork* is installed instead of the
+# vanilla PyPI build. Override via env if you fork under a different name.
+#   export OMNI_FORK_MARKER="github.com/your-user/omnivoice-server"
+OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/.*/omnivoice-server}"
+
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
 SESSION_ID="$(date +%Y%m%d-%H%M%S)"
