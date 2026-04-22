@@ -37,6 +37,12 @@ OMNI_BASE="http://$OMNI_HOST:$OMNI_PORT"
 VITE_PORT="8080"
 PROD_URL="https://booker-studio.lovable.app"
 
+# Substring that must appear in `pip show omnivoice-server` output (Home-page
+# or Project-URLs) to confirm the *patched fork* is installed instead of the
+# vanilla PyPI build. Override via env if you fork under a different name.
+#   export OMNI_FORK_MARKER="github.com/your-user/omnivoice-server"
+OMNI_FORK_MARKER="${OMNI_FORK_MARKER:-github.com/.*/omnivoice-server}"
+
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
 SESSION_ID="$(date +%Y%m%d-%H%M%S)"
@@ -190,6 +196,45 @@ if [[ "$NEW_HASH" != "$OLD_HASH" ]]; then
 else
   log "Dependencies unchanged, skipping npm install."
 fi
+
+# -------- step 2b: verify patched fork is installed --------
+# We maintain a fork of omnivoice-server with a fix for audio.py
+# (tensor_to_wav_bytes WAV encoding). A plain `pip install -U omnivoice-server`
+# silently overwrites the patch — warn loudly so we don't lose hours debugging
+# silent/broken WAV output later.
+# See: .lovable/memory/tech/audio/omnivoice-fork-workflow.md
+check_omnivoice_fork() {
+  if ! command -v pip >/dev/null 2>&1; then
+    warn "pip not found, cannot verify omnivoice-server install source."
+    return 0
+  fi
+  local pip_show
+  pip_show="$(pip show omnivoice-server 2>/dev/null || true)"
+  if [[ -z "$pip_show" ]]; then
+    warn "omnivoice-server is not installed via pip (or not visible to current python)."
+    warn "  Install the patched fork:"
+    warn "    pip install --force-reinstall git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+    return 0
+  fi
+  if printf "%s\n" "$pip_show" | grep -Eiq "$OMNI_FORK_MARKER"; then
+    log "omnivoice-server: patched fork detected ✓"
+    return 0
+  fi
+  warn "============================================================"
+  warn "omnivoice-server appears to be the VANILLA PyPI build."
+  warn "The audio.py WAV-encoding patch is NOT applied → expect"
+  warn "silent / broken WAV output from /v1/audio/speech*."
+  warn ""
+  warn "Reinstall from our fork:"
+  warn "  pip install --force-reinstall \\"
+  warn "    git+https://github.com/<you>/omnivoice-server.git@booker-patches"
+  warn ""
+  warn "Workflow & PR template:"
+  warn "  .lovable/memory/tech/audio/omnivoice-fork-workflow.md"
+  warn "  .lovable/memory/tech/audio/omnivoice-audio-py-pr-template.md"
+  warn "============================================================"
+}
+check_omnivoice_fork
 
 # -------- step 3: start omnivoice-server --------
 if curl -fsS --max-time 1 "$OMNI_BASE/health" >/dev/null 2>&1; then
