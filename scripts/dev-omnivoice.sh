@@ -225,13 +225,13 @@ probe_omnivoice_api() {
   : > "$PROBE_LOG"
 
   local failed=0
-  # Required: server alive + at least one TTS-related route reachable.
-  probe_endpoint "/health"                     required || failed=1
-  probe_endpoint "/v1/audio/speech"            required || failed=1   # POST-only, but should answer (405/422), not 404/000
+  # Required: server alive + at least one TTS-related route registered.
+  probe_endpoint "/health"                     required get       || failed=1
+  probe_endpoint "/v1/audio/speech"            required post-only || failed=1
   # Optional: nice-to-have introspection routes (depends on server version).
-  probe_endpoint "/v1/voices"                  optional
-  probe_endpoint "/v1/models"                  optional
-  probe_endpoint "/v1/audio/speech/clone"      optional   # POST-only; 405/422 acceptable
+  probe_endpoint "/v1/voices"                  optional get
+  probe_endpoint "/v1/models"                  optional get
+  probe_endpoint "/v1/audio/speech/clone"      optional post-only
 
   if [[ "$failed" -ne 0 ]]; then
     warn "One or more REQUIRED OmniVoice endpoints failed. See $PROBE_LOG and $OMNI_LOG"
