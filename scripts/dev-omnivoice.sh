@@ -52,6 +52,17 @@ PROD_URL="https://booker-studio.lovable.app"
 OMNI_LIB_INSTALL_URL="git+https://github.com/k2-fsa/OmniVoice.git"
 OMNI_SERVER_INSTALL_URL="git+https://github.com/maemreyo/omnivoice-server.git@main"
 
+# Where omnivoice-server is installed. We auto-detect a venv so we don't run it
+# under the system python (which doesn't have the package).
+#   Priority: --venv <path>  >  $OMNIVOICE_VENV  >  ~/.venvs/omnivoice  >  PATH
+OMNIVOICE_VENV_DEFAULT="$HOME/.venvs/omnivoice"
+OMNIVOICE_VENV="${OMNIVOICE_VENV:-}"
+
+# Isolated cwd for omnivoice-server. We MUST NOT start it from $PROJECT_ROOT,
+# because pydantic-settings auto-loads .env from cwd and chokes on our
+# VITE_SUPABASE_* / SUPABASE_* keys ("Extra inputs are not permitted").
+OMNI_RUNTIME_DIR="${OMNI_RUNTIME_DIR:-$HOME/omnivoice-runtime}"
+
 # Logs root + per-session subdir (timestamped so each run is comparable)
 LOG_ROOT="/tmp/booker-dev"
 SESSION_ID="$(date +%Y%m%d-%H%M%S)"
