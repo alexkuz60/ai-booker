@@ -202,17 +202,36 @@ else
 fi
 
 # 4b. audio.py canary — the WAV-encoding fix marker
-AUDIO_PATH="$("$PY" -c 'import omnivoice.utils.audio as a; print(a.__file__)' 2>/dev/null || true)"
-if [[ -z "$AUDIO_PATH" || ! -f "$AUDIO_PATH" ]]; then
-  fail "omnivoice/utils/audio.py not found"
+#
+# The actual `tensor_to_wav_bytes` (the function we care about) lives in the
+# *server* package, not the library:
+#
+#   omnivoice_server/utils/audio.py      ← the one that matters (PCM_16 fix)
+#   omnivoice/utils/audio.py             ← library helper, unrelated
+#
+# We try the server module first, fall back to the library only if the server
+# isn't installed (--library-only).
+CANARY_PATH=""
+CANARY_SOURCE=""
+for mod in omnivoice_server.utils.audio omnivoice.utils.audio; do
+  p="$("$PY" -c "import $mod as a; print(a.__file__)" 2>/dev/null || true)"
+  if [[ -n "$p" && -f "$p" ]]; then
+    CANARY_PATH="$p"
+    CANARY_SOURCE="$mod"
+    break
+  fi
+done
+
+if [[ -z "$CANARY_PATH" ]]; then
+  fail "Neither omnivoice_server.utils.audio nor omnivoice.utils.audio could be located"
   VERIFY_FAILED=1
 else
-  if grep -q 'PCM_16' "$AUDIO_PATH"; then
-    ok "audio.py WAV-fix canary OK (PCM_16 present)"
-    printf "${C_DIM}     %s${C_RESET}\n" "$AUDIO_PATH"
+  if grep -q 'PCM_16' "$CANARY_PATH"; then
+    ok "audio.py WAV-fix canary OK (PCM_16 present in $CANARY_SOURCE)"
+    printf "${C_DIM}     %s${C_RESET}\n" "$CANARY_PATH"
   else
     fail "audio.py is MISSING the 'PCM_16' marker — WAV output will likely be broken"
-    printf "${C_DIM}     %s${C_RESET}\n" "$AUDIO_PATH"
+    printf "${C_DIM}     %s  (module: %s)${C_RESET}\n" "$CANARY_PATH" "$CANARY_SOURCE"
     warn "  Upstream may have regressed the fix. Try --pypi, or pin a known-good commit."
     VERIFY_FAILED=1
   fi
