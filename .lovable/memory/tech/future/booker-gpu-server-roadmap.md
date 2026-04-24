@@ -60,7 +60,7 @@ type: feature
 - `microphone_med` → `atten_lim_db=15`
 - `voice_reference_strong` → `atten_lim_db=30`
 
-**Day 2-5 — ✅ ЗАКРЫТ (2026-04-24)**:
+**Day 2-5 — ✅ ЗАКРЫТ + ЗАПУШЕН в origin/main (2026-04-24, commit `d7d75cb`)**:
 - `omnivoice_server/locks.py` — глобальный `MODEL_LOCK = asyncio.Lock()` (монопольный GPU)
 - `omnivoice_server/services/denoise.py` — singleton DenoiseService, lazy init, 5-мин idle release, 3 пресета, server-side resample через soxr
 - `omnivoice_server/routers/denoise.py` — `POST /v1/audio/denoise` (multipart + query: preset, sample_rate, atten_lim_db; response headers X-Snr-Improvement-Db, X-Processing-Ms, X-Output-Sample-Rate, X-Preset-Used)
