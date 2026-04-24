@@ -54,20 +54,24 @@ type: feature
 - `pip install deepfilternet soxr` — успешно
 - Smoke-test пройден: cold start 5.7s, VRAM idle 9 MB, realtime 18.2× на A4000
 - Auto-resample 24→48 kHz внутри DFNet работает
-- Минорные warnings (torchaudio.backend.common, sinc_interpolation, packaging 23.2) — косметика, не блокеры
 
 **Калибровка пресетов (на слух, 2026-04-24)**:
-- `atmo_light` → `atten_lim_db=10` — лёгкая чистка, минимальное вмешательство
-- `microphone_med` → `atten_lim_db=15` — заметная чистка, без искажений
-- `voice_reference_strong` → `atten_lim_db=30` — идеально чисто, без искажений (для клонирования)
+- `atmo_light` → `atten_lim_db=10`
+- `microphone_med` → `atten_lim_db=15`
+- `voice_reference_strong` → `atten_lim_db=30`
 
-**План Day 2-7 (в работе)**:
-1. Day 2 — `services/denoise.py` (singleton + lazy init + 5-мин idle release), `routers/denoise.py` (POST `/v1/audio/denoise`, multipart + query params), `locks.py` (глобальный MODEL_LOCK), patches в `app.py`/`speech.py`/`script.py`
-2. Day 3 — параметризация: `?preset=light|med|strong`, `?sample_rate=...` (default 48000, server-side resample через soxr), response headers (X-Snr-Improvement-Db, X-Processing-Ms, X-Output-Sample-Rate)
-3. Day 4 — `/v1/health/extended` (GPU/VRAM через pynvml + loaded_models[])
-4. Day 5 — pytest на 3 пресета + проверка query params + проверка lock contention (TTS → denoise → TTS sequence)
-5. Day 6 — клиентская интеграция (denoise() в `useOmniVoiceServer.ts`, кнопки в `VoiceReferenceManager`, `VoiceConversionTab`, atmo-панель Studio, mic recorder)
-6. Day 7 — полировка, доки
+**Day 2-5 — ✅ ЗАКРЫТ (2026-04-24)**:
+- `omnivoice_server/locks.py` — глобальный `MODEL_LOCK = asyncio.Lock()` (монопольный GPU)
+- `omnivoice_server/services/denoise.py` — singleton DenoiseService, lazy init, 5-мин idle release, 3 пресета, server-side resample через soxr
+- `omnivoice_server/routers/denoise.py` — `POST /v1/audio/denoise` (multipart + query: preset, sample_rate, atten_lim_db; response headers X-Snr-Improvement-Db, X-Processing-Ms, X-Output-Sample-Rate, X-Preset-Used)
+- `services/inference.py.synthesize()` — обёрнут в `async with MODEL_LOCK` (TTS speech/clone/script все защищены)
+- `app.py` — denoise router зарегистрирован
+- 8/8 pytest passed (`tests/test_denoise.py`): 3 пресета, unknown preset 422, resample 24kHz, atten override, empty upload, presets constant
+- Скрипт автоматизации: `scripts/apply_sprint1.sh` (idempotent, проверяет существующие импорты)
+
+**План Day 6-7 (далее)**:
+- Day 6 — клиентская интеграция (`denoise()` в `useOmniVoiceServer.ts`, кнопки в `VoiceReferenceManager`, `VoiceConversionTab`, atmo-панель Studio, mic recorder)
+- Day 7 — `/v1/health/extended` (GPU/VRAM через pynvml + loaded_models[]) + полировка + доки
 
 ## Sprint 1 API контракт (зафиксирован)
 
