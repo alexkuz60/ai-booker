@@ -13,14 +13,12 @@ const Home = () => {
       animate={{ opacity: 1 }}
       className="relative h-full overflow-hidden"
     >
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: `url(${heroImg})`,
-          backgroundSize: "auto 100%",
-          backgroundPosition: "center center",
-          backgroundRepeat: "no-repeat",
-        }}
+      <img
+        src={heroImg}
+        alt="AI Booker Studio"
+        className="absolute inset-0 h-full w-full object-contain object-center"
+        fetchPriority="high"
+        decoding="async"
       />
       <div className="absolute inset-0 bg-background/40" />
       <div className="relative z-10 flex flex-col justify-between h-full p-6 pt-5">
